@@ -15,6 +15,7 @@ db.exec(`
     created INTEGER NOT NULL DEFAULT (unixepoch())
   );
 `);
+try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch { /* already present */ }
 
 const jobs = db.prepare(`SELECT * FROM jobs ORDER BY id`).all();
 db.close();
@@ -24,6 +25,7 @@ const formatted = jobs.map(j => ({
   name: j.name,
   cron: j.cron,
   enabled: !!j.enabled,
+  notify: !!j.notify,
   last_run: j.last_run ? new Date(j.last_run * 1000).toISOString() : null,
   next_run: j.next_run ? new Date(j.next_run * 1000).toISOString() : null,
   payload: j.payload.slice(0, 80) + (j.payload.length > 80 ? '...' : ''),

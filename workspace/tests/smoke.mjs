@@ -470,6 +470,84 @@ function fail(label, reason) {
   finally { if (server) server.close(); }
 }
 
+// ---- 22. scheduler.add accepts --notify, scheduler.list surfaces it ----
+{
+  const label = 'scheduler.add: --notify false is persisted and surfaced by scheduler.list';
+  try {
+    const NAME = '__smoke_notify_flag';
+    // Add with notify=false
+    const r1 = spawnSync('node', [
+      path.join(WORKSPACE, 'tools/impl/scheduler.add.mjs'),
+      '--name', NAME, '--cron', '0 4 * * *',
+      '--payload', 'smoke notify test',
+      '--enabled', 'false', '--notify', 'false',
+    ], { encoding: 'utf8', timeout: 10_000 });
+    if (r1.status !== 0) throw new Error(`add failed: ${r1.stderr}`);
+    const added = JSON.parse(r1.stdout);
+    if (added.notify !== false) throw new Error(`add returned notify=${added.notify}, expected false`);
+
+    // List should show it with notify=false
+    const r2 = spawnSync('node', [path.join(WORKSPACE, 'tools/tools.mjs'), 'call', 'scheduler.list'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r2.status !== 0) throw new Error(`list failed: ${r2.stderr}`);
+    const jobs = JSON.parse(r2.stdout);
+    const found = jobs.find(j => j.name === NAME);
+    if (!found) throw new Error(`job ${NAME} not in list`);
+    if (found.notify !== false) throw new Error(`list returned notify=${found.notify}, expected false`);
+
+    // Re-add with default notify (omit flag) — should flip back to true
+    const r3 = spawnSync('node', [
+      path.join(WORKSPACE, 'tools/impl/scheduler.add.mjs'),
+      '--name', NAME, '--cron', '0 4 * * *',
+      '--payload', 'smoke notify test',
+      '--enabled', 'false',
+    ], { encoding: 'utf8', timeout: 10_000 });
+    if (r3.status !== 0) throw new Error(`re-add failed: ${r3.stderr}`);
+    const readded = JSON.parse(r3.stdout);
+    if (readded.notify !== true) throw new Error(`re-add returned notify=${readded.notify}, expected true (default)`);
+
+    // Cleanup: delete the row directly
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'scheduler/jobs.db'));
+    db.prepare(`DELETE FROM jobs WHERE name = ?`).run(NAME);
+    db.close();
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 23. facts(kind, key) UNIQUE index prevents duplicate rows ----
+{
+  const label = 'memory: UNIQUE index on facts(kind, key) exists and blocks direct duplicate inserts';
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    // Index is created by memory.mjs init on import (we triggered it via earlier tests).
+    const idx = db.prepare(
+      `SELECT name FROM sqlite_master WHERE type='index' AND name='facts_kind_key_uniq'`
+    ).get();
+    if (!idx) throw new Error('facts_kind_key_uniq index missing');
+
+    const KEY = '__smoke_uniq_index';
+    // Cleanup any leftovers
+    db.prepare(`DELETE FROM facts WHERE kind = 'preference' AND key = ?`).run(KEY);
+    db.prepare(
+      `INSERT INTO facts (kind, key, value, source) VALUES ('preference', ?, 'v1', 'smoke')`
+    ).run(KEY);
+    let threw = false;
+    try {
+      db.prepare(
+        `INSERT INTO facts (kind, key, value, source) VALUES ('preference', ?, 'v2', 'smoke')`
+      ).run(KEY);
+    } catch (e) {
+      threw = /UNIQUE|constraint/i.test(e.message);
+    }
+    db.prepare(`DELETE FROM facts WHERE kind = 'preference' AND key = ?`).run(KEY);
+    db.close();
+    if (!threw) throw new Error('second insert should have failed UNIQUE constraint');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

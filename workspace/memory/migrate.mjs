@@ -33,6 +33,11 @@ db.exec(`
   )
 `);
 
+// Long-term guard against re-introducing duplicates: enforce uniqueness at the DB
+// level. Only create the index once dedup above has cleared any existing dupes;
+// CREATE UNIQUE INDEX would otherwise fail with "UNIQUE constraint failed".
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS facts_kind_key_uniq ON facts(kind, key)`);
+
 const stmtFind   = db.prepare(`SELECT id FROM facts WHERE kind = ? AND key = ?`);
 const stmtInsert = db.prepare(
   `INSERT INTO facts (kind, key, value, source, confidence) VALUES (?, ?, ?, 'CLAUDE.md', 1.0)`

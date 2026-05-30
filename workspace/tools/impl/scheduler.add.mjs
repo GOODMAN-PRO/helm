@@ -13,6 +13,8 @@ const name    = get('name');
 const cron    = get('cron');
 const payload = get('payload');
 const enabled = get('enabled') === 'true' ? 1 : 0;
+// notify defaults to 1 (on) — pass --notify false to silence completion DMs.
+const notify  = get('notify') === 'false' ? 0 : 1;
 
 if (!name || !cron || !payload) {
   console.error('--name, --cron, and --payload required');
@@ -36,17 +38,19 @@ db.exec(`
     created INTEGER NOT NULL DEFAULT (unixepoch())
   );
 `);
+// Idempotent: ensure notify column exists (matches scheduler.mjs runtime upgrade).
+try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch { /* already present */ }
 
 const existing = db.prepare(`SELECT id FROM jobs WHERE name = ?`).get(name);
 if (existing) {
   db.prepare(
-    `UPDATE jobs SET cron=?, payload=?, enabled=?, next_run=? WHERE name=?`
-  ).run(cron, payload, enabled, next ? Math.floor(next.getTime()/1000) : null, name);
-  console.log(JSON.stringify({ action: 'updated', name, cron, enabled: !!enabled, next_run: next?.toISOString() }));
+    `UPDATE jobs SET cron=?, payload=?, enabled=?, next_run=?, notify=? WHERE name=?`
+  ).run(cron, payload, enabled, next ? Math.floor(next.getTime()/1000) : null, notify, name);
+  console.log(JSON.stringify({ action: 'updated', name, cron, enabled: !!enabled, notify: !!notify, next_run: next?.toISOString() }));
 } else {
   const r = db.prepare(
-    `INSERT INTO jobs (name, cron, payload, enabled, next_run) VALUES (?,?,?,?,?)`
-  ).run(name, cron, payload, enabled, next ? Math.floor(next.getTime()/1000) : null);
-  console.log(JSON.stringify({ action: 'inserted', id: r.lastInsertRowid, name, cron, enabled: !!enabled, next_run: next?.toISOString() }));
+    `INSERT INTO jobs (name, cron, payload, enabled, next_run, notify) VALUES (?,?,?,?,?,?)`
+  ).run(name, cron, payload, enabled, next ? Math.floor(next.getTime()/1000) : null, notify);
+  console.log(JSON.stringify({ action: 'inserted', id: r.lastInsertRowid, name, cron, enabled: !!enabled, notify: !!notify, next_run: next?.toISOString() }));
 }
 db.close();

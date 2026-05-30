@@ -48,6 +48,9 @@ try { db.exec(`ALTER TABLE facts ADD COLUMN evidence_count INTEGER NOT NULL DEFA
 try { db.exec(`ALTER TABLE facts ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0`); } catch {}
 // Backfill last_seen on rows that pre-date the column.
 db.exec(`UPDATE facts SET last_seen = COALESCE(NULLIF(last_seen, 0), updated)`);
+// Long-term guard against (kind, key) duplicates. Skip if existing rows already
+// violate uniqueness — migrate.mjs handles the dedup-then-create path.
+try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS facts_kind_key_uniq ON facts(kind, key)`); } catch {}
 
 const [,, verb, ...rest] = process.argv;
 

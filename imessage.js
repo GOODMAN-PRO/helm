@@ -169,10 +169,12 @@ function newMessages(sinceRowId) {
   }
   // Dedicated Helm Apple ID: the owner texts Helm from their own phone, so the messages
   // we care about are INCOMING (is_from_me = 0) from the owner's personal handle.
+  // Coerce to integer defensively — chat.db is read via sqlite3 CLI (no parameter binding here).
+  const safeSince = Math.max(0, Math.floor(Number(sinceRowId) || 0));
   const sql =
     `SELECT m.ROWID, COALESCE(m.text,''), hex(m.attributedBody), h.id ` +
     `FROM message m JOIN handle h ON m.handle_id = h.ROWID ` +
-    `WHERE m.is_from_me = 0 AND m.ROWID > ${sinceRowId} ` +
+    `WHERE m.is_from_me = 0 AND m.ROWID > ${safeSince} ` +
     `ORDER BY m.ROWID ASC;`;
   const r = spawnSync('/usr/bin/sqlite3', ['-readonly', '-separator', '', tmp, sql], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error((r.stderr || 'sqlite read failed').trim());

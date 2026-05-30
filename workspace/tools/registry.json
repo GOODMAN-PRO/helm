@@ -103,7 +103,8 @@
       "name":    { "type": "string", "required": true },
       "cron":    { "type": "string", "required": true, "description": "5-field cron: min hour dom month dow" },
       "payload": { "type": "string", "required": true, "description": "Natural-language goal or shell command" },
-      "enabled": { "type": "boolean", "default": false }
+      "enabled": { "type": "boolean", "default": false },
+      "notify":  { "type": "boolean", "default": true, "description": "DM owner with the job result when it finishes. Set false for silent housekeeping jobs." }
     },
     "requires": [],
     "side_effects": "writes to jobs.db",
