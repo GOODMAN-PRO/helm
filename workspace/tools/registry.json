@@ -348,5 +348,30 @@
     "requires": ["whisper.cpp (brew install whisper-cpp — ask owner before installing)"],
     "side_effects": "none",
     "confirm": false
+  },
+  {
+    "name": "vision.describe",
+    "summary": "Take a screenshot and use Claude to describe what is visible on screen.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/vision.mjs describe",
+    "args_schema": {
+      "out":   { "type": "string", "description": "Output path for temp screenshot PNG. Default: /tmp/helm-vision.png" },
+      "scale": { "type": "number", "description": "Retina display scale factor (pixels÷scale = points). Default: 2" }
+    },
+    "requires": ["Screen Recording permission", "claude CLI in PATH"],
+    "side_effects": "writes temp PNG; makes a Claude API call via claude -p",
+    "confirm": false
+  },
+  {
+    "name": "vision.find",
+    "summary": "Take a screenshot and use Claude to locate a UI element; returns its center {x,y} in points for gui.click.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/vision.mjs find",
+    "args_schema": {
+      "query": { "type": "string", "required": true, "description": "Description of the UI element to find, e.g. 'Submit button'" },
+      "out":   { "type": "string", "description": "Output path for temp screenshot PNG. Default: /tmp/helm-vision.png" },
+      "scale": { "type": "number", "description": "Retina display scale factor (pixels÷scale = points). Default: 2" }
+    },
+    "requires": ["Screen Recording permission", "claude CLI in PATH"],
+    "side_effects": "writes temp PNG; makes a Claude API call via claude -p",
+    "confirm": false
   }
 ]

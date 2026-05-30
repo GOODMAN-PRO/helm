@@ -363,6 +363,24 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 18. vision: tools registered and module importable without screenshot ----
+{
+  const label = 'vision: vision.describe + vision.find registered; module imports without taking a screenshot';
+  try {
+    const r = spawnSync('node', [path.join(WORKSPACE, 'tools/tools.mjs'), 'list'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`tools list failed: ${r.stderr}`);
+    const tools = JSON.parse(r.stdout);
+    const names = tools.map(t => t.name);
+    for (const n of ['vision.describe', 'vision.find']) {
+      if (!names.includes(n)) throw new Error(`vision tool missing from registry: ${n}`);
+    }
+    // Module must import cleanly without taking a real screenshot (main() is gated behind argv check)
+    await import(path.join(WORKSPACE, 'tools/impl/vision.mjs'));
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
