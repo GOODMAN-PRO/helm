@@ -98,12 +98,12 @@ try {
       '--- QUEUE.md ---',
       queue,
     ].join('\n');
-    log('running claude self-improvement (up to 90 min)...');
+    log('running claude self-improvement (up to ~4.5h; nightly 00:00-05:00 window)...');
     const cl = spawnSync(CLAUDE_BIN, [
       '-p', '--output-format', 'json', '--model', MODEL,
       '--permission-mode', 'bypassPermissions', '--add-dir', ROOT,
       '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-    ], { cwd: ROOT, input: prompt, encoding: 'utf8', timeout: 90 * 60_000, maxBuffer: 128 * 1024 * 1024 });
+    ], { cwd: ROOT, input: prompt, encoding: 'utf8', timeout: 270 * 60_000, maxBuffer: 256 * 1024 * 1024 });
     try { summary = (JSON.parse(cl.stdout).result || '').trim(); } catch { summary = (cl.stdout || cl.stderr || '').trim().slice(-1500); }
     log(`claude exit ${cl.status}`);
   }

@@ -27,3 +27,8 @@ bin/ocr-helper
 
 # self-upgrade lock
 .upgrade.lock
+
+# background cognition (derived/state)
+workspace/think/journal/
+workspace/think/.think.lock
+workspace/memory/INDEX.md
