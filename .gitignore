@@ -9,7 +9,8 @@ node_modules/
 # session + run artifacts
 workspace/.sessions.json
 workspace/.imessage-sessions.json
-workspace/runs/
+workspace/runs/*
+!workspace/runs/*.mjs
 workspace/browser-profile/
 
 # captured media (screenshots, audio, ocr buffers)

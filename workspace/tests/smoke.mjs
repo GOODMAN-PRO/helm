@@ -340,6 +340,29 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 17. browser tools: tools list includes browser.open; modules import without browser launch ----
+{
+  const label = 'browser: tools list includes browser.open; modules load without launching a browser';
+  try {
+    // Part 1: tools list
+    const r = spawnSync('node', [path.join(WORKSPACE, 'tools/tools.mjs'), 'list'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`tools list failed: ${r.stderr}`);
+    const tools = JSON.parse(r.stdout);
+    const names = tools.map(t => t.name);
+    for (const n of ['browser.open', 'browser.read', 'browser.click', 'browser.fill', 'browser.screenshot']) {
+      if (!names.includes(n)) throw new Error(`browser tool missing from list: ${n}`);
+    }
+
+    // Part 2: each module must import cleanly without launching chromium
+    const implDir = path.join(WORKSPACE, 'tools/impl');
+    for (const f of ['browser.open', 'browser.read', 'browser.click', 'browser.fill', 'browser.screenshot']) {
+      await import(path.join(implDir, `${f}.mjs`));
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
