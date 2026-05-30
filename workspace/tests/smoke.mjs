@@ -363,6 +363,24 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 18. MCP: servers.json is valid JSON with at least one server; index.js references it ----
+{
+  const label = 'MCP: workspace/mcp/servers.json is valid JSON with >= 1 server; index.js references it';
+  try {
+    const configPath = path.join(ROOT, 'workspace/mcp/servers.json');
+    if (!existsSync(configPath)) throw new Error('workspace/mcp/servers.json not found');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    if (!config.mcpServers || typeof config.mcpServers !== 'object')
+      throw new Error('mcpServers key missing or not an object');
+    if (Object.keys(config.mcpServers).length < 1)
+      throw new Error('at least one server required in mcpServers');
+    const src = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!src.includes('workspace/mcp/servers.json'))
+      throw new Error('index.js does not reference workspace/mcp/servers.json');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
