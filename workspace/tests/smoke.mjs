@@ -236,6 +236,110 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 13. memory consolidation script is runnable and idempotent ----
+{
+  const label = 'memory/consolidate.mjs: dry-run + live run succeed and preserve owner facts';
+  try {
+    // Pre/post fact count of CLAUDE.md-sourced rows must be unchanged (those never decay/prune).
+    const before = JSON.parse(spawnSync('node',
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'dump'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout)
+      .filter(f => f.source === 'CLAUDE.md').length;
+
+    const dry = spawnSync('node',
+      [path.join(WORKSPACE, 'memory/consolidate.mjs'), '--dry-run'],
+      { encoding: 'utf8', timeout: 15_000 });
+    if (dry.status !== 0) throw new Error(`dry-run failed: ${dry.stderr}`);
+    const dryReport = JSON.parse(dry.stdout);
+    if (dryReport.dry_run !== true) throw new Error('dry_run flag not echoed');
+
+    const live = spawnSync('node',
+      [path.join(WORKSPACE, 'memory/consolidate.mjs')],
+      { encoding: 'utf8', timeout: 15_000 });
+    if (live.status !== 0) throw new Error(`live run failed: ${live.stderr}`);
+
+    const after = JSON.parse(spawnSync('node',
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'dump'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout)
+      .filter(f => f.source === 'CLAUDE.md').length;
+    if (after !== before) throw new Error(`CLAUDE.md facts changed: ${before} → ${after}`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 14. active learning: evidence_count rises on repeat, provisional cap on first observe ----
+{
+  const label = 'memory.remember: observed first-write capped at 0.7, repeat increments evidence_count';
+  try {
+    const KEY = '__smoke_active_learn';
+    // ensure clean state
+    const cleanup = () => {
+      const d = JSON.parse(spawnSync('node',
+        [path.join(WORKSPACE, 'memory/memory.mjs'), 'dump', '--kind', 'preference'],
+        { encoding: 'utf8', timeout: 10_000 }).stdout);
+      for (const r of d.filter(x => x.key === KEY)) {
+        spawnSync('node',
+          [path.join(WORKSPACE, 'memory/memory.mjs'), 'forget', String(r.id)],
+          { encoding: 'utf8', timeout: 5_000 });
+      }
+    };
+    cleanup();
+
+    const r1 = JSON.parse(spawnSync('node', [
+      path.join(WORKSPACE, 'memory/memory.mjs'), 'remember', 'preference', KEY, 'v1',
+      '--source', 'observed', '--confidence', '0.95',
+    ], { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (r1.evidence_count !== 1) throw new Error(`expected evidence_count 1, got ${r1.evidence_count}`);
+    if (r1.confidence > 0.71) throw new Error(`first observation should cap conf <=0.7, got ${r1.confidence}`);
+
+    const r2 = JSON.parse(spawnSync('node', [
+      path.join(WORKSPACE, 'memory/memory.mjs'), 'remember', 'preference', KEY, 'v1',
+      '--source', 'observed', '--confidence', '0.95',
+    ], { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (r2.evidence_count !== 2) throw new Error(`expected evidence_count 2 on repeat, got ${r2.evidence_count}`);
+    if (r2.confidence <= r1.confidence) throw new Error(`repeat should raise confidence (${r1.confidence} → ${r2.confidence})`);
+    cleanup();
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 15. unsure verb returns array of low-confidence preferences ----
+{
+  const label = 'memory.mjs unsure: returns JSON array filtered by threshold';
+  try {
+    const r = spawnSync('node',
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'unsure', '--threshold', '1.0'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`exit ${r.status}: ${r.stderr}`);
+    const arr = JSON.parse(r.stdout);
+    if (!Array.isArray(arr)) throw new Error('output is not an array');
+    if (arr.some(x => x.kind !== 'preference')) throw new Error('returned non-preference row');
+    if (arr.some(x => x.confidence >= 1.0)) throw new Error('threshold not respected');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 16. recall output shape unchanged (semantic blend preserves keys) ----
+{
+  const label = 'memory.mjs recall: output shape includes the original fact columns';
+  try {
+    const r = spawnSync('node',
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'example query'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`exit ${r.status}: ${r.stderr}`);
+    const arr = JSON.parse(r.stdout);
+    if (!arr.length) throw new Error('no results');
+    const first = arr[0];
+    for (const k of ['id', 'kind', 'key', 'value', 'confidence', 'updated']) {
+      if (!(k in first)) throw new Error(`missing key in recall result: ${k}`);
+    }
+    for (const k of ['_score', '_k', '_s']) {
+      if (k in first) throw new Error(`internal scoring key ${k} leaked to output`);
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

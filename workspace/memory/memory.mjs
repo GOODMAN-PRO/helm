@@ -43,6 +43,11 @@ db.exec(`
     PRIMARY KEY (from_id, to_id, kind)
   );
 `);
+// Active-learning columns. Idempotent: ignore "duplicate column" errors on re-run.
+try { db.exec(`ALTER TABLE facts ADD COLUMN evidence_count INTEGER NOT NULL DEFAULT 1`); } catch {}
+try { db.exec(`ALTER TABLE facts ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0`); } catch {}
+// Backfill last_seen on rows that pre-date the column.
+db.exec(`UPDATE facts SET last_seen = COALESCE(NULLIF(last_seen, 0), updated)`);
 
 const [,, verb, ...rest] = process.argv;
 
@@ -70,21 +75,48 @@ switch (verb) {
     const value = valueParts.join(' ');
     if (!kind || !key || !value) die('usage: remember <kind> <key> <value>');
 
+    const source = flags.source ?? null;
+    const reqConf = parseFloat(flags.confidence ?? 1);
+    const force = flags.force === true || flags.force === 'true';
+    // Active learning: a single observation is provisional. Confidence only rises with
+    // independent repeats. `--force` (or non-observed sources) bypass the cap.
+    const isObserved = source === 'observed' && !force;
+    const PROVISIONAL_CAP = 0.7;
+
     const existing = db.prepare(
-      `SELECT id FROM facts WHERE kind = ? AND key = ?`
+      `SELECT id, value, confidence, evidence_count FROM facts WHERE kind = ? AND key = ?`
     ).get(kind, key);
 
     if (existing) {
+      const sameValue = existing.value === value;
+      let evidence = existing.evidence_count || 1;
+      let newConf;
+      if (sameValue) {
+        evidence += 1;
+        if (isObserved) {
+          // Independent repeat — let confidence rise toward requested, ratchet only upward.
+          newConf = Math.max(existing.confidence, Math.min(reqConf, PROVISIONAL_CAP + 0.05 * (evidence - 1)));
+        } else {
+          newConf = Math.max(existing.confidence, reqConf);
+        }
+      } else {
+        // Value changed — treat as a new observation; reset evidence and cap if observed.
+        evidence = 1;
+        newConf = isObserved ? Math.min(reqConf, PROVISIONAL_CAP) : reqConf;
+      }
       db.prepare(
-        `UPDATE facts SET value = ?, source = ?, confidence = ?, updated = unixepoch()
+        `UPDATE facts SET value = ?, source = ?, confidence = ?, evidence_count = ?,
+                          last_seen = unixepoch(), updated = unixepoch()
          WHERE id = ?`
-      ).run(value, flags.source ?? null, parseFloat(flags.confidence ?? 1), existing.id);
-      out({ action: 'updated', id: existing.id, kind, key, value });
+      ).run(value, source, newConf, evidence, existing.id);
+      out({ action: 'updated', id: existing.id, kind, key, value, confidence: newConf, evidence_count: evidence });
     } else {
+      const conf = isObserved ? Math.min(reqConf, PROVISIONAL_CAP) : reqConf;
       const r = db.prepare(
-        `INSERT INTO facts (kind, key, value, source, confidence) VALUES (?, ?, ?, ?, ?)`
-      ).run(kind, key, value, flags.source ?? null, parseFloat(flags.confidence ?? 1));
-      out({ action: 'inserted', id: r.lastInsertRowid, kind, key, value });
+        `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen)
+         VALUES (?, ?, ?, ?, ?, 1, unixepoch())`
+      ).run(kind, key, value, source, conf);
+      out({ action: 'inserted', id: r.lastInsertRowid, kind, key, value, confidence: conf, evidence_count: 1 });
     }
     break;
   }
@@ -93,32 +125,93 @@ switch (verb) {
     const { flags, pos } = parseFlags(rest);
     const query = pos.join(' ');
     const limit = parseInt(flags.limit ?? 20, 10);
+    const keywordOnly = flags['keyword-only'] === true || flags['keyword-only'] === 'true';
 
-    // Keyword + recency ranking.
-    // Split query into words, score each fact by how many words appear in key+value.
     const allFacts = db.prepare(
       `SELECT * FROM facts ORDER BY updated DESC, confidence DESC LIMIT 500`
     ).all();
 
-    const words = (query || '').toLowerCase().split(/\s+/).filter(Boolean);
-    // Stem each query word by stripping trailing 's'/'ing'/'ed' for simple plurals/conjugations.
-    const stems = words.map(w => w.replace(/(?:ing|ed|s)$/, '').replace(/ies$/, 'y') || w);
-    const scored = allFacts.map(f => {
+    const STOP = new Set(['the','a','an','of','to','in','on','for','and','or','is','are','be',
+      'was','were','it','this','that','with','as','by','at','from','do','does','did','i','you','my']);
+    const tokenize = s => (s || '').toLowerCase().match(/[a-z0-9]+/g)?.filter(w => w.length > 1 && !STOP.has(w)) || [];
+    const stem = w => w.replace(/ies$/, 'y').replace(/(?:ing|ed|s)$/, '') || w;
+
+    const qTokens = tokenize(query);
+    const qStems  = qTokens.map(stem);
+
+    // Keyword score: fraction of query words that appear (substring or stem) in the fact.
+    const keywordScore = f => {
+      if (!qTokens.length) return 1;
       const haystack = `${f.kind} ${f.key} ${f.value}`.toLowerCase();
       let hits = 0;
-      for (let i = 0; i < words.length; i++) {
-        if (haystack.includes(words[i]) || (stems[i] && haystack.includes(stems[i]))) hits++;
+      for (let i = 0; i < qTokens.length; i++) {
+        if (haystack.includes(qTokens[i]) || haystack.includes(qStems[i])) hits++;
       }
-      return { ...f, _score: words.length ? hits / words.length : 1 };
+      return hits / qTokens.length;
+    };
+
+    // Semantic-ish score: TF-IDF cosine over stemmed bag-of-words across the corpus.
+    // A real embedding model would slot in here (tryLoadEmbedder()), but it isn't
+    // bundled — TF-IDF gives meaning-aware ranking using only the local corpus.
+    let semScore = () => 0;
+    if (!keywordOnly && qStems.length && allFacts.length >= 3) {
+      const docs = allFacts.map(f => tokenize(`${f.kind} ${f.key} ${f.value}`).map(stem));
+      const df = new Map();
+      for (const doc of docs) for (const w of new Set(doc)) df.set(w, (df.get(w) || 0) + 1);
+      const N = docs.length;
+      const idf = w => Math.log(1 + N / (1 + (df.get(w) || 0)));
+      const vec = toks => {
+        const tf = new Map();
+        for (const w of toks) tf.set(w, (tf.get(w) || 0) + 1);
+        const v = new Map();
+        for (const [w, c] of tf) v.set(w, c * idf(w));
+        return v;
+      };
+      const cosine = (a, b) => {
+        if (!a.size || !b.size) return 0;
+        let dot = 0, na = 0, nb = 0;
+        for (const [, x] of a) na += x * x;
+        for (const [, x] of b) nb += x * x;
+        const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+        for (const [w, x] of small) { const y = big.get(w); if (y) dot += x * y; }
+        return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+      };
+      const qVec = vec(qStems);
+      const docVecs = docs.map(vec);
+      semScore = (_, i) => cosine(qVec, docVecs[i]);
+    }
+
+    const scored = allFacts.map((f, i) => {
+      const k = keywordScore(f);
+      const s = semScore(f, i);
+      // Blend: keyword dominates when query terms appear verbatim; semantic surfaces
+      // related facts when none of the literal words match. Take the stronger signal.
+      const score = Math.max(k, s * 0.9);
+      return { ...f, _score: score, _k: k, _s: s };
     });
 
     const results = scored
-      .filter(f => !words.length || f._score > 0)
-      .sort((a, b) => b._score - a._score || b.updated - a.updated)
+      .filter(f => !qTokens.length || f._score > 0.01)
+      .sort((a, b) => b._score - a._score || (b.confidence - a.confidence) || (b.updated - a.updated))
       .slice(0, limit)
-      .map(({ _score, ...f }) => f);
+      .map(({ _score, _k, _s, ...f }) => f);
 
     out(results);
+    break;
+  }
+
+  case 'unsure': {
+    // List preferences whose confidence is below the threshold — the ones Helm should
+    // confirm with the owner before relying on them.
+    const { flags } = parseFlags(rest);
+    const threshold = parseFloat(flags.threshold ?? 0.7);
+    const rows = db.prepare(
+      `SELECT id, kind, key, value, confidence, evidence_count, last_seen, source
+         FROM facts
+        WHERE kind = 'preference' AND confidence < ?
+        ORDER BY confidence ASC, last_seen ASC`
+    ).all(threshold);
+    out(rows);
     break;
   }
 
@@ -162,7 +255,7 @@ switch (verb) {
   }
 
   default:
-    die('verbs: remember | recall | forget | dump | episode');
+    die('verbs: remember | recall | forget | dump | episode | unsure');
 }
 
 db.close();
