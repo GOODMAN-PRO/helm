@@ -340,6 +340,129 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 17. plans subsystem: create → add-step → next → complete → show round-trip ----
+{
+  const label = 'plans/plan.mjs: create → add-step → next → complete → show round-trip';
+  try {
+    const PLAN = path.join(WORKSPACE, 'plans/plan.mjs');
+
+    // Delete the test DB before to keep the test hermetic.
+    const DB = path.join(WORKSPACE, 'plans/plans.db');
+    const { unlinkSync, existsSync: exists } = await import('node:fs');
+    if (exists(DB)) unlinkSync(DB);
+
+    // create
+    const rCreate = spawnSync('node', [PLAN, 'create', 'smoke test goal'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rCreate.status !== 0) throw new Error(`create failed: ${rCreate.stderr}`);
+    const plan = JSON.parse(rCreate.stdout);
+    if (!plan.id || plan.status !== 'active') throw new Error(`bad plan shape: ${rCreate.stdout}`);
+
+    // add-step
+    const rStep = spawnSync('node', [PLAN, 'add-step', String(plan.id), 'do the thing', '--tool', 'echo ok'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rStep.status !== 0) throw new Error(`add-step failed: ${rStep.stderr}`);
+    const step = JSON.parse(rStep.stdout);
+    if (!step.id || step.status !== 'pending' || step.tool_or_cmd !== 'echo ok')
+      throw new Error(`bad step shape: ${rStep.stdout}`);
+
+    // next
+    const rNext = spawnSync('node', [PLAN, 'next', String(plan.id)],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rNext.status !== 0) throw new Error(`next failed: ${rNext.stderr}`);
+    const nextObj = JSON.parse(rNext.stdout);
+    if (!nextObj.step || nextObj.step.id !== step.id)
+      throw new Error(`next returned wrong step: ${rNext.stdout}`);
+
+    // complete
+    const rComplete = spawnSync('node', [
+      PLAN, 'complete', String(plan.id), String(step.id),
+      '--result', 'smoke passed', '--checkpoint', 'ckpt-1',
+    ], { encoding: 'utf8', timeout: 10_000 });
+    if (rComplete.status !== 0) throw new Error(`complete failed: ${rComplete.stderr}`);
+    const completed = JSON.parse(rComplete.stdout);
+    if (completed.status !== 'done' || completed.result !== 'smoke passed')
+      throw new Error(`bad complete result: ${rComplete.stdout}`);
+
+    // show — plan should now be done (all steps complete)
+    const rShow = spawnSync('node', [PLAN, 'show', String(plan.id)],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rShow.status !== 0) throw new Error(`show failed: ${rShow.stderr}`);
+    const shown = JSON.parse(rShow.stdout);
+    if (shown.status !== 'done') throw new Error(`plan not done after complete: ${rShow.stdout}`);
+    if (!Array.isArray(shown.steps) || shown.steps.length !== 1)
+      throw new Error(`bad steps array in show: ${rShow.stdout}`);
+
+    // list — must include the plan
+    const rList = spawnSync('node', [PLAN, 'list'], { encoding: 'utf8', timeout: 10_000 });
+    if (rList.status !== 0) throw new Error(`list failed: ${rList.stderr}`);
+    const list = JSON.parse(rList.stdout);
+    if (!Array.isArray(list) || !list.some(p => p.id === plan.id))
+      throw new Error(`plan not in list: ${rList.stdout}`);
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 18. dashboard/server.mjs: syntax check and GET / returns HTTP 200 ----
+{
+  const label = 'dashboard/server.mjs: syntax check and GET / returns HTTP 200';
+  try {
+    const SERVER = path.join(WORKSPACE, 'dashboard/server.mjs');
+    if (!existsSync(SERVER)) throw new Error('server.mjs missing');
+
+    // syntax check
+    const rCheck = spawnSync('node', ['--check', SERVER], { encoding: 'utf8', timeout: 10_000 });
+    if (rCheck.status !== 0) throw new Error(`syntax error: ${rCheck.stderr}`);
+
+    // pre-import async modules before using them in sync callbacks
+    const { createServer: netServer } = await import('node:net');
+    const { spawn: spawnProc } = await import('node:child_process');
+    const { request: httpRequest } = await import('node:http');
+
+    // find a free ephemeral port
+    const port = await new Promise((res, rej) => {
+      const probe = netServer();
+      probe.listen(0, '127.0.0.1', () => { const p = probe.address().port; probe.close(() => res(p)); });
+      probe.on('error', rej);
+    });
+
+    // start server on ephemeral port and GET /
+    await new Promise((resolve, reject) => {
+      const child = spawnProc('node', [SERVER], {
+        env: { ...process.env, PORT: String(port) },
+        stdio: 'pipe',
+      });
+      let settled = false;
+      const done = (err) => {
+        if (settled) return;
+        settled = true;
+        child.kill();
+        if (err) reject(err); else resolve();
+      };
+      child.on('error', done);
+      const tryFetch = (attempts) => {
+        if (attempts <= 0) return done(new Error('server never became ready'));
+        setTimeout(() => {
+          const req = httpRequest(
+            { hostname: '127.0.0.1', port, path: '/', method: 'GET' },
+            res => {
+              if (res.statusCode !== 200) return done(new Error(`GET / returned ${res.statusCode}`));
+              res.resume();
+              res.on('end', () => done(null));
+            }
+          );
+          req.on('error', () => tryFetch(attempts - 1));
+          req.end();
+        }, 200);
+      };
+      tryFetch(15);
+    });
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
