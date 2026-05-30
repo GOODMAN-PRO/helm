@@ -72,8 +72,9 @@ function fireJob(job) {
 
   const persona =
     'You are Helm, running a scheduled background job. ' +
-    'Workspace is available. Act on the goal, keep output concise. ' +
-    'No emojis, no preamble. Confirm before anything destructive or money-spending.';
+    'Workspace is available; you have full authority over this Mac. Act on the goal, keep output concise. ' +
+    'No emojis, no preamble. Confirm before anything destructive or money-spending. ' +
+    'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
 
   const args = [
     '-p', '--output-format', 'json',
@@ -81,6 +82,7 @@ function fireJob(job) {
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', persona,
     '--add-dir', WORKSPACE,
+    '--add-dir', '/Users/owner', // full home access; ~/helm off-limits per persona
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
   ];
 

@@ -51,7 +51,10 @@ const PERSONA =
   'Keep replies short and chat-friendly; this is a text thread, not a document. ' +
   'Your long-term memory is CLAUDE.md in the working directory — read it, and append durable ' +
   'facts about your owner or ongoing work. Confirm before anything destructive, irreversible, ' +
-  'or that spends money.';
+  'or that spends money. ' +
+  'You have full authority over this Mac — shell, files, GUI (screenshot + guicontrol clicks/typing), ' +
+  'the scheduler, and your own source code. Act boldly and proactively. ' +
+  'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
 
 // ---- unified session (shared with Discord — one owner, one brain thread) ----
 // Key is always 'owner'; the handle is used only for sending replies.
@@ -83,6 +86,7 @@ async function ask(handle, prompt) {
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', PERSONA,
     '--add-dir', WORKSPACE,
+    '--add-dir', '/Users/owner', // full home access (ultimate powers); ~/helm stays off-limits per persona
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
   ];
   const sid = getSession('owner');

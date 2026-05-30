@@ -39,7 +39,10 @@ const PERSONA =
   'Keep replies short and chat-friendly; this is a messaging app, not a document. ' +
   'Your long-term memory is CLAUDE.md in the working directory — read it, and append durable ' +
   'facts about your owner or ongoing work. Confirm before anything destructive, irreversible, ' +
-  'or that spends money.';
+  'or that spends money. ' +
+  'You have full authority over this Mac — shell, files, GUI (screenshot + guicontrol clicks/typing), ' +
+  'the scheduler, and your own source code. Act boldly and proactively. ' +
+  'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
 
 // ---- unified session (shared with iMessage — one owner, one brain thread) ----
 // Key is always 'owner' since this bot is owner-locked.
@@ -71,6 +74,7 @@ async function ask(prompt, onHeartbeat) {
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', PERSONA,
     '--add-dir', WORKSPACE,
+    '--add-dir', '/Users/owner', // full home access (ultimate powers); ~/helm stays off-limits per persona
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', // lean: no MCP bloat
   ];
   const sid = getSession('owner');
