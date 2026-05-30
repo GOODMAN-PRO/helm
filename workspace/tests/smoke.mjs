@@ -363,6 +363,47 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 18. embed.mjs: API shape, cosineSimilarity math, isModelAvailable safety ----
+{
+  const label = 'embed.mjs: API exports correct, cosineSimilarity works, isModelAvailable safe without model';
+  try {
+    const { isModelAvailable, cosineSimilarity, embedText, getOrComputeVector, ensureVectorsTable } =
+      await import(path.join(WORKSPACE, 'memory/embed.mjs'));
+
+    if (typeof isModelAvailable   !== 'function') throw new Error('isModelAvailable not exported');
+    if (typeof cosineSimilarity   !== 'function') throw new Error('cosineSimilarity not exported');
+    if (typeof embedText          !== 'function') throw new Error('embedText not exported');
+    if (typeof getOrComputeVector !== 'function') throw new Error('getOrComputeVector not exported');
+    if (typeof ensureVectorsTable !== 'function') throw new Error('ensureVectorsTable not exported');
+
+    // cosineSimilarity must handle known cases correctly
+    const a = [1, 0, 0], b = [0, 1, 0], c = [1, 0, 0];
+    if (Math.abs(cosineSimilarity(a, b)) > 0.001)
+      throw new Error(`orthogonal vectors should give ~0, got ${cosineSimilarity(a, b)}`);
+    if (Math.abs(cosineSimilarity(a, c) - 1.0) > 0.001)
+      throw new Error(`identical vectors should give ~1, got ${cosineSimilarity(a, c)}`);
+    if (cosineSimilarity(null, [1]) !== 0)
+      throw new Error('null input should return 0');
+
+    // isModelAvailable() must return a boolean without throwing (model download NOT required)
+    const avail = await isModelAvailable();
+    if (typeof avail !== 'boolean')
+      throw new Error(`isModelAvailable must return boolean, got ${typeof avail}`);
+
+    // recall --keyword-only must succeed regardless of model availability
+    const r = spawnSync('node',
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'example query', '--keyword-only'],
+      { encoding: 'utf8', timeout: 15_000 });
+    if (r.status !== 0) throw new Error(`recall --keyword-only failed: ${r.stderr}`);
+    const arr = JSON.parse(r.stdout);
+    if (!Array.isArray(arr)) throw new Error('recall --keyword-only must return array');
+    const hasExam = arr.some(f => f.kind === 'exam' || /examfacts/i.test(f.key + f.value));
+    if (!hasExam) throw new Error('recall --keyword-only returned no the seeded example facts');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
