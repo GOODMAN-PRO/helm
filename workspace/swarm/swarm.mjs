@@ -166,7 +166,20 @@ const reviewPrompt = (t, builderSummary) => [
     if (t._verdict !== 'APPROVE') { results.push({ id: t.id, status: 'rejected', note: t._vtext }); continue; }
     const before = git(ROOT, 'rev-parse', 'HEAD').stdout.trim();
     const m = git(ROOT, 'merge', '--no-ff', '--no-edit', `swarm/${t.id}`);
-    if (m.status !== 0) { git(ROOT, 'merge', '--abort'); results.push({ id: t.id, status: 'merge-conflict' }); log(`conflict ${t.id}`); continue; }
+    if (m.status !== 0) {
+      // conflict — combine both sides with a resolver agent instead of bailing
+      log(`conflict ${t.id}; invoking resolver`);
+      await runClaude(ROOT, REVIEW_MODEL, [
+        `A git merge of feature branch swarm/${t.id} into main hit CONFLICTS. Resolve them now.`,
+        `Feature: ${t.title}`,
+        `Run \`git status\` to find conflicted files. Edit each to COMBINE both sides — keep main's existing content AND integrate the feature's additions. For append-style files (workspace/tests/smoke.mjs, workspace/tools/registry.json, .gitignore, workspace/CLAUDE.md) keep ALL entries/checks from both sides; renumber duplicate smoke check numbers so each is unique. Drop no one's work.`,
+        `Then \`git add -A\` (do NOT commit). Make sure NO conflict markers remain and \`node workspace/tests/smoke.mjs\` passes. NEVER touch ~/helm.`,
+      ].join('\n'));
+      if (git(ROOT, 'diff', '--name-only', '--diff-filter=U').stdout.trim()) {
+        git(ROOT, 'merge', '--abort'); results.push({ id: t.id, status: 'conflict-unresolved' }); log(`unresolved ${t.id}`); continue;
+      }
+      git(ROOT, 'commit', '--no-edit');
+    }
     if (git(ROOT, 'diff', '--name-only', before, 'HEAD').stdout.includes('package.json')) sh('npm', ['install', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
     const smoke = sh('node', ['workspace/tests/smoke.mjs'], { cwd: ROOT, timeout: 12 * 60_000 });
     if (smoke.status !== 0) {
