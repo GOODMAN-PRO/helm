@@ -32,6 +32,15 @@ if (!DISCORD_TOKEN || !OWNER_ID) {
 }
 mkdirSync(WORKSPACE, { recursive: true });
 
+// Returns an --mcp-config value: the path to workspace/mcp/servers.json when valid,
+// or an inline empty-servers JSON as a fallback so Helm always starts even if the
+// config file is missing or malformed.
+function mcpConfigArg() {
+  const p = path.join(__dirname, 'workspace/mcp/servers.json');
+  try { JSON.parse(readFileSync(p, 'utf8')); return p; }
+  catch { return '{"mcpServers":{}}'; }
+}
+
 // ---- fleet: swap which machine runs the brain ("use mac" / "use windows") ----
 // mac = run claude locally (this Mac). windows = run claude over SSH on the Windows box.
 // Free, no cloud, doesn't touch the Helm project. Configure Windows in .env:
@@ -111,7 +120,7 @@ async function ask(prompt, onHeartbeat, target = 'mac') {
     '--append-system-prompt', PERSONA,
     '--add-dir', WORKSPACE,
     '--add-dir', '/Users/owner', // full home access (ultimate powers); ~/helm stays off-limits per persona
-    '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', // lean: no MCP bloat
+    '--strict-mcp-config', '--mcp-config', mcpConfigArg(), // workspace/mcp/servers.json (filesystem + fetch)
   ];
   const sid = getSession('owner');
   const args = sid ? [...base, '--resume', sid] : base;

@@ -6,7 +6,7 @@
 // sends replies via AppleScript. Owner-locked to a single handle. Same brain as Discord.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, copyFileSync, existsSync } from 'node:fs';
+import { mkdirSync, copyFileSync, existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,15 @@ function isOwner(h) {
   return false;
 }
 mkdirSync(WORKSPACE, { recursive: true });
+
+// Returns an --mcp-config value: the path to workspace/mcp/servers.json when valid,
+// or an inline empty-servers JSON as a fallback so Helm always starts even if the
+// config file is missing or malformed.
+function mcpConfigArg() {
+  const p = path.join(__dirname, 'workspace/mcp/servers.json');
+  try { JSON.parse(readFileSync(p, 'utf8')); return p; }
+  catch { return '{"mcpServers":{}}'; }
+}
 
 const PERSONA =
   'You are Helm, a personal AI agent talking to your owner over iMessage. ' +
@@ -87,7 +96,7 @@ async function ask(handle, prompt) {
     '--append-system-prompt', PERSONA,
     '--add-dir', WORKSPACE,
     '--add-dir', '/Users/owner', // full home access (ultimate powers); ~/helm stays off-limits per persona
-    '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+    '--strict-mcp-config', '--mcp-config', mcpConfigArg(), // workspace/mcp/servers.json (filesystem + fetch)
   ];
   const sid = getSession('owner');
   const args = sid ? [...base, '--resume', sid] : base;
