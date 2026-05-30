@@ -35,3 +35,7 @@ workspace/memory/INDEX.md
 
 # fleet: per-machine active target
 workspace/active-target
+
+# swarm worktrees
+.swarm/
+workspace/swarm/swarm.log

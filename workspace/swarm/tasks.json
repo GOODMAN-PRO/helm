@@ -1,0 +1,38 @@
+[
+  {
+    "id": "mcp",
+    "title": "MCP server support",
+    "status": "pending",
+    "spec": "Give Helm real MCP tools. Create workspace/mcp/servers.json defining free, no-auth MCP servers runnable via npx: a filesystem server rooted at /Users/owner/secondme, and a fetch/web server. Change index.js and imessage.js so the ask() Claude args load this file via --mcp-config workspace/mcp/servers.json (keep --strict-mcp-config). Make it degrade gracefully if a server fails to start (Helm must still reply). Document usage in workspace/CLAUDE.md. Add a smoke check (next free number in workspace/tests/smoke.mjs): assert workspace/mcp/servers.json is valid JSON with at least one server, and that index.js references it. Do not require network at test time."
+  },
+  {
+    "id": "browser",
+    "title": "Web browsing via Playwright",
+    "status": "pending",
+    "spec": "Add browser automation as registry tools. npm install playwright (and run its chromium download lazily/once). Create workspace/tools/impl/browser.open.mjs, browser.read.mjs, browser.click.mjs, browser.fill.mjs, browser.screenshot.mjs driving a persistent context with profile dir workspace/browser-profile so logins persist. Register all in workspace/tools/registry.json. Add a smoke check that `node workspace/tools/tools.mjs list` includes browser.open and that the modules import without launching a browser (lazy import). Keep the heavy chromium download out of the smoke path."
+  },
+  {
+    "id": "embeddings",
+    "title": "True local embeddings for recall",
+    "status": "pending",
+    "spec": "Upgrade memory recall with real semantic embeddings, no paid API. Use @xenova/transformers (npm) with all-MiniLM-L6-v2 running locally. Add workspace/memory/embed.mjs that computes/caches a vector per fact (store in a vectors table in memory.db keyed by fact id). Modify memory.mjs recall to blend embedding cosine similarity with the existing keyword/TF-IDF score; fall back to current behavior if the model isn't downloaded yet or on --keyword-only. Keep recall's JSON output shape identical. Add a smoke check that recall still returns the existing the seeded example facts and the same shape (model download must NOT be required for smoke to pass — guard it)."
+  },
+  {
+    "id": "planning",
+    "title": "Multi-step planning subsystem",
+    "status": "pending",
+    "spec": "Add workspace/plans/ with plan.mjs (uses node:sqlite, plans.db). A plan = {id, goal, created, status} with steps {id, plan_id, idx, task, tool_or_cmd, status, checkpoint, result}. CLI verbs: create <goal>, add-step <plan_id> <task>, next <plan_id> (returns next pending step), complete <plan_id> <step_id> [--result], show <plan_id>, list. The scheduler and swarm can resume a plan by querying next. Output JSON. Add a smoke check covering create -> add-step -> next -> complete -> show round-trip. Document in CLAUDE.md."
+  },
+  {
+    "id": "vision",
+    "title": "Vision: understand the screen",
+    "status": "pending",
+    "spec": "Add workspace/tools/impl/vision.mjs: take a screenshot (screencapture -x to a temp png), then use Claude's own image reading (spawn `claude -p` with the image path and a question) to describe the screen or locate a UI element and return its click point. Account for the Retina scale (divide pixel coords by the display scale, default 2) so the returned points work with bin/guicontrol. Verbs: describe, find <query> (returns {x,y} in points). Register in workspace/tools/registry.json. Add a smoke check that the tool is registered and the module imports (do NOT require a real screenshot/permission at test time — guard it)."
+  },
+  {
+    "id": "dashboard",
+    "title": "Helm dashboard (local web UI)",
+    "status": "pending",
+    "spec": "Create workspace/dashboard/server.mjs: a Node http server (node:http only, NO external deps) on http://localhost:7777 serving one self-contained HTML page (inline CSS/JS, auto-refresh every 10s) showing Helm's live state: launchd service status for com.helm.discord/think/scheduler/selfupgrade/dashboard (parse `launchctl list`), memory stats + recent facts/preferences (read memory.db via node:sqlite), scheduler jobs (jobs.db), latest think journal entries, recent self-upgrade history (tail UPGRADE_LOG.md), active fleet target, and last 5 git commits. Add a JSON endpoint /api/state. Create a launchd plist workspace/dashboard/com.helm.dashboard.plist (RunAtLoad, KeepAlive, logs to workspace/dashboard/dashboard.log) but do NOT attempt to load it from the build. Add a smoke check that server.mjs imports and that starting it briefly then GET / returns HTTP 200 (use an ephemeral port in the test). Keep it dependency-free and clean, dark, readable."
+  }
+]
