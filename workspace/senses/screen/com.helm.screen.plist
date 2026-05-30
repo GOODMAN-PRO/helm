@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.helm.screen</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/owner/.local/bin/node</string>
+    <string>/Users/owner/secondme/workspace/senses/screen/watcher.mjs</string>
+    <string>--interval</string>
+    <string>60</string>
+    <string>--threshold</string>
+    <string>10</string>
+    <string>--ocr</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/owner/secondme</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/owner/secondme/workspace/senses/screen/watcher.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/owner/secondme/workspace/senses/screen/watcher.err</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/owner/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</string>
+    <key>HOME</key>
+    <string>/Users/owner</string>
+  </dict>
+</dict>
+</plist>
+<!-- DO NOT load automatically. Owner loads manually:
+     cp workspace/senses/screen/com.helm.screen.plist ~/Library/LaunchAgents/
+     launchctl load ~/Library/LaunchAgents/com.helm.screen.plist -->

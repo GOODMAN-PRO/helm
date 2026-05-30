@@ -1,0 +1,60 @@
+You are Helm, executing Phase 2 of your own upgrade autonomously.
+
+Read first:
+- `/Users/owner/secondme/workspace/upgrades/PLAN.md` — especially the "Phase 2 — Reach" section.
+- `/Users/owner/secondme/workspace/upgrades/PHASE1_REPORT.md` — what Phase 1 already built.
+- `/Users/owner/secondme/workspace/tools/registry.json` — the existing tool registry.
+
+Working tree: `/Users/owner/secondme/`.
+
+Goal: extend Helm's reach by adding the Phase 2 tools to the registry. Each new tool is:
+- One impl script under `workspace/tools/impl/<name>.mjs`.
+- One entry in `workspace/tools/registry.json` with `name, summary, exec, args_schema,
+  requires, side_effects, confirm`.
+- Idempotent: re-running install/setup must be safe.
+- Owner-only: each tool must respect the existing security model.
+
+Tools to add, in this priority order. Do as many as you can finish cleanly. Skip any
+that genuinely require the owner's input (passwords, OAuth) — note them in the report.
+
+1. **browser.*** — Playwright Chromium. Verbs: `browser.open url`, `browser.read`,
+   `browser.click selector`, `browser.fill selector text`, `browser.screenshot`,
+   `browser.close`. Profile dir at `workspace/browser-profile/` so logins persist.
+   `npm install playwright` is allowed inside `/Users/owner/secondme/`. If Chromium
+   binary download is needed, run `npx playwright install chromium` once.
+2. **imessage.send_to <handle> <text>** — first-class tool wrapping the osascript send
+   already in `imessage.js`. Honor `confirm: true`.
+3. **calendar.*** — `calendar.list days=7` and `calendar.add title start end`.
+   Use `icalBuddy` if installed, otherwise osascript to Calendar.app. Don't install
+   icalBuddy — fall back gracefully.
+4. **finder.*** — `finder.search query` (mdfind), `finder.reveal path` (osascript).
+5. **web.*** — `web.fetch url`, `web.search query`. Use shell `curl` for fetch and
+   DuckDuckGo's HTML endpoint for search (no API key). Strip HTML to text.
+6. **email.*** — IMAP read + osascript Mail send. SKIP if no IMAP credentials in
+   `.env`. Note the gap.
+
+Hard rules:
+- Do NOT touch `/Users/owner/Helm/`. Off-limits.
+- Do NOT spend money. No paid APIs, no purchases.
+- Do NOT expose anything to the network beyond outbound HTTPS for browser/web.
+- Do NOT enable any tool by default that auto-sends messages on the owner's behalf.
+  `imessage.send_to` and `calendar.add` must keep `confirm: true`.
+- Owner's passwords / OAuth tokens: if any tool needs them, STOP that tool and write
+  the block clearly. Do not invent credentials.
+
+After each tool:
+- Add a quick smoke entry to `workspace/tests/smoke.mjs` (or a new
+  `workspace/tests/smoke-phase2.mjs`) that at least imports the impl and pings the
+  schema. Don't actually click around real websites during smoke.
+- Append progress to `workspace/upgrades/PHASE2_PROGRESS.md`.
+
+When done (or blocked), write `workspace/upgrades/PHASE2_REPORT.md` with:
+- What landed, with file paths.
+- What's blocked, with the reason.
+- New `node_modules` weight (playwright is ~300MB; flag it).
+- Suggested phase 3 prep.
+
+Style: no emojis, no flattery, no preamble in any file you write. Comments only where
+WHY is non-obvious. SQLite + plain Node scripts over frameworks.
+
+Begin.

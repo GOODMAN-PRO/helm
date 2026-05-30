@@ -1,0 +1,98 @@
+You are Helm, executing Phase 3 of your own upgrade autonomously.
+
+Read first:
+- `/Users/owner/secondme/workspace/upgrades/PLAN.md` — especially the "Phase 3 — Senses" section.
+- `/Users/owner/secondme/workspace/upgrades/PHASE1_REPORT.md` and `PHASE2_REPORT.md`.
+- `/Users/owner/secondme/workspace/tools/registry.json` — the existing 23 tools.
+
+Working tree: `/Users/owner/secondme/`.
+
+Goal: give Helm senses. Build the subsystems below. Idempotent. Off-by-default for
+anything that captures continuously (privacy).
+
+### 3.1 Screen watcher
+New: `workspace/senses/screen/`.
+- `watcher.mjs` — daemon. Every N seconds (default 60s, configurable), runs
+  `screencapture -x -t png /tmp/helm-screen.png`. Computes a small perceptual hash
+  (downscale to 8x8 grayscale, threshold by mean — implement in pure JS with no
+  external dep beyond `sharp`). If hash differs significantly from the last frame,
+  store a record in `workspace/senses/screen/events.db`:
+    `events(id, ts, hash, png_path, ocr_text)`.
+  Keep PNGs in a ring buffer: `workspace/senses/screen/frames/` capped to 200 files
+  (delete oldest). Don't run OCR by default — too expensive. Make OCR opt-in via
+  `--ocr` flag; if enabled, use macOS Vision via a Swift helper at
+  `workspace/senses/screen/ocr-helper.swift` (compile to a binary alongside the
+  existing `bin/guicontrol`). If Swift unavailable, leave OCR off and document.
+- launchd plist `com.helm.screen.plist` — DO NOT auto-load. Owner enables manually
+  when ready. Default: not loaded.
+- Tools (added to registry):
+  - `screen.recent --limit N` — return last N events with timestamps and hashes.
+  - `screen.at --ts <unix>` — return event closest to that timestamp.
+  - `screen.search --query <q>` — only useful if OCR is on; search ocr_text. If OCR
+    off, return helpful error.
+
+### 3.2 Notification interceptor
+New: `workspace/senses/notify/`.
+- `poller.mjs` — daemon. Every 30s, polls:
+  - `~/Library/Messages/chat.db` — unread Messages count (reuse the SQLite snapshot
+    pattern from `imessage.js`).
+  - Calendar — next upcoming event in the next 24h (via JXA; if Automation permission
+    missing, gracefully skip with a one-time warning).
+  - Mail — unread count (osascript Mail; same permission caveat).
+  Record changes in `workspace/senses/notify/events.db`:
+    `events(id, ts, source, kind, summary, payload_json)`.
+- launchd plist `com.helm.notify.plist` — DO NOT auto-load.
+- Tools (added to registry):
+  - `notify.recent --limit N` — recent events.
+  - `notify.unread` — current unread totals across sources.
+
+### 3.3 Location (opt-in)
+New: `workspace/senses/location/`.
+- `location.mjs` — on-demand only. Spawns `CoreLocationCLI` if installed (don't install
+  it; check `which CoreLocationCLI`). If not installed, return a helpful note with the
+  Homebrew install command but do not execute it (no money/install without owner ask).
+- Tool: `location.here` — returns `{lat, lon, accuracy, ts}` or `{installed: false}`.
+
+### 3.4 Mic on demand
+New: `workspace/senses/mic/`.
+- `record.mjs` — on-demand only. Uses `sox` if installed (`which sox`), else `ffmpeg`,
+  else return install note. Default 30s clip to `/tmp/helm-mic-<ts>.wav`. Hard cap 5
+  minutes per call.
+- `transcribe.mjs` — runs `whisper.cpp` against the WAV if `whisper.cpp` is installed.
+  Skip if not installed; document install path.
+- Tools:
+  - `mic.record --seconds N` — returns path to WAV.
+  - `mic.transcribe --file <path>` — returns text or "not installed".
+
+### Registry edits
+You OWN `workspace/tools/registry.json` during this run. The bugs agent has been
+explicitly told not to touch it. Add all phase 3 tool entries cleanly. Re-run
+`node workspace/tools/tools.mjs list` and confirm all new entries appear.
+
+### Smoke
+Add `workspace/tests/smoke-phase3.mjs` covering:
+- Each new tool exec path exists.
+- `screen.recent` against an empty DB returns `[]` not an error.
+- `notify.unread` returns a shape `{messages, calendar, mail}` even with permissions
+  missing (skip values gracefully).
+- `location.here` returns `{installed: false}` if CoreLocationCLI is missing.
+- `mic.record` returns "not installed" if neither sox nor ffmpeg is present.
+
+Run all three smoke suites at the end (phase 1, 2, 3). All must pass.
+
+### Hard rules
+- Do NOT touch `/Users/owner/Helm/`.
+- Do NOT spend money. No paid APIs, no Homebrew installs without owner ask.
+- Do NOT auto-load any new launchd plist. Owner controls activation.
+- Screen watcher OFF by default. Mic OFF by default. Location is on-demand only.
+- Privacy: no PNGs uploaded anywhere. No screen text leaves the machine.
+- Owner-only. Same security posture as Phase 1.
+
+### Output
+- Append progress to `workspace/upgrades/PHASE3_PROGRESS.md` after each subsystem.
+- Final report: `workspace/upgrades/PHASE3_REPORT.md` — what landed, what blocked, install
+  hints for the owner (Homebrew formulas needed, permissions to grant).
+
+Style: no emojis, no flattery, no preamble. Comments only where WHY is non-obvious.
+
+Begin.

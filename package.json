@@ -1,0 +1,17 @@
+{
+  "name": "helm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Your own tiny AI agent — Discord (+ iMessage on Mac) -> Claude on your subscription -> action.",
+  "scripts": {
+    "start": "node index.js",
+    "imessage": "node imessage.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.60.0",
+    "sharp": "^0.34.5"
+  }
+}

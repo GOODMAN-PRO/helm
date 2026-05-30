@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.helm.notify</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/owner/.local/bin/node</string>
+    <string>/Users/owner/secondme/workspace/senses/notify/poller.mjs</string>
+    <string>--interval</string>
+    <string>30</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/owner/secondme</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/owner/secondme/workspace/senses/notify/poller.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/owner/secondme/workspace/senses/notify/poller.err</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/owner/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HOME</key>
+    <string>/Users/owner</string>
+  </dict>
+</dict>
+</plist>
+<!-- DO NOT load automatically. Owner loads manually:
+     cp workspace/senses/notify/com.helm.notify.plist ~/Library/LaunchAgents/
+     launchctl load ~/Library/LaunchAgents/com.helm.notify.plist -->

@@ -1,0 +1,352 @@
+[
+  {
+    "name": "screencap",
+    "summary": "Capture a screenshot of the Mac screen to a temp file.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/screencap.mjs",
+    "args_schema": {
+      "out": { "type": "string", "description": "Output path. Default: /tmp/helm-screen.png" }
+    },
+    "requires": ["Screen Recording permission"],
+    "side_effects": "writes /tmp/helm-screen.png or specified path",
+    "confirm": false
+  },
+  {
+    "name": "gui.click",
+    "summary": "Click at point coordinates on screen (points, not pixels).",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/gui.click.mjs",
+    "args_schema": {
+      "x": { "type": "number", "required": true },
+      "y": { "type": "number", "required": true },
+      "button": { "type": "string", "enum": ["left", "right", "double"], "default": "left" }
+    },
+    "requires": ["Accessibility permission"],
+    "side_effects": "moves mouse, fires click",
+    "confirm": false
+  },
+  {
+    "name": "gui.type",
+    "summary": "Type text into the currently focused element.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/gui.type.mjs",
+    "args_schema": {
+      "text": { "type": "string", "required": true }
+    },
+    "requires": ["Accessibility permission"],
+    "side_effects": "sends keystrokes",
+    "confirm": false
+  },
+  {
+    "name": "gui.key",
+    "summary": "Press a key by macOS key code with optional modifiers.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/gui.key.mjs",
+    "args_schema": {
+      "code": { "type": "number", "required": true, "description": "macOS key code (return=36, esc=53, etc.)" },
+      "mods": { "type": "string", "description": "comma-separated: cmd,shift,opt,ctrl" }
+    },
+    "requires": ["Accessibility permission"],
+    "side_effects": "sends key event",
+    "confirm": false
+  },
+  {
+    "name": "imessage.send",
+    "summary": "Send an iMessage to a handle (phone number or email).",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/imessage.send.mjs",
+    "args_schema": {
+      "handle": { "type": "string", "required": true },
+      "text":   { "type": "string", "required": true }
+    },
+    "requires": ["Messages app running", "AppleScript permission"],
+    "side_effects": "sends a real iMessage",
+    "confirm": true
+  },
+  {
+    "name": "discord.attach",
+    "summary": "Attach a file to the Discord reply by appending ATTACH: /path to stdout.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/discord.attach.mjs",
+    "args_schema": {
+      "path": { "type": "string", "required": true }
+    },
+    "requires": [],
+    "side_effects": "prints ATTACH: line; Discord bot handles the rest",
+    "confirm": false
+  },
+  {
+    "name": "memory.remember",
+    "summary": "Store a structured fact in memory.db.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/memory.remember.mjs",
+    "args_schema": {
+      "kind":  { "type": "string", "required": true },
+      "key":   { "type": "string", "required": true },
+      "value": { "type": "string", "required": true },
+      "confidence": { "type": "number", "default": 1.0 }
+    },
+    "requires": [],
+    "side_effects": "writes to memory.db",
+    "confirm": false
+  },
+  {
+    "name": "memory.recall",
+    "summary": "Query memory.db by keywords; returns ranked facts.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/memory.recall.mjs",
+    "args_schema": {
+      "query": { "type": "string", "required": true },
+      "limit": { "type": "number", "default": 20 }
+    },
+    "requires": [],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "scheduler.add",
+    "summary": "Register a new scheduled job in jobs.db.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/scheduler.add.mjs",
+    "args_schema": {
+      "name":    { "type": "string", "required": true },
+      "cron":    { "type": "string", "required": true, "description": "5-field cron: min hour dom month dow" },
+      "payload": { "type": "string", "required": true, "description": "Natural-language goal or shell command" },
+      "enabled": { "type": "boolean", "default": false }
+    },
+    "requires": [],
+    "side_effects": "writes to jobs.db",
+    "confirm": false
+  },
+  {
+    "name": "scheduler.list",
+    "summary": "List all scheduled jobs.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/scheduler.list.mjs",
+    "args_schema": {},
+    "requires": [],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "browser.open",
+    "summary": "Open a URL in headless Chromium and return page text. Logins persist via workspace/browser-profile/.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs open",
+    "args_schema": {
+      "url": { "type": "string", "required": true, "description": "URL to navigate to" }
+    },
+    "requires": ["Playwright Chromium (installed via npx playwright install chromium)"],
+    "side_effects": "saves current URL to workspace/browser-state.json; may write cookies to browser-profile/",
+    "confirm": false
+  },
+  {
+    "name": "browser.read",
+    "summary": "Read text content of the current browser page (set by the last browser.open or browser.click).",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs read",
+    "args_schema": {},
+    "requires": ["browser.open called first"],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "browser.click",
+    "summary": "Click a CSS selector on the current page; follows navigation if it occurs.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs click",
+    "args_schema": {
+      "selector": { "type": "string", "required": true, "description": "CSS selector to click" }
+    },
+    "requires": ["browser.open called first"],
+    "side_effects": "may navigate; updates workspace/browser-state.json",
+    "confirm": false
+  },
+  {
+    "name": "browser.fill",
+    "summary": "Fill a form input on the current page with text.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs fill",
+    "args_schema": {
+      "selector": { "type": "string", "required": true, "description": "CSS selector of the input" },
+      "text":     { "type": "string", "required": true, "description": "Value to fill in" }
+    },
+    "requires": ["browser.open called first"],
+    "side_effects": "modifies form field on loaded page",
+    "confirm": false
+  },
+  {
+    "name": "browser.screenshot",
+    "summary": "Screenshot the current browser page viewport.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs screenshot",
+    "args_schema": {
+      "out": { "type": "string", "description": "Output path. Default: /tmp/helm-browser.png" }
+    },
+    "requires": ["browser.open called first"],
+    "side_effects": "writes PNG file",
+    "confirm": false
+  },
+  {
+    "name": "browser.close",
+    "summary": "Clear the current browser session state (forgets current URL; cookies in profile persist).",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs close",
+    "args_schema": {},
+    "requires": [],
+    "side_effects": "deletes workspace/browser-state.json",
+    "confirm": false
+  },
+  {
+    "name": "imessage.send_to",
+    "summary": "Send an iMessage to any handle (phone or email). First-class proactive send — not a reply.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/imessage.send_to.mjs",
+    "args_schema": {
+      "handle": { "type": "string", "required": true, "description": "Phone number (+66...) or Apple ID email" },
+      "text":   { "type": "string", "required": true }
+    },
+    "requires": ["Messages app running", "AppleScript permission"],
+    "side_effects": "sends a real iMessage to the specified handle",
+    "confirm": true
+  },
+  {
+    "name": "calendar.list",
+    "summary": "List upcoming calendar events via Calendar.app (JXA). Falls back gracefully if Calendar is inaccessible.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/calendar.mjs list",
+    "args_schema": {
+      "days": { "type": "number", "default": 7, "description": "How many days ahead to look" }
+    },
+    "requires": ["Calendar.app access (macOS Full Automation permission)"],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "calendar.add",
+    "summary": "Add an event to the first writable calendar via Calendar.app.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/calendar.mjs add",
+    "args_schema": {
+      "title": { "type": "string", "required": true },
+      "start": { "type": "string", "required": true, "description": "ISO 8601 datetime, e.g. 2026-06-01T10:00:00" },
+      "end":   { "type": "string", "required": true, "description": "ISO 8601 datetime" }
+    },
+    "requires": ["Calendar.app access (macOS Full Automation permission)"],
+    "side_effects": "creates a new calendar event",
+    "confirm": true
+  },
+  {
+    "name": "finder.search",
+    "summary": "Search for files by name or content using mdfind (Spotlight).",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/finder.mjs search",
+    "args_schema": {
+      "query": { "type": "string", "required": true, "description": "Spotlight query string" },
+      "limit": { "type": "number", "default": 50, "description": "Max results to return" }
+    },
+    "requires": [],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "finder.reveal",
+    "summary": "Reveal a file or folder in Finder (brings Finder to front).",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/finder.mjs reveal",
+    "args_schema": {
+      "path": { "type": "string", "required": true, "description": "Absolute path to reveal" }
+    },
+    "requires": ["Finder running", "AppleScript permission"],
+    "side_effects": "opens Finder, brings window to front",
+    "confirm": false
+  },
+  {
+    "name": "web.fetch",
+    "summary": "Fetch a URL with curl and return stripped plain text. No API key required.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/web.mjs fetch",
+    "args_schema": {
+      "url": { "type": "string", "required": true }
+    },
+    "requires": ["outbound HTTPS"],
+    "side_effects": "outbound HTTP request",
+    "confirm": false
+  },
+  {
+    "name": "web.search",
+    "summary": "Search the web via DuckDuckGo HTML endpoint. Returns titles, URLs, snippets. No API key.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/web.mjs search",
+    "args_schema": {
+      "query": { "type": "string", "required": true },
+      "limit": { "type": "number", "default": 10, "description": "Max results (1-20)" }
+    },
+    "requires": ["outbound HTTPS to duckduckgo.com"],
+    "side_effects": "outbound HTTP request",
+    "confirm": false
+  },
+  {
+    "name": "screen.recent",
+    "summary": "Return last N screen-change events (timestamp, hash, path). Requires screen watcher daemon running.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/screen.recent.mjs",
+    "args_schema": {
+      "limit": { "type": "number", "default": 10, "description": "Number of events to return" }
+    },
+    "requires": ["Screen watcher daemon (workspace/senses/screen/watcher.mjs)"],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "screen.at",
+    "summary": "Return the screen event closest to a given Unix timestamp (ms).",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/screen.at.mjs",
+    "args_schema": {
+      "ts": { "type": "number", "required": true, "description": "Unix timestamp in milliseconds" }
+    },
+    "requires": ["Screen watcher daemon"],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "screen.search",
+    "summary": "Search OCR text from screen events. Only useful when watcher was started with --ocr flag.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/screen.search.mjs",
+    "args_schema": {
+      "query": { "type": "string", "required": true },
+      "limit": { "type": "number", "default": 20 }
+    },
+    "requires": ["Screen watcher daemon running with --ocr", "ocr-helper binary compiled from workspace/senses/screen/ocr-helper.swift"],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "notify.recent",
+    "summary": "Return last N notification events (Messages/Calendar/Mail) recorded by the notify poller daemon.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/notify.recent.mjs",
+    "args_schema": {
+      "limit": { "type": "number", "default": 10 }
+    },
+    "requires": ["Notify poller daemon (workspace/senses/notify/poller.mjs)"],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "notify.unread",
+    "summary": "Return current unread totals: { messages, calendar, mail }. Queries live; poller not required.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/notify.unread.mjs",
+    "args_schema": {},
+    "requires": ["Full Disk Access (Messages), Automation > Calendar, Automation > Mail (all optional; missing returns null)"],
+    "side_effects": "none",
+    "confirm": false
+  },
+  {
+    "name": "location.here",
+    "summary": "Return current location { lat, lon, accuracy, ts } via CoreLocationCLI, or { installed: false } if not installed.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/location.here.mjs",
+    "args_schema": {},
+    "requires": ["CoreLocationCLI (brew install corlocationcli — must ask owner first)", "Location Services enabled"],
+    "side_effects": "queries Location Services",
+    "confirm": false
+  },
+  {
+    "name": "mic.record",
+    "summary": "Record a WAV clip from the default microphone. Uses sox or ffmpeg. Returns path to WAV or install note.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/mic.record.mjs",
+    "args_schema": {
+      "seconds": { "type": "number", "default": 30, "description": "Duration in seconds (hard cap: 300)" }
+    },
+    "requires": ["sox (brew install sox) or ffmpeg (brew install ffmpeg) — ask owner before installing", "Microphone permission"],
+    "side_effects": "writes WAV to /tmp/helm-mic-<ts>.wav",
+    "confirm": true
+  },
+  {
+    "name": "mic.transcribe",
+    "summary": "Transcribe a WAV file using whisper.cpp. Returns { text } or install note if whisper.cpp missing.",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/mic.transcribe.mjs",
+    "args_schema": {
+      "file": { "type": "string", "required": true, "description": "Path to WAV file" },
+      "model": { "type": "string", "default": "base.en", "description": "Whisper model name" }
+    },
+    "requires": ["whisper.cpp (brew install whisper-cpp — ask owner before installing)"],
+    "side_effects": "none",
+    "confirm": false
+  }
+]

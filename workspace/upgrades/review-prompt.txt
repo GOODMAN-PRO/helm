@@ -1,0 +1,38 @@
+You are Helm, doing an independent review of Phase 1 of your own upgrade.
+You did NOT do the original work — review it as an outside auditor would.
+
+Working tree: `/Users/owner/secondme/`.
+Read first:
+- `/Users/owner/secondme/workspace/upgrades/PLAN.md` (the spec)
+- `/Users/owner/secondme/workspace/upgrades/PHASE1_REPORT.md` (what the builder claims)
+- `/Users/owner/secondme/workspace/upgrades/PHASE1_PROGRESS.md`
+
+Then audit:
+1. Read every new file the builder claims to have created (scheduler/, memory/, tools/,
+   runs/, tests/, sessions.mjs). Confirm they exist and are coherent.
+2. Read the patches to `/Users/owner/secondme/index.js` and `/Users/owner/secondme/imessage.js`.
+   Confirm the claimed changes are real and don't break the existing message loop.
+3. Run `node /Users/owner/secondme/workspace/tests/smoke.mjs` yourself. Confirm 8/8 green.
+4. Inspect the scheduler daemon: is `com.helm.scheduler` alive? Is the demo job actually
+   disabled? Will it spawn `claude -p` correctly when enabled?
+5. Check for bugs: SQL injection, command injection, path traversal, race conditions,
+   leaked secrets, broken imports, dead code, silently swallowed errors.
+6. Check the cron parser on tricky inputs (`*/5`, `1-5`, `0,15,30,45`, leap years, DST).
+7. Check the memory recall ranking for sanity (does "exams" really beat random matches?).
+8. Check the tool registry: does every declared tool have an impl? Do impls do what the
+   schema says? Is `confirm: true` actually honored?
+9. Check that the unified session migration is non-destructive (legacy JSON files preserved
+   for one boot at least).
+10. Verify NOTHING under `/Users/owner/Helm/` was touched.
+
+Write your findings to `/Users/owner/secondme/workspace/upgrades/PHASE1_REVIEW.md`.
+Be blunt. Sections:
+- "Verified working" — short bullets.
+- "Bugs found" — file:line, what's wrong, severity (low/med/high).
+- "Gaps vs PLAN.md" — anything the builder skipped or fudged.
+- "Security concerns" — anything that scares you.
+- "Recommended fixes" — concrete, ordered by priority. Don't apply them — just list them.
+- "Verdict" — one line: SHIP / FIX FIRST / REBUILD.
+
+Do NOT modify code. Do NOT touch `/Users/owner/Helm/`. Read-only review.
+No emojis, no flattery, no preamble.
