@@ -68,6 +68,7 @@ function parseFlags(args) {
 function out(obj) { console.log(JSON.stringify(obj, null, 2)); }
 function die(msg) { console.error(msg); process.exit(1); }
 
+await (async () => {
 switch (verb) {
   case 'remember': {
     const { flags, pos } = parseFlags(rest);
@@ -150,9 +151,7 @@ switch (verb) {
       return hits / qTokens.length;
     };
 
-    // Semantic-ish score: TF-IDF cosine over stemmed bag-of-words across the corpus.
-    // A real embedding model would slot in here (tryLoadEmbedder()), but it isn't
-    // bundled — TF-IDF gives meaning-aware ranking using only the local corpus.
+    // TF-IDF semantic score — fallback when the embedding model is not yet downloaded.
     let semScore = () => 0;
     if (!keywordOnly && qStems.length && allFacts.length >= 3) {
       const docs = allFacts.map(f => tokenize(`${f.kind} ${f.key} ${f.value}`).map(stem));
@@ -181,12 +180,36 @@ switch (verb) {
       semScore = (_, i) => cosine(qVec, docVecs[i]);
     }
 
+    // Real embedding similarity (all-MiniLM-L6-v2 via @xenova/transformers).
+    // Only used when the model is already in the local cache; falls back to TF-IDF silently.
+    let embedScores = null;
+    if (!keywordOnly) {
+      try {
+        const { isModelAvailable, embedText, cosineSimilarity, getOrComputeVector } =
+          await import('./embed.mjs');
+        if (await isModelAvailable()) {
+          const qVec = await embedText(query || ' ');
+          embedScores = await Promise.all(
+            allFacts.map(f =>
+              getOrComputeVector(db, f.id, `${f.kind} ${f.key} ${f.value}`)
+                .then(fv => cosineSimilarity(qVec, fv))
+            )
+          );
+        }
+      } catch {
+        // package missing or model not downloaded — embedScores stays null
+      }
+    }
+
     const scored = allFacts.map((f, i) => {
       const k = keywordScore(f);
       const s = semScore(f, i);
-      // Blend: keyword dominates when query terms appear verbatim; semantic surfaces
-      // related facts when none of the literal words match. Take the stronger signal.
-      const score = Math.max(k, s * 0.9);
+      const e = embedScores ? embedScores[i] : null;
+      // When real embeddings are available, blend keyword + embedding similarity.
+      // When absent, fall back to keyword + TF-IDF (identical to previous behavior).
+      const score = e !== null
+        ? Math.max(k, e * 0.9)
+        : Math.max(k, s * 0.9);
       return { ...f, _score: score, _k: k, _s: s };
     });
 
@@ -257,5 +280,6 @@ switch (verb) {
   default:
     die('verbs: remember | recall | forget | dump | episode | unsure');
 }
+})();
 
 db.close();
