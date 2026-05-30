@@ -32,3 +32,6 @@ bin/ocr-helper
 workspace/think/journal/
 workspace/think/.think.lock
 workspace/memory/INDEX.md
+
+# fleet: per-machine active target
+workspace/active-target

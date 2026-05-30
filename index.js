@@ -5,7 +5,7 @@
 // No framework, no plugins, no gateway service. Read it top to bottom.
 
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
@@ -31,6 +31,41 @@ if (!DISCORD_TOKEN || !OWNER_ID) {
   process.exit(1);
 }
 mkdirSync(WORKSPACE, { recursive: true });
+
+// ---- fleet: swap which machine runs the brain ("use mac" / "use windows") ----
+// mac = run claude locally (this Mac). windows = run claude over SSH on the Windows box.
+// Free, no cloud, doesn't touch the Helm project. Configure Windows in .env:
+//   HELM_WIN_HOST=you@windows-host   (LAN IP or Tailscale name; key-based SSH)
+//   HELM_WIN_CLAUDE=claude           (path to claude on Windows, optional)
+//   HELM_WIN_DIR=C:/path/to/dir      (remote working dir, optional)
+const HELM_WIN_HOST = process.env.HELM_WIN_HOST || '';
+const HELM_WIN_CLAUDE = process.env.HELM_WIN_CLAUDE || 'claude';
+const HELM_WIN_DIR = process.env.HELM_WIN_DIR || '';
+const TARGET_FILE = path.join(WORKSPACE, 'active-target');
+const VALID_TARGETS = ['mac', 'windows'];
+const getTarget = () => { try { const t = readFileSync(TARGET_FILE, 'utf8').trim(); return VALID_TARGETS.includes(t) ? t : 'mac'; } catch { return 'mac'; } };
+const setTarget = t => writeFileSync(TARGET_FILE, t);
+
+// Run the brain on the Windows node over SSH (async so the gateway stays responsive).
+function runClaudeRemote(prompt) {
+  return new Promise(resolve => {
+    if (!HELM_WIN_HOST) return resolve('Windows node not configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Claude on Windows, then say "use windows" again.');
+    const remoteCmd = `${HELM_WIN_DIR ? `cd ${HELM_WIN_DIR} && ` : ''}${HELM_WIN_CLAUDE} -p --output-format json --model ${MODEL} --permission-mode ${PERMISSION_MODE}`;
+    const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
+    let out = '', err = '';
+    const kill = setTimeout(() => child.kill(), 30 * 60_000);
+    child.stdout.on('data', d => { out += d; });
+    child.stderr.on('data', d => { err += d; });
+    child.on('error', e => { clearTimeout(kill); resolve(`Windows SSH error: ${e.message}`); });
+    child.on('close', code => {
+      clearTimeout(kill);
+      if (code !== 0) return resolve(`Windows exec failed (exit ${code}): ${(err || '').trim().slice(0, 500)}`);
+      try { resolve((JSON.parse(out).result ?? '').toString().trim() || '(empty reply)'); }
+      catch { resolve(out.trim() || '(no output)'); }
+    });
+    child.stdin.write(prompt); child.stdin.end();
+  });
+}
 
 // ---- persona: appended to Claude Code's own (tool-enabled) system prompt ----
 const PERSONA =
@@ -67,7 +102,8 @@ function runClaude(args, prompt) {
   });
 }
 
-async function ask(prompt, onHeartbeat) {
+async function ask(prompt, onHeartbeat, target = 'mac') {
+  if (target === 'windows') return runClaudeRemote(prompt);
   const base = [
     '-p', '--output-format', 'json',
     '--model', MODEL,
@@ -145,11 +181,27 @@ client.on(Events.MessageCreate, async msg => {
   const text = msg.content.replace(`<@${client.user.id}>`, '').trim();
   if (!text) return;
 
-  console.log(`📩 ${text}`);
+  // ---- fleet commands (handled before the brain) ----
+  const low = text.toLowerCase();
+  const useM = low.match(/^\/?use\s+(mac|windows|win|pc)\b/);
+  if (useM) {
+    const t = (useM[1] === 'mac') ? 'mac' : 'windows';
+    setTarget(t);
+    const note = (t === 'windows' && !HELM_WIN_HOST) ? ' — not configured yet (set HELM_WIN_HOST in .env)' : '';
+    await msg.reply(`Active machine: **${t}**${note}.`);
+    return;
+  }
+  if (/^\/?(where|which|target|status)\b/.test(low)) {
+    await msg.reply(`Active machine: **${getTarget()}**${getTarget() === 'windows' && !HELM_WIN_HOST ? ' (not configured)' : ''}.`);
+    return;
+  }
+
+  const target = getTarget();
+  console.log(`📩 [${target}] ${text}`);
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
   try {
-    const reply = await ask(text, heartbeat => msg.channel.send(heartbeat).catch(() => {}));
+    const reply = await ask(text, heartbeat => msg.channel.send(heartbeat).catch(() => {}), target);
     clearInterval(typing);
     const { text: body, files } = splitAttachments(reply);
     for (const part of chunks(body || '(see attachment)')) await msg.reply(part);
