@@ -363,6 +363,37 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 18. dashboard server: imports cleanly + GET / returns HTTP 200 on ephemeral port ----
+{
+  const label = 'dashboard/server.mjs: imports cleanly; GET / returns 200; GET /api/state returns valid JSON';
+  let server;
+  try {
+    const { start } = await import(path.join(WORKSPACE, 'dashboard/server.mjs'));
+    // port 0 → OS assigns an ephemeral port; avoids conflicts
+    const { server: s, url } = await start(0);
+    server = s;
+
+    // GET /
+    const homeRes = await fetch(url + '/');
+    if (homeRes.status !== 200) throw new Error(`GET / returned ${homeRes.status}`);
+    const html = await homeRes.text();
+    if (!html.includes('<title>Helm Dashboard</title>')) throw new Error('HTML missing expected title');
+
+    // GET /api/state
+    const apiRes = await fetch(url + '/api/state');
+    if (apiRes.status !== 200) throw new Error(`GET /api/state returned ${apiRes.status}`);
+    const state = await apiRes.json();
+    for (const key of ['ts', 'services', 'memory', 'jobs', 'journal', 'upgradeHistory', 'fleetTarget', 'gitLog']) {
+      if (!(key in state)) throw new Error(`/api/state missing key: ${key}`);
+    }
+    if (!Array.isArray(state.services)) throw new Error('state.services is not an array');
+    if (state.services.length !== 5) throw new Error(`expected 5 services, got ${state.services.length}`);
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+  finally { if (server) server.close(); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
