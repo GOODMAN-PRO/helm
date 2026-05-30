@@ -121,18 +121,18 @@
   {
     "name": "browser.open",
     "summary": "Open a URL in headless Chromium and return page text. Logins persist via workspace/browser-profile/.",
-    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs open",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.open.mjs",
     "args_schema": {
       "url": { "type": "string", "required": true, "description": "URL to navigate to" }
     },
-    "requires": ["Playwright Chromium (installed via npx playwright install chromium)"],
+    "requires": ["Playwright Chromium — auto-installed on first use via npx playwright install chromium"],
     "side_effects": "saves current URL to workspace/browser-state.json; may write cookies to browser-profile/",
     "confirm": false
   },
   {
     "name": "browser.read",
     "summary": "Read text content of the current browser page (set by the last browser.open or browser.click).",
-    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs read",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.read.mjs",
     "args_schema": {},
     "requires": ["browser.open called first"],
     "side_effects": "none",
@@ -141,7 +141,7 @@
   {
     "name": "browser.click",
     "summary": "Click a CSS selector on the current page; follows navigation if it occurs.",
-    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs click",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.click.mjs",
     "args_schema": {
       "selector": { "type": "string", "required": true, "description": "CSS selector to click" }
     },
@@ -152,7 +152,7 @@
   {
     "name": "browser.fill",
     "summary": "Fill a form input on the current page with text.",
-    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs fill",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.fill.mjs",
     "args_schema": {
       "selector": { "type": "string", "required": true, "description": "CSS selector of the input" },
       "text":     { "type": "string", "required": true, "description": "Value to fill in" }
@@ -164,7 +164,7 @@
   {
     "name": "browser.screenshot",
     "summary": "Screenshot the current browser page viewport.",
-    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.mjs screenshot",
+    "exec": "node /Users/owner/secondme/workspace/tools/impl/browser.screenshot.mjs",
     "args_schema": {
       "out": { "type": "string", "description": "Output path. Default: /tmp/helm-browser.png" }
     },
