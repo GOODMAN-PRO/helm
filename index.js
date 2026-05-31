@@ -118,6 +118,7 @@ function runClaude(args, prompt) {
       if (code === 0) resolve(out);
       else reject(new Error(err.trim() || `claude exited ${code}`));
     });
+    child.stdin.on('error', () => {}); // EPIPE if claude exits before reading stdin
     child.stdin.write(prompt);
     child.stdin.end();
   });
@@ -248,7 +249,7 @@ client.on(Events.MessageCreate, async msg => {
     const m = e.timedOut
       ? '⚠️ that task hit the 10-min cap and was stopped — try breaking it into a smaller step.'
       : `⚠️ brain error: ${String(e.message || e).slice(0, 1800)}`;
-    await msg.reply(m);
+    try { await msg.reply(m); } catch {}  // Discord API failure in error path must not crash the process
   }
 });
 

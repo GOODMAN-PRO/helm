@@ -584,6 +584,29 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 25. sweepidx-1: child.stdin has error handler in runClaude ----
+{
+  const label = 'sweepidx-1: runClaude guards child.stdin against EPIPE (error handler present)';
+  try {
+    const src = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!src.includes("child.stdin.on('error'"))
+      throw new Error("child.stdin.on('error') handler missing from runClaude — EPIPE crashes process");
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 26. sweepidx-2: error-handler reply is guarded with try-catch ----
+{
+  const label = 'sweepidx-2: msg.reply(m) in MessageCreate catch block is wrapped in try-catch';
+  try {
+    const src = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    // The pattern we require: "try { await msg.reply(m); } catch" inside the outer catch block.
+    if (!src.includes('try { await msg.reply(m); } catch'))
+      throw new Error('msg.reply(m) in error handler is not wrapped in try-catch — Discord API failure becomes unhandled rejection');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
