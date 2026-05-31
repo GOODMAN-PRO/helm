@@ -40,3 +40,6 @@ workspace/active-target
 # swarm worktrees
 .swarm/
 workspace/swarm/swarm.log
+
+workspace/swarm/diffs/
+workspace/swarm/bugsweep.json.bak

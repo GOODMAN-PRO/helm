@@ -211,6 +211,14 @@ const reviewPrompt = (t, builderSummary) => [
     }
   }
 
+  // Save each task's proposed diff (vs the run's base) for review, regardless of merge outcome.
+  const DIFFS = path.join(__dirname, 'diffs');
+  mkdirSync(DIFFS, { recursive: true });
+  for (const t of todo) {
+    const d = git(ROOT, 'diff', baseMain, `swarm/${t.id}`).stdout || '';
+    writeFileSync(path.join(DIFFS, `${t.id}.diff`), d.trim() ? d : '(no changes — no bug found / nothing to fix)\n');
+  }
+
   for (const t of todo) { sh('git', ['-C', ROOT, 'worktree', 'remove', '--force', t._wt]); git(ROOT, 'branch', '-D', `swarm/${t.id}`); }
 
   if (DRY) { git(ROOT, 'reset', '--hard', baseMain); log('DRY: main restored'); }
