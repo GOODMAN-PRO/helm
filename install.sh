@@ -2,7 +2,7 @@
 # Helm installer — set up the Helm AI agent (Discord DM -> Claude on your subscription -> action).
 #
 # Remote (after publish):
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash
 #
 # Local test (install from a local source dir into a throwaway target, no clone):
 #   HELM_SRC=/Users/owner/secondme HELM_DIR=/tmp/helm-test bash install.sh
@@ -14,7 +14,7 @@
 #   HELM_NONINTERACTIVE=1  skip prompts; write .env from template for manual editing
 set -euo pipefail
 
-REPO_URL="${HELM_REPO:-https://github.com/OWNER/REPO.git}"
+REPO_URL="${HELM_REPO:-https://github.com/GOODMAN-PRO/helm.git}"
 TARGET="${HELM_DIR:-$HOME/helm}"
 SRC="${HELM_SRC:-}"
 NONINTERACTIVE="${HELM_NONINTERACTIVE:-0}"

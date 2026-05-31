@@ -8,7 +8,7 @@ You DM your Discord bot; the message goes to `claude -p` running on your machine
 ## Install
 One command (macOS / Linux). It checks prerequisites, fetches the code, installs deps, and walks you through the `.env`:
 ```
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash
 ```
 Prerequisites: **Node 18+**, **git**, and **Claude Code** (`claude`) logged into your Max/Pro subscription.
 
@@ -25,7 +25,7 @@ bash ~/helm/scripts/install-service.sh
 
 ### Manual install
 ```
-git clone https://github.com/OWNER/REPO.git helm && cd helm
+git clone https://github.com/GOODMAN-PRO/helm.git helm && cd helm
 npm install
 cp .env.example .env   # then set DISCORD_TOKEN + OWNER_ID
 npm start
