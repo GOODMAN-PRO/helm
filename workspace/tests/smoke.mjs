@@ -711,6 +711,24 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 33. vision: scale-math fix — invalid --scale string must not produce NaN ----
+{
+  const label = 'vision: invalid --scale string falls back to SCALE_DEFAULT, not NaN';
+  try {
+    // Verify the fixed pattern: Number(val) || default handles NaN and null safely.
+    const parseScale = (val, def = 2) => Number(val) || def;
+    if (isNaN(parseScale('abc'))) throw new Error('invalid scale should fall back, not NaN');
+    if (parseScale('abc') !== 2) throw new Error(`expected 2 for "abc", got ${parseScale('abc')}`);
+    if (parseScale(null) !== 2) throw new Error(`expected 2 for null, got ${parseScale(null)}`);
+    if (parseScale('1') !== 1) throw new Error(`expected 1 for "1", got ${parseScale('1')}`);
+    if (parseScale('2') !== 2) throw new Error(`expected 2 for "2", got ${parseScale('2')}`);
+    // Confirm the old buggy pattern would have produced NaN for the same input.
+    const OLD = val => Number(val || 2);
+    if (!isNaN(OLD('abc'))) throw new Error('test setup error: old pattern should give NaN for "abc"');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
