@@ -48,3 +48,6 @@ workspace/swarm/bugsweep.json.bak
 workspace/secrets/vault.json
 
 workspace/inbox/
+
+workspace/research/reports/
+workspace/research/research.log
