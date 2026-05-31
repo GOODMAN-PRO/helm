@@ -52,8 +52,9 @@ function launchctlStatus() {
 function memoryStats() {
   const dbPath = path.join(WORKSPACE, 'memory', 'memory.db');
   if (!existsSync(dbPath)) return { total: 0, byKind: {}, recent: [] };
+  let db;
   try {
-    const db = new DatabaseSync(dbPath);
+    db = new DatabaseSync(dbPath);
     const { n: total } = db.prepare('SELECT COUNT(*) AS n FROM facts').get();
     const byKind = {};
     for (const row of db.prepare('SELECT kind, COUNT(*) AS n FROM facts GROUP BY kind').all()) {
@@ -63,26 +64,29 @@ function memoryStats() {
       `SELECT id, kind, key, value, confidence, updated
        FROM facts ORDER BY updated DESC LIMIT 12`
     ).all();
-    db.close();
     return { total, byKind, recent };
   } catch (e) {
     return { total: 0, byKind: {}, recent: [], error: e.message };
+  } finally {
+    try { db?.close(); } catch {}
   }
 }
 
 function schedulerJobs() {
   const dbPath = path.join(WORKSPACE, 'scheduler', 'jobs.db');
   if (!existsSync(dbPath)) return [];
+  let db;
   try {
-    const db = new DatabaseSync(dbPath);
+    db = new DatabaseSync(dbPath);
     const jobs = db.prepare(
       `SELECT id, name, cron, enabled, last_run, next_run, payload
        FROM jobs ORDER BY enabled DESC, name ASC`
     ).all();
-    db.close();
     return jobs;
   } catch {
     return [];
+  } finally {
+    try { db?.close(); } catch {}
   }
 }
 
@@ -432,7 +436,7 @@ function renderAllCards(state) {
 export function start(port = 7777) {
   const server = http.createServer((req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.writeHead(405).end('Method Not Allowed');
+      res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Method Not Allowed');
       return;
     }
     try {
@@ -448,7 +452,9 @@ export function start(port = 7777) {
         res.end(body);
       }
     } catch (err) {
-      res.writeHead(500).end(String(err));
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' }).end(String(err));
+      }
     }
   });
 
