@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helm — your own AI agent, on your own machine</title>
+<meta name="description" content="Helm is a personal AI agent that lives on your hardware. Message it from Discord, give it full shell, files, screen and your whole fleet. Powered by your Claude subscription or an API key.">
+<style>
+  :root{
+    --bg:#080b11; --bg2:#0b111b; --panel:#0f1828; --panel2:#121d2e;
+    --line:#1d2a3d; --ink:#eaf6f8; --muted:#8ca2b8; --faint:#5d7088;
+    --cyan:#22d3ee; --teal:#5eead4; --sky:#38bdf8;
+    --grad:linear-gradient(120deg,#7df0dc 0%,#22d3ee 50%,#38bdf8 100%);
+    --yes:#5eead4; --no:#41506a; --part:#e0b65a;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 700px at 50% -10%, #14202f 0%, transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--cyan);text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.5px}
+  .brand svg{width:34px;height:34px;border-radius:9px}
+  .nav-links{display:flex;gap:26px;font-size:14px;color:var(--muted)}
+  .nav-links a:hover{color:var(--ink)}
+  @media(max-width:640px){.nav-links{display:none}}
+
+  /* hero */
+  header.hero{text-align:center;padding:64px 0 30px}
+  .logo-glow{display:inline-block;border-radius:28px;
+    box-shadow:0 0 0 1px #1c2c40, 0 0 60px -8px #22d3ee66, 0 0 140px -30px #38bdf855;
+    animation:pulse 5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 1px #1c2c40,0 0 50px -10px #22d3ee44,0 0 120px -30px #38bdf844}
+    50%{box-shadow:0 0 0 1px #20405a,0 0 80px -6px #22d3ee88,0 0 170px -24px #38bdf877}}
+  .logo-glow svg{display:block;width:128px;height:128px;border-radius:28px}
+  h1{font-size:clamp(34px,6vw,60px);line-height:1.05;margin:26px 0 14px;letter-spacing:-1px}
+  .sub{font-size:clamp(16px,2.4vw,20px);color:var(--muted);max-width:680px;margin:0 auto 28px}
+  .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:12px;font-weight:600;font-size:15px;border:1px solid transparent;cursor:pointer}
+  .btn.primary{background:var(--grad);color:#05202a}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.ghost{border-color:var(--line);color:var(--ink);background:#0c1421}
+  .btn.ghost:hover{border-color:var(--cyan)}
+  .tagrow{margin-top:22px;color:var(--faint);font-size:13px}
+
+  /* sections */
+  section{padding:54px 0}
+  .eyebrow{color:var(--cyan);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 0 10px}
+  h2{font-size:clamp(26px,4vw,38px);margin:0 0 10px;letter-spacing:-.5px}
+  .lead{color:var(--muted);max-width:680px;margin:0 0 34px}
+
+  /* feature grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px;transition:.2s}
+  .card:hover{transform:translateY(-2px);border-color:#2c4561}
+  .card .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:14px;
+    font-size:18px;background:#0c1827;border:1px solid #20364e;color:var(--teal)}
+  .card h3{margin:0 0 6px;font-size:17px}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+
+  /* how it works */
+  .flow{display:flex;align-items:stretch;gap:14px;flex-wrap:wrap}
+  .step{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .step .n{font-size:13px;color:var(--cyan);font-weight:700;margin-bottom:8px}
+  .step h4{margin:0 0 6px;font-size:16px}
+  .step p{margin:0;color:var(--muted);font-size:14px}
+
+  /* comparison */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+  table{border-collapse:collapse;width:100%;min-width:720px;font-size:14px}
+  th,td{padding:14px 12px;text-align:center;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left;color:var(--ink);font-weight:500;min-width:230px}
+  thead th{font-size:12.5px;color:var(--muted);font-weight:600;letter-spacing:.4px;background:#0c1421;position:sticky;top:0}
+  thead th.helm{color:#06222b;background:var(--grad);border-top-left-radius:0}
+  tbody tr:hover{background:#0c1726}
+  td.helm{background:#0b1a22}
+  .mk{font-weight:800}
+  .yes{color:var(--yes)} .no{color:var(--no)} .part{color:var(--part)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:14px}
+  .legend span b{font-weight:800;margin-right:6px}
+  .note{color:var(--faint);font-size:12.5px;margin-top:12px;max-width:760px}
+
+  /* install */
+  .install{background:linear-gradient(180deg,var(--panel2),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:34px}
+  .code{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#06090f;border:1px solid #1b2740;border-radius:12px;padding:14px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:#cfeaf2;overflow-x:auto}
+  .code button{flex:none;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer}
+  .code button:hover{border-color:var(--cyan)}
+  .opts{display:flex;gap:14px;flex-wrap:wrap;margin-top:18px}
+  .opt{flex:1;min-width:200px;background:#0c1726;border:1px solid var(--line);border-radius:12px;padding:16px}
+  .opt h4{margin:0 0 4px;font-size:15px}
+  .opt p{margin:0;color:var(--muted);font-size:13.5px}
+
+  footer{border-top:1px solid var(--line);padding:34px 0;color:var(--faint);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav>
+    <div class="brand">
+      <!-- inline Helm mark -->
+      <svg viewBox="0 0 512 512" aria-label="Helm"><defs>
+        <radialGradient id="bg" cx="50%" cy="34%" r="80%"><stop offset="0%" stop-color="#1d2738"/><stop offset="55%" stop-color="#111722"/><stop offset="100%" stop-color="#080b11"/></radialGradient>
+        <linearGradient id="wh" gradientUnits="userSpaceOnUse" x1="110" y1="90" x2="402" y2="422"><stop offset="0%" stop-color="#7df0dc"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
+        <radialGradient id="core" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#d6fff7"/><stop offset="60%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></radialGradient>
+      </defs>
+      <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+      <g transform="translate(256,256)" fill="none" stroke="url(#wh)" stroke-linecap="round">
+        <g stroke-width="15"><line y2="-184"/><line y2="-184" transform="rotate(45)"/><line y2="-184" transform="rotate(90)"/><line y2="-184" transform="rotate(135)"/><line y2="-184" transform="rotate(180)"/><line y2="-184" transform="rotate(225)"/><line y2="-184" transform="rotate(270)"/><line y2="-184" transform="rotate(315)"/></g>
+        <circle r="126" stroke-width="20"/>
+      </g>
+      <circle cx="256" cy="256" r="46" fill="#080b11"/><circle cx="256" cy="256" r="46" fill="none" stroke="url(#wh)" stroke-width="6"/><circle cx="256" cy="256" r="16" fill="url(#core)"/>
+      </svg>
+      <span>HELM</span>
+    </div>
+    <div class="nav-links">
+      <a href="#features">What it does</a>
+      <a href="#compare">Compare</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+    </div>
+  </nav>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="logo-glow">
+      <svg viewBox="0 0 512 512" aria-label="Helm"><defs>
+        <radialGradient id="bg2g" cx="50%" cy="34%" r="80%"><stop offset="0%" stop-color="#1d2738"/><stop offset="55%" stop-color="#111722"/><stop offset="100%" stop-color="#080b11"/></radialGradient>
+        <linearGradient id="wh2" gradientUnits="userSpaceOnUse" x1="110" y1="90" x2="402" y2="422"><stop offset="0%" stop-color="#7df0dc"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
+        <radialGradient id="core2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#d6fff7"/><stop offset="60%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></radialGradient>
+      </defs>
+      <rect width="512" height="512" rx="116" fill="url(#bg2g)"/>
+      <circle cx="256" cy="256" r="158" fill="none" stroke="#2b3a52" stroke-width="2" opacity="0.45"/>
+      <g transform="translate(256,256)" fill="none" stroke="url(#wh2)" stroke-linecap="round" stroke-linejoin="round">
+        <g stroke-width="15"><line y2="-184"/><line y2="-184" transform="rotate(45)"/><line y2="-184" transform="rotate(90)"/><line y2="-184" transform="rotate(135)"/><line y2="-184" transform="rotate(180)"/><line y2="-184" transform="rotate(225)"/><line y2="-184" transform="rotate(270)"/><line y2="-184" transform="rotate(315)"/></g>
+        <circle r="126" stroke-width="20"/><circle r="96" stroke-width="3" opacity="0.5"/>
+      </g>
+      <circle cx="256" cy="256" r="46" fill="#080b11"/><circle cx="256" cy="256" r="46" fill="none" stroke="url(#wh2)" stroke-width="6"/><circle cx="256" cy="256" r="16" fill="url(#core2)"/>
+      </svg>
+    </div>
+    <h1>Your own AI agent,<br><span class="grad">on your own machine.</span></h1>
+    <p class="sub">Helm lives on your hardware with full shell, files, web and screen. You message it from Discord; it actually does the work and reports back. Owner-locked, private, and powered by the Claude subscription you already pay for.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install Helm</a>
+      <a class="btn ghost" href="#compare">See how it compares</a>
+    </div>
+    <div class="tagrow">Runs on macOS, Windows and Linux · Discord &amp; iMessage · No new SaaS bill</div>
+  </header>
+</div>
+
+<div class="wrap">
+  <section id="features">
+    <p class="eyebrow">What Helm can do</p>
+    <h2>Not a chatbot. An agent that <span class="grad">acts</span>.</h2>
+    <p class="lead">Most assistants answer in a web tab. Helm has your terminal, your files, your browser and your screen — and the judgment to use them.</p>
+    <div class="grid">
+      <div class="card"><div class="ic">⌘</div><h3>Lives on your machine</h3><p>Full shell, file system and web access — not a locked cloud sandbox. It builds, runs and fixes things for real.</p></div>
+      <div class="card"><div class="ic">◌</div><h3>Message it anywhere</h3><p>DM it on Discord, or iMessage on a Mac. No dashboard to babysit — it works like texting a very capable friend.</p></div>
+      <div class="card"><div class="ic">⦿</div><h3>Owner-locked &amp; private</h3><p>Only your ID can command it. Your data, keys and conversations never leave hardware you own.</p></div>
+      <div class="card"><div class="ic">❖</div><h3>Real long-term memory</h3><p>Structured recall plus a living Obsidian "brain" that learns your preferences — and stays in sync across machines.</p></div>
+      <div class="card"><div class="ic">⇄</div><h3>Your whole fleet</h3><p>Swap between your Mac and Windows box mid-conversation over Tailscale. One agent, every machine.</p></div>
+      <div class="card"><div class="ic">▣</div><h3>Sees and drives your screen</h3><p>Takes screenshots, clicks and types. It can operate apps that have no API when it has to.</p></div>
+      <div class="card"><div class="ic">↻</div><h3>Thinks 24/7, upgrades itself</h3><p>Background cognition during the day; nightly self-improvement gated by tests that auto-revert on failure.</p></div>
+      <div class="card"><div class="ic">⌁</div><h3>Powered your way</h3><p>Run it on your Claude Pro/Max subscription, or a pay-as-you-go Anthropic API key. Your choice at install.</p></div>
+      <div class="card"><div class="ic">⚿</div><h3>Encrypted secrets vault</h3><p>Hand it credentials safely — encrypted at rest, never echoed into chat, logs or git.</p></div>
+    </div>
+  </section>
+
+  <section id="compare">
+    <p class="eyebrow">How Helm compares</p>
+    <h2>Built for <span class="grad">you</span>, not a data center.</h2>
+    <p class="lead">Cloud agents are powerful but they run on someone else's computer, on someone else's terms. Helm trades the polish of a hosted product for something more valuable: it's yours.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Capability</th>
+          <th class="helm">Helm</th>
+          <th>ChatGPT</th>
+          <th>Claude.ai</th>
+          <th>Devin</th>
+          <th>AutoGPT</th>
+          <th>Open&nbsp;Interpreter</th>
+        </tr></thead>
+        <tbody>
+          <tr><td>Runs on your own machine</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Private &amp; owner-locked</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>Chat from Discord / iMessage</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Full shell + file access on your box</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Controls your real screen (GUI)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Persistent personal memory</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Multi-machine fleet (Mac + Windows)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Self-upgrades over time</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Uses your existing subscription</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Open &amp; self-installed</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span><b class="yes">✓</b>Yes</span>
+      <span><b class="part">~</b>Partial / cloud-sandboxed only</span>
+      <span><b class="no">—</b>No</span>
+    </div>
+    <p class="note">Comparison reflects each tool's primary, out-of-the-box model. "Partial" means a capability exists but only inside a hosted sandbox (e.g. cloud code execution or API-only computer-use), not on your own machine. Product names belong to their owners; this is an honest positioning, not an exhaustive benchmark.</p>
+  </section>
+
+  <section id="how">
+    <p class="eyebrow">How it works</p>
+    <h2>Three moving parts. <span class="grad">That's it.</span></h2>
+    <div class="flow">
+      <div class="step"><div class="n">01</div><h4>You message</h4><p>Send a DM from Discord or iMessage — a task, a question, anything.</p></div>
+      <div class="step"><div class="n">02</div><h4>Helm acts on your machine</h4><p>It runs Claude with full tools right on your hardware: shell, files, web, screen, memory.</p></div>
+      <div class="step"><div class="n">03</div><h4>It reports back</h4><p>You get the result — files built, problems fixed, a screenshot — straight back in the chat.</p></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <p class="eyebrow">Get Helm</p>
+    <h2>One command. <span class="grad">Then it's yours.</span></h2>
+    <div class="install">
+      <div class="code">
+        <span id="cmd">curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash</span>
+        <button onclick="copyCmd()">Copy</button>
+      </div>
+      <div class="opts">
+        <div class="opt"><h4>Pick your gateways</h4><p>A guided setup screen lets you turn on Discord, iMessage, or both.</p></div>
+        <div class="opt"><h4>Pick your backend</h4><p>Your Claude Pro/Max subscription, or an Anthropic API key — no subscription required.</p></div>
+        <div class="opt"><h4>Run it 24/7</h4><p>Optionally install it as a background service so it's always there.</p></div>
+      </div>
+      <p class="note">Requires Node 18+, git, and Claude Code logged into your Anthropic account. macOS, Windows and Linux supported.</p>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">Helm — a personal AI agent that runs on your hardware. Your machine, your data, your agent.</div>
+</footer>
+
+<script>
+function copyCmd(){
+  const t=document.getElementById('cmd').textContent;
+  navigator.clipboard.writeText(t).then(()=>{
+    const b=event.target; const o=b.textContent; b.textContent='Copied'; setTimeout(()=>b.textContent=o,1400);
+  });
+}
+</script>
+</body>
+</html>
