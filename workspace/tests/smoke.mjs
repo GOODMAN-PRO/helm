@@ -661,6 +661,56 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 30. scheduler: in-flight tracking present (overlap fix) ----
+{
+  const label = 'scheduler.mjs: in-flight Set prevents concurrent execution of the same job';
+  try {
+    const src = readFileSync(path.join(WORKSPACE, 'scheduler/scheduler.mjs'), 'utf8');
+    if (!src.includes('const running = new Set()'))
+      throw new Error('running Set not declared');
+    if (!src.includes('running.add(job.id)'))
+      throw new Error('running.add(job.id) not found in fireJob');
+    if (!src.includes('running.delete(job.id)'))
+      throw new Error('running.delete(job.id) not found in close/error handlers');
+    if (!src.includes('running.has(job.id)'))
+      throw new Error('running.has(job.id) guard not found in tick()');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 31. scheduler: overdue jobs fire regardless of cronMatches (catch-up fix) ----
+{
+  const label = 'scheduler.mjs: overdue jobs (next_run in past) fire as catch-up, not silently dropped';
+  try {
+    const src = readFileSync(path.join(WORKSPACE, 'scheduler/scheduler.mjs'), 'utf8');
+    if (!src.includes('isOverdue'))
+      throw new Error('isOverdue logic not found');
+    if (!src.includes('job.next_run !== null'))
+      throw new Error('overdue detection (job.next_run !== null) not found');
+    if (!src.includes('!isOverdue'))
+      throw new Error('cronMatches bypass for overdue jobs not found');
+    if (!src.includes('overdue — firing catch-up run'))
+      throw new Error('catch-up log message not found');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 32. scheduler: stmtSchedule used on new-job path (last_run not poisoned) ----
+{
+  const label = 'scheduler.mjs: new-job schedule path uses stmtSchedule (not stmtUpdate) so last_run stays NULL';
+  try {
+    const src = readFileSync(path.join(WORKSPACE, 'scheduler/scheduler.mjs'), 'utf8');
+    if (!src.includes('stmtSchedule'))
+      throw new Error('stmtSchedule not declared');
+    if (!src.includes('UPDATE jobs SET next_run = ?'))
+      throw new Error('stmtSchedule SQL (next_run only) not found');
+    // The new-job scheduling path must call stmtSchedule, not stmtUpdate
+    if (!src.includes('stmtSchedule.run('))
+      throw new Error('stmtSchedule.run() call not found');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

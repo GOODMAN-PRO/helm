@@ -62,11 +62,19 @@ const stmtDue = db.prepare(
 const stmtUpdate = db.prepare(
   `UPDATE jobs SET last_run = unixepoch(), next_run = ? WHERE id = ?`
 );
+// Bug fix 3: rescheduling a new job that didn't match this tick must NOT touch last_run.
+const stmtSchedule = db.prepare(
+  `UPDATE jobs SET next_run = ? WHERE id = ?`
+);
 const stmtDisable = db.prepare(
   `UPDATE jobs SET enabled = 0, next_run = NULL WHERE id = ?`
 );
 
+// Bug fix 1: track in-flight job IDs to prevent concurrent execution of the same job.
+const running = new Set();
+
 function fireJob(job) {
+  running.add(job.id); // Bug fix 1: mark in-flight before async work begins
   const slug = job.name.replace(/[^a-z0-9]+/gi, '-').slice(0, 40);
   const runDir = makeRunDir(slug);
 
@@ -113,6 +121,7 @@ function fireJob(job) {
 
   child.on('close', code => {
     clearTimeout(killTimer);
+    running.delete(job.id); // Bug fix 1: clear in-flight on completion
     appendLog(runDir, { event: 'close', code });
     let result = '(no output)';
     try {
@@ -131,6 +140,7 @@ function fireJob(job) {
 
   child.on('error', e => {
     clearTimeout(killTimer);
+    running.delete(job.id); // Bug fix 1: clear in-flight on error
     appendLog(runDir, { event: 'error', message: e.message });
     finaliseRun(runDir, `ERROR: ${e.message}`);
     log(`job "${job.name}" error: ${e.message}`);
@@ -144,18 +154,36 @@ function tick() {
 
   for (const job of due) {
     try {
+      // Bug fix 1: skip jobs that are already running to prevent overlap.
+      if (running.has(job.id)) {
+        log(`job "${job.name}" still in-flight — skipping this tick`);
+        continue;
+      }
+
       const next = nextCronDate(job.cron);
       if (!next) {
         log(`WARNING: job "${job.name}" cron "${job.cron}" has no valid next date — disabling`);
         stmtDisable.run(job.id);
         continue;
       }
-      if (!cronMatches(job.cron, now)) {
-        // not due this tick — recompute next_run
-        stmtUpdate.run(Math.floor(next.getTime() / 1000), job.id);
+
+      // Bug fix 2: a job is overdue when next_run was explicitly set (not NULL) and is now
+      // in the past — meaning the daemon was down when it should have fired. Fire it as a
+      // catch-up regardless of whether cronMatches the current minute.
+      const isOverdue = job.next_run !== null;
+
+      if (!cronMatches(job.cron, now) && !isOverdue) {
+        // New job (next_run IS NULL) that doesn't match this minute — schedule it.
+        // Bug fix 3: use stmtSchedule (next_run only) so last_run is not poisoned.
+        stmtSchedule.run(Math.floor(next.getTime() / 1000), job.id);
         continue;
       }
-      log(`firing job "${job.name}"`);
+
+      if (isOverdue && !cronMatches(job.cron, now)) {
+        log(`job "${job.name}" overdue — firing catch-up run`);
+      } else {
+        log(`firing job "${job.name}"`);
+      }
       stmtUpdate.run(Math.floor(next.getTime() / 1000), job.id);
       fireJob(job);
     } catch (e) {
