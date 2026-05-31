@@ -73,8 +73,8 @@ if (path.resolve(PKG_ROOT) === path.resolve(TARGET)) {
 
 // 3) dependencies
 say('Installing dependencies (npm install)...');
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-if (spawnSync(npm, ['install', '--no-audit', '--no-fund'], { cwd: TARGET, stdio: 'inherit' }).status !== 0)
+// shell:true is required on Windows (Node refuses to spawn npm.cmd directly) and harmless on POSIX
+if (spawnSync('npm', ['install', '--no-audit', '--no-fund'], { cwd: TARGET, stdio: 'inherit', shell: true }).status !== 0)
   die(`npm install failed — run 'npm install' in ${TARGET}.`);
 ok('dependencies installed');
 
