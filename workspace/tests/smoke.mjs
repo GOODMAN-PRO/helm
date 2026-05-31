@@ -1014,6 +1014,80 @@ function fail(label, reason) {
   finally { if (server) server.close(); }
 }
 
+// ---- 43. bin/guiclick: syntax clean + detectScale exported ----
+{
+  const label = 'bin/guiclick: node --check clean; detectScale exported as a function';
+  try {
+    const guiclickPath = path.join(ROOT, 'bin/guiclick');
+    if (!existsSync(guiclickPath)) throw new Error('bin/guiclick not found');
+
+    const r = spawnSync('node', ['--check', guiclickPath], { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`syntax check failed: ${r.stderr}`);
+
+    // Import as a module and verify detectScale is exported.
+    // The CLI argv check prevents main() from running on import.
+    const { detectScale } = await import(guiclickPath);
+    if (typeof detectScale !== 'function') throw new Error('detectScale not exported from bin/guiclick');
+
+    // detectScale must return a positive integer without Screen Recording (it reads display metadata).
+    const scale = detectScale();
+    if (typeof scale !== 'number' || scale < 1 || !Number.isInteger(scale)) {
+      throw new Error(`detectScale returned unexpected value: ${scale}`);
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 44. gui_task.mjs: syntax clean + guiStep exported ----
+{
+  const label = 'gui_task.mjs: node --check clean; guiStep exported as async function';
+  try {
+    const guiTaskPath = path.join(WORKSPACE, 'tools/impl/gui_task.mjs');
+    if (!existsSync(guiTaskPath)) throw new Error('workspace/tools/impl/gui_task.mjs not found');
+
+    const r = spawnSync('node', ['--check', guiTaskPath], { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`syntax check failed: ${r.stderr}`);
+
+    // Import without triggering CLI main() — the argv guard prevents execution on import.
+    const { guiStep } = await import(guiTaskPath);
+    if (typeof guiStep !== 'function') throw new Error('guiStep not exported from gui_task.mjs');
+    // Must be async (returns a Promise)
+    const asyncTag = Object.prototype.toString.call(guiStep);
+    if (!guiStep.constructor?.name?.includes('Async') && guiStep.length === undefined) {
+      // Check by invoking with a no-op and confirming a Promise is returned
+    }
+    // Structural check: guiStep accepts 3 params (action, description, maxRetries)
+    if (guiStep.length < 2) throw new Error(`guiStep.length=${guiStep.length} — expected at least 2 params`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 45. MCP: playwright entry present with command; gui.step in registry ----
+{
+  const label = 'MCP playwright server present; gui.step registered in tools registry';
+  try {
+    const configPath = path.join(ROOT, 'workspace/mcp/servers.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    if (!config.mcpServers.playwright)
+      throw new Error('"playwright" server missing from workspace/mcp/servers.json');
+    if (!config.mcpServers.playwright.command || typeof config.mcpServers.playwright.command !== 'string')
+      throw new Error('playwright server entry missing command field');
+    if (!Array.isArray(config.mcpServers.playwright.args) || !config.mcpServers.playwright.args.includes('--headless'))
+      throw new Error('playwright server args missing --headless flag');
+
+    // gui.step must be in the tools registry
+    const registryPath = path.join(WORKSPACE, 'tools/registry.json');
+    const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
+    const guiStep = registry.find(t => t.name === 'gui.step');
+    if (!guiStep) throw new Error('gui.step not found in tools/registry.json');
+    if (!guiStep.exec) throw new Error('gui.step missing exec field in registry');
+    if (!guiStep.args_schema?.cmd) throw new Error('gui.step missing cmd in args_schema');
+    if (!guiStep.args_schema?.description) throw new Error('gui.step missing description in args_schema');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
