@@ -962,6 +962,27 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 41. vision: verify verb present; closes GUI verify-after-action loop ----
+{
+  const label = 'vision: verify verb present in vision.mjs with verified/explanation JSON shape';
+  try {
+    const src = readFileSync(path.join(ROOT, 'workspace/tools/impl/vision.mjs'), 'utf8');
+    if (!src.includes("verb === 'verify'"))
+      throw new Error("verify verb branch missing from vision.mjs");
+    if (!src.includes('result.verified'))
+      throw new Error('result.verified check missing from verify handler');
+    if (!src.includes('explanation'))
+      throw new Error('explanation field missing from verify handler');
+    if (!src.includes('--expect'))
+      throw new Error('--expect flag missing from verify handler');
+    // Registry must expose vision.verify so the tool dispatcher can call it
+    const reg = readFileSync(path.join(ROOT, 'workspace/tools/registry.json'), 'utf8');
+    if (!reg.includes('"vision.verify"'))
+      throw new Error('vision.verify entry missing from tools/registry.json');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

@@ -90,8 +90,26 @@ async function main() {
       const y = Math.round(coords.y / scale);
       console.log(JSON.stringify({ ok: true, x, y, px: coords.x, py: coords.y, scale, query }));
 
+    } else if (verb === 'verify') {
+      const expectation = get('expect') || rawArgs[1];
+      if (!expectation) {
+        console.error('verify requires: vision.mjs verify --expect "<expected screen state>"');
+        process.exit(1);
+      }
+      screenshot(imgPath);
+      const response = askClaude(
+        `Please use your Read tool to read the image at the path below. Does the screen currently show: "${expectation}"? Reply with ONLY a raw JSON object: {"verified": true, "explanation": "<one sentence>"} or {"verified": false, "explanation": "<one sentence>"}. No markdown, no extra text.`,
+        imgPath
+      );
+      const jsonMatch = response.match(/\{[^{}]+\}/);
+      if (!jsonMatch) throw new Error(`no JSON in claude response: ${response.slice(0, 300)}`);
+      let result;
+      try { result = JSON.parse(jsonMatch[0]); } catch (e) { throw new Error(`malformed JSON: ${jsonMatch[0]}`); }
+      if (typeof result.verified !== 'boolean') throw new Error(`expected {verified: bool}, got: ${jsonMatch[0]}`);
+      console.log(JSON.stringify({ ok: true, verified: result.verified, explanation: result.explanation ?? '', expectation }));
+
     } else {
-      console.error('Usage: vision.mjs describe | find <query>');
+      console.error('Usage: vision.mjs describe | find <query> | verify --expect "<expected state>"');
       process.exit(1);
     }
   } finally {

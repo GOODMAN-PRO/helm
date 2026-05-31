@@ -614,5 +614,31 @@
     ],
     "side_effects": "writes temp PNG; makes a Claude API call via claude -p",
     "confirm": false
+  },
+  {
+    "name": "vision.verify",
+    "summary": "Take a screenshot and ask Claude whether an expected screen state is currently visible. Use after gui.click or gui.type to confirm the action worked.",
+    "exec": "node tools/impl/vision.mjs verify",
+    "args_schema": {
+      "expect": {
+        "type": "string",
+        "required": true,
+        "description": "Natural-language description of what should be visible, e.g. 'the text field contains hello'"
+      },
+      "out": {
+        "type": "string",
+        "description": "Output path for temp screenshot PNG. Default: /tmp/helm-vision.png"
+      },
+      "scale": {
+        "type": "number",
+        "description": "Retina display scale factor. Default: 2"
+      }
+    },
+    "requires": [
+      "Screen Recording permission",
+      "claude CLI in PATH"
+    ],
+    "side_effects": "writes temp PNG; makes a Claude API call via claude -p",
+    "confirm": false
   }
 ]
