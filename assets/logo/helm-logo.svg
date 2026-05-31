@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 200" width="620" height="200" role="img" aria-label="HelmAgent logo">
+  <title>HelmAgent</title>
+  <!-- mark -->
+  <g transform="translate(0,0)">
+    <g fill="none" stroke="#111418" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <g>
+        <line x1="100" y1="100" x2="100" y2="6"/>
+        <line x1="100" y1="100" x2="100" y2="6" transform="rotate(45 100 100)"/>
+        <line x1="100" y1="100" x2="100" y2="6" transform="rotate(90 100 100)"/>
+        <line x1="100" y1="100" x2="100" y2="6" transform="rotate(135 100 100)"/>
+        <line x1="100" y1="100" x2="100" y2="6" transform="rotate(180 100 100)"/>
+        <line x1="100" y1="100" x2="100" y2="6" transform="rotate(225 100 100)"/>
+        <line x1="100" y1="100" x2="100" y2="6" transform="rotate(270 100 100)"/>
+        <line x1="100" y1="100" x2="100" y2="6" transform="rotate(315 100 100)"/>
+      </g>
+      <circle cx="100" cy="100" r="62" stroke-width="11"/>
+    </g>
+    <circle cx="100" cy="100" r="20" fill="#111418"/>
+    <circle cx="100" cy="100" r="7.5" fill="#2DD4BF"/>
+  </g>
+  <!-- wordmark -->
+  <text x="208" y="108" font-family="Helvetica Neue, Arial, sans-serif" font-size="74" font-weight="700" letter-spacing="-2" fill="#111418">Helm</text>
+  <text x="210" y="146" font-family="Helvetica Neue, Arial, sans-serif" font-size="26" font-weight="500" letter-spacing="11" fill="#5B6470">AGENT</text>
+</svg>

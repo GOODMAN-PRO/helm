@@ -61,7 +61,8 @@ function runClaudeRemote(prompt) {
     if (!HELM_WIN_HOST) return resolve('Windows node not configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Claude on Windows, then say "use windows" again.');
     // Shell-quote components so paths with spaces survive the remote shell.
     const q = s => `"${s.replace(/"/g, '\\"')}"`;
-    const remoteCmd = `${HELM_WIN_DIR ? `cd ${q(HELM_WIN_DIR)} && ` : ''}${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)}`;
+    const REMOTE_PERSONA = 'You are Helm running on the owners Windows PC over SSH, with full shell and file access on this machine. Act, do not just advise. Keep replies short and chat-friendly. Confirm before anything destructive, irreversible, or that spends money. Never touch the separate Helm project.';
+    const remoteCmd = `${HELM_WIN_DIR ? `cd ${q(HELM_WIN_DIR)} && ` : ''}${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)} --append-system-prompt ${q(REMOTE_PERSONA)}`;
     const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
     let out = '', err = '';
     const kill = setTimeout(() => child.kill(), 30 * 60_000);

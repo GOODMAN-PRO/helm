@@ -43,3 +43,6 @@ workspace/swarm/swarm.log
 
 workspace/swarm/diffs/
 workspace/swarm/bugsweep.json.bak
+
+# secrets vault (encrypted, but never commit)
+workspace/secrets/vault.json
