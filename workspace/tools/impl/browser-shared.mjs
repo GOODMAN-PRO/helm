@@ -1,7 +1,7 @@
 // Shared browser implementation. playwright is imported lazily inside runBrowser()
 // so this module is safe to import without triggering a browser launch or chromium download.
 
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -15,7 +15,9 @@ export function loadState() {
 }
 
 export function saveState(s) {
-  writeFileSync(STATE_FILE, JSON.stringify(s, null, 2));
+  const tmp = STATE_FILE + '.tmp';
+  writeFileSync(tmp, JSON.stringify(s, null, 2));
+  renameSync(tmp, STATE_FILE);
 }
 
 function stripHtml(html) {
@@ -66,9 +68,9 @@ export async function runBrowser(verb, params = {}) {
     headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
-  const page = await ctx.newPage();
 
   try {
+    const page = await ctx.newPage();
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     const currentUrl = page.url();
     const title      = await page.title();
