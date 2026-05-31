@@ -85,16 +85,25 @@ if [ -n "$SRC" ]; then
 elif [ -d "$TARGET/.git" ]; then
   say "Updating existing install at $TARGET"
   git -C "$TARGET" pull --ff-only && ok "updated"
-elif command -v git >/dev/null; then
-  say "Cloning $REPO_URL -> $TARGET"
-  git clone --depth 1 "$REPO_URL" "$TARGET" && ok "cloned"
 else
-  # no git — download the tarball instead (works with just curl + tar)
-  say "git not found — downloading tarball..."
   TARBALL="${HELM_TARBALL:-https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main}"
-  mkdir -p "$TARGET"
-  curl -fsSL "$TARBALL" | tar -xz -C "$TARGET" --strip-components=1 && ok "downloaded" || die "download failed — install git and re-run."
+  fetch_tarball() {
+    say "Downloading Helm (tarball)..."
+    command -v curl >/dev/null || die "Need curl to download Helm."
+    mkdir -p "$TARGET"
+    curl -fsSL "$TARBALL" | tar -xz -C "$TARGET" --strip-components=1 || die "download failed — check your connection/proxy and re-run."
+  }
+  if command -v git >/dev/null; then
+    say "Cloning $REPO_URL -> $TARGET"
+    if git clone --depth 1 "$REPO_URL" "$TARGET" 2>/dev/null; then ok "cloned"; else
+      warn "git clone failed (proxy/firewall?) — downloading the tarball instead"
+      rm -rf "$TARGET"; fetch_tarball; ok "downloaded"
+    fi
+  else
+    fetch_tarball; ok "downloaded"
+  fi
 fi
+[ -f "$TARGET/index.js" ] || die "Could not fetch Helm (network blocked?). Check your connection/proxy and re-run."
 cd "$TARGET"
 
 # 3) dependencies -----------------------------------------------------------

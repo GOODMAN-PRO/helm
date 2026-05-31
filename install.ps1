@@ -42,6 +42,19 @@ $claudeState = if (Get-Command claude -ErrorAction SilentlyContinue) { "claude p
 Write-Host "ok  node $(node -v)   git present   $claudeState" -ForegroundColor Green
 
 # 2) fetch source
+function Get-HelmZip($dest) {
+  # Download + extract the repo zip via Invoke-WebRequest (uses the system proxy, unlike git).
+  Write-Host "Downloading Helm (zip)..." -ForegroundColor Cyan
+  $zip = Join-Path $env:TEMP "helm-main.zip"
+  $tmp = Join-Path $env:TEMP ("helm-zip-" + [guid]::NewGuid().ToString("N"))
+  try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+  Invoke-WebRequest -UseBasicParsing "https://codeload.github.com/GOODMAN-PRO/helm/zip/refs/heads/main" -OutFile $zip
+  Expand-Archive -Path $zip -DestinationPath $tmp -Force
+  $inner = Get-ChildItem -Directory $tmp | Select-Object -First 1
+  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+  Copy-Item -Recurse -Force (Join-Path $inner.FullName "*") $dest
+  Remove-Item $zip, $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
 if ($Src) {
   Write-Host "Copying source from $Src -> $Dir"
   New-Item -ItemType Directory -Force -Path $Dir | Out-Null
@@ -51,8 +64,16 @@ if ($Src) {
   git -C $Dir pull --ff-only
 } else {
   Write-Host "Cloning $Repo -> $Dir"
-  git clone --depth 1 $Repo $Dir
+  # git often isn't proxy-aware; if the clone can't reach github.com, fall back to the zip download.
+  $cloned = $false
+  try { git clone --depth 1 $Repo $Dir 2>$null; if (Test-Path (Join-Path $Dir ".git")) { $cloned = $true } } catch {}
+  if (-not $cloned) {
+    Write-Host "git clone failed (proxy/firewall?) — using the zip download instead." -ForegroundColor Yellow
+    if (Test-Path $Dir) { Remove-Item $Dir -Recurse -Force -ErrorAction SilentlyContinue }
+    Get-HelmZip $Dir
+  }
 }
+if (-not (Test-Path (Join-Path $Dir "index.js"))) { Write-Host "xx  Could not fetch Helm (network blocked?). Check your connection/proxy and re-run." -ForegroundColor Red; exit 1 }
 Set-Location $Dir
 
 # 3) dependencies
