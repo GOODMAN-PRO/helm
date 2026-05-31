@@ -1,69 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Helm captain">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Helm">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="34%" r="80%">
-      <stop offset="0%" stop-color="#19293f"/><stop offset="60%" stop-color="#101a27"/><stop offset="100%" stop-color="#070a10"/>
+    <radialGradient id="bg" cx="50%" cy="36%" r="75%">
+      <stop offset="0%" stop-color="#1b2942"/>
+      <stop offset="55%" stop-color="#0f1722"/>
+      <stop offset="100%" stop-color="#070a10"/>
     </radialGradient>
-    <linearGradient id="wheel" gradientUnits="userSpaceOnUse" x1="244" y1="150" x2="268" y2="182">
-      <stop offset="0%" stop-color="#7df0dc"/><stop offset="100%" stop-color="#38bdf8"/>
+    <linearGradient id="wheel" gradientUnits="userSpaceOnUse" x1="120" y1="100" x2="392" y2="412">
+      <stop offset="0%" stop-color="#7df0dc"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
     </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e6fffb"/>
+      <stop offset="60%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
 
-  <!-- circular background -->
+  <!-- full-bleed circular avatar background -->
   <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="250" fill="none" stroke="#2a3a54" stroke-width="3" opacity="0.5"/>
 
-  <!-- shoulders / coat -->
-  <path d="M256 352 C168 352 96 402 80 470 C74 506 84 512 100 512 L412 512 C428 512 438 506 432 470 C416 402 344 352 256 352 Z" fill="#15243b"/>
-  <!-- coat lapels (teal trim) -->
-  <path d="M232 360 L150 430" stroke="#22d3ee" stroke-width="9" stroke-linecap="round"/>
-  <path d="M280 360 L362 430" stroke="#22d3ee" stroke-width="9" stroke-linecap="round"/>
-  <!-- shirt V + tie -->
-  <path d="M256 356 L298 430 L256 476 L214 430 Z" fill="#eef2f5"/>
-  <path d="M256 360 L270 416 L256 452 L242 416 Z" fill="#22d3ee"/>
-  <!-- epaulet buttons -->
-  <circle cx="256" cy="402" r="6" fill="#22d3ee"/>
-  <circle cx="256" cy="430" r="6" fill="#22d3ee"/>
-
-  <!-- neck -->
-  <path d="M228 300 H284 V360 C284 372 228 372 228 360 Z" fill="#e9c2a0"/>
-  <ellipse cx="256" cy="308" rx="30" ry="12" fill="#d3a684" opacity="0.6"/>
-
-  <!-- ears -->
-  <circle cx="178" cy="234" r="15" fill="#e9c2a0"/>
-  <circle cx="334" cy="234" r="15" fill="#e9c2a0"/>
-
-  <!-- head -->
-  <ellipse cx="256" cy="224" rx="80" ry="92" fill="#edc6a4"/>
-
-  <!-- beard framing the jaw -->
-  <path d="M178 226 C178 256 188 300 206 326 C224 352 240 360 256 360 C272 360 288 352 306 326 C324 300 334 256 334 226
-           C326 252 312 270 296 276 L296 300 C296 300 280 314 256 314 C232 314 216 300 216 300 L216 276 C200 270 186 252 178 226 Z"
-        fill="#6e5844"/>
-
-  <!-- eyebrows -->
-  <path d="M204 206 C214 200 232 200 240 206" stroke="#5b4636" stroke-width="8" stroke-linecap="round" fill="none"/>
-  <path d="M272 206 C280 200 298 200 308 206" stroke="#5b4636" stroke-width="8" stroke-linecap="round" fill="none"/>
-  <!-- eyes -->
-  <ellipse cx="222" cy="224" rx="9" ry="11" fill="#2b2b33"/>
-  <ellipse cx="290" cy="224" rx="9" ry="11" fill="#2b2b33"/>
-  <circle cx="225" cy="220" r="3" fill="#ffffff" opacity="0.85"/>
-  <circle cx="293" cy="220" r="3" fill="#ffffff" opacity="0.85"/>
-  <!-- nose -->
-  <path d="M256 230 L247 258 C247 264 265 264 265 258 Z" fill="#d8aa86"/>
-  <!-- mustache + smile -->
-  <path d="M230 280 C244 288 268 288 282 280 C270 294 242 294 230 280 Z" fill="#5b4636"/>
-  <path d="M236 294 C248 302 264 302 276 294" stroke="#b76a59" stroke-width="5" stroke-linecap="round" fill="none"/>
-
-  <!-- captain cap -->
-  <!-- crown (white top) -->
-  <path d="M170 150 C178 104 216 84 256 84 C296 84 334 104 342 150 C318 140 288 134 256 134 C224 134 194 140 170 150 Z" fill="#eef1f4"/>
-  <!-- band -->
-  <rect x="160" y="148" width="192" height="32" rx="7" fill="#0f1d30"/>
-  <!-- visor -->
-  <path d="M152 180 C194 198 318 198 360 180 C358 196 316 210 256 210 C196 210 154 196 152 180 Z" fill="#0a1524"/>
-  <!-- cap badge: small helm wheel -->
-  <g transform="translate(256,164)" stroke="url(#wheel)" fill="none" stroke-linecap="round">
-    <g stroke-width="3"><line y2="-12"/><line y2="-12" transform="rotate(60)"/><line y2="-12" transform="rotate(120)"/><line y2="-12" transform="rotate(180)"/><line y2="-12" transform="rotate(240)"/><line y2="-12" transform="rotate(300)"/></g>
-    <circle r="9" stroke-width="3"/>
+  <g transform="translate(256,256)" filter="url(#glow)" fill="none"
+     stroke="url(#wheel)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 8 bold spokes / handle pegs -->
+    <g stroke-width="22">
+      <line y2="-190"/>
+      <line y2="-190" transform="rotate(45)"/>
+      <line y2="-190" transform="rotate(90)"/>
+      <line y2="-190" transform="rotate(135)"/>
+      <line y2="-190" transform="rotate(180)"/>
+      <line y2="-190" transform="rotate(225)"/>
+      <line y2="-190" transform="rotate(270)"/>
+      <line y2="-190" transform="rotate(315)"/>
+    </g>
+    <!-- bold outer ring -->
+    <circle r="150" stroke-width="30"/>
   </g>
-  <circle cx="256" cy="164" r="3" fill="#7df0dc"/>
+
+  <!-- hub: dark disc + ring + glowing core -->
+  <circle cx="256" cy="256" r="58" fill="#070a10"/>
+  <circle cx="256" cy="256" r="58" fill="none" stroke="url(#wheel)" stroke-width="9"/>
+  <circle cx="256" cy="256" r="22" fill="url(#core)" filter="url(#glow)"/>
 </svg>
