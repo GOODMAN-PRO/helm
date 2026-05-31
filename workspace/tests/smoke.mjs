@@ -633,6 +633,34 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 29. cron N/step: single-start step expands to full range, not just start ----
+{
+  const label = 'cron.mjs: N/step (e.g. 5/15) expands to full range, not just start value';
+  try {
+    const { cronMatches, nextCronDate } = await import(
+      path.join(WORKSPACE, 'scheduler/cron.mjs')
+    );
+    // 5/15 on minutes should match {5, 20, 35, 50}
+    const matchedMinutes = [];
+    for (let m = 0; m < 60; m++) {
+      const d = new Date(Date.UTC(2026, 4, 30, 9, m, 0));
+      if (cronMatches('5/15 * * * *', d)) matchedMinutes.push(m);
+    }
+    const expected = [5, 20, 35, 50];
+    if (JSON.stringify(matchedMinutes) !== JSON.stringify(expected))
+      throw new Error(`5/15 matched ${JSON.stringify(matchedMinutes)}, expected ${JSON.stringify(expected)}`);
+
+    // nextCronDate from 09:06 should land at 09:20, not skip to next cycle
+    const from = new Date(Date.UTC(2026, 4, 30, 9, 6, 0));
+    const next = nextCronDate('5/15 * * * *', from);
+    if (!next) throw new Error('nextCronDate returned null for 5/15');
+    if (next.getUTCMinutes() !== 20)
+      throw new Error(`expected next minute=20, got ${next.getUTCMinutes()} (${next.toISOString()})`);
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
