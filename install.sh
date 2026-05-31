@@ -31,11 +31,15 @@ say "${c_b}== Helm installer ==${c_0}"
 
 # 1) prerequisites ----------------------------------------------------------
 command -v node  >/dev/null || die "Node not found. Install Node 18+ first (https://nodejs.org), then re-run."
-command -v claude>/dev/null || die "Claude Code (claude) not found. Install it, run 'claude' once and log into your Max subscription, then re-run."
 command -v git >/dev/null || command -v curl >/dev/null || die "Need either git or curl to fetch Helm."
 NODE_MAJ="$(node -p 'process.versions.node.split(".")[0]')"
 [ "$NODE_MAJ" -ge 18 ] || die "Node $(node -v 2>/dev/null) is too old; need 18+."
-ok "node $(node -v)   claude $(claude --version 2>/dev/null | head -n1)   $(command -v git >/dev/null && echo git || echo 'curl (no git)')"
+# Claude Code is the engine Helm runs on — auto-install it if missing.
+if ! command -v claude >/dev/null; then
+  say "Claude Code (Helm's engine) not found — installing it with npm..."
+  npm install -g @anthropic-ai/claude-code || warn "couldn't auto-install Claude Code — run: npm install -g @anthropic-ai/claude-code"
+fi
+ok "node $(node -v)   claude $(command -v claude >/dev/null && claude --version 2>/dev/null | head -n1 || echo 'installed')   $(command -v git >/dev/null && echo git || echo 'curl (no git)')"
 
 # 2) fetch source -----------------------------------------------------------
 if [ -n "$SRC" ]; then

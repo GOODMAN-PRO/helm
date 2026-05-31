@@ -27,8 +27,13 @@ say(`${c.b}== Helm installer ==${c.x}`);
 if (!has('node')) die('Node 18+ not found (https://nodejs.org).');
 const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
 if (nodeMajor < 18) die(`Node ${process.version} is too old; need 18+.`);
-if (!has('claude')) die("Claude Code (claude) not found. Install it, run 'claude' once and log in, then re-run.");
-ok(`node ${process.version}   claude present${has('git') ? '   git present' : ''}`);
+// Claude Code is the engine Helm runs on — auto-install it if missing (don't dead-end).
+if (!has('claude')) {
+  say("Claude Code (Helm's engine) not found — installing it with npm...");
+  spawnSync('npm install -g @anthropic-ai/claude-code', { stdio: 'inherit', shell: true });
+}
+const claudeOk = has('claude');
+ok(`node ${process.version}${claudeOk ? '   claude present' : '   claude installed (restart shell if not found)'}${has('git') ? '   git present' : ''}`);
 
 // 2) place the project at TARGET
 if (path.resolve(PKG_ROOT) === path.resolve(TARGET)) {

@@ -16,12 +16,17 @@ function Need($cmd, $msg) { if (-not (Get-Command $cmd -ErrorAction SilentlyCont
 Write-Host "== Helm installer (Windows) ==" -ForegroundColor Cyan
 
 # 1) prerequisites
-Need node   "Node 18+ not found. Install from https://nodejs.org then re-run."
-Need git    "git not found. Install Git for Windows (https://git-scm.com) then re-run."
-Need claude "Claude Code (claude) not found. Install it, run 'claude' once and log in, then re-run."
+Need node "Node 18+ not found. Install from https://nodejs.org then re-run."
+Need git  "git not found. Install Git for Windows (https://git-scm.com) then re-run."
 $nodeMajor = [int](node -p "process.versions.node.split('.')[0]")
 if ($nodeMajor -lt 18) { Write-Host "xx  Node too old; need 18+." -ForegroundColor Red; exit 1 }
-Write-Host "ok  node $(node -v)   git present   claude present" -ForegroundColor Green
+# Claude Code is the engine Helm runs on — auto-install it if missing.
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+  Write-Host "Claude Code (Helm's engine) not found — installing it with npm..." -ForegroundColor Cyan
+  npm install -g @anthropic-ai/claude-code
+}
+$claudeState = if (Get-Command claude -ErrorAction SilentlyContinue) { "claude present" } else { "claude installed (restart shell if not found)" }
+Write-Host "ok  node $(node -v)   git present   $claudeState" -ForegroundColor Green
 
 # 2) fetch source
 if ($Src) {
