@@ -95,7 +95,7 @@ Pick at install (or set `AUTH_MODE` in `.env`):
 
 Helm is the one that runs on your own hardware **and** ties your whole fleet together — local + open +
 Discord/iMessage + persistent memory + multi-machine fleet + 24/7 self-upgrade + free/local models, in
-one agent. See the full matrix on the [site](site/index.html).
+one agent. See the full matrix on the [live site](https://goodman-pro.github.io/helm/).
 
 ## Configuration (`.env`)
 

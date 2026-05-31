@@ -6,6 +6,7 @@ unchecked ones, marks them done, runs the smoke gate, and commits — or auto-re
 You can add items from any chat ("Helm, add to your upgrade queue: ...") or by editing this file.
 
 ## Pending
+- [ ] Hermes gap-closure: build `workspace/skills/` from scratch on Mac (proposed files from Windows never synced). Implement: `workspace/skills/loader.mjs` (listSkills/runSkillCommand), seed skill files (helm-core, reverse-engineering, screenshot-and-show), wire into `index.js` (import loader at startup, register slash commands, prepend skill result to system prompt on fire), add smoke assertion `listSkills().length >= 3`. Sir gave go 2026-05-31 session.
 
 ## Done
 - [x] Scheduler `notify` flag exposed at add-time: `scheduler.add` now accepts `--notify true|false` (default true), `scheduler.list` surfaces it, `registry.json` documents it. Closes the §1.4 deferral from BUGS_REPORT — owner can opt housekeeping jobs out of completion DMs while keeping the proactive default on. Smoke #22. (2026-05-31 nightly)
