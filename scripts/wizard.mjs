@@ -160,6 +160,14 @@ const LOCAL_MODELS = [
   { label: 'Llama 3.1 (8B) — balanced (~5 GB)', id: 'llama3.1' },
   { label: 'Qwen2.5 Coder (7B) — best for coding (~5 GB)', id: 'qwen2.5-coder' },
 ];
+// Free ONLINE providers (OpenAI-compatible). Helm routes through its local translation proxy
+// (workspace/proxy/llm-proxy.mjs) so Claude Code can use them. Each has a free tier — paste a key.
+const FREE_ONLINE = [
+  { label: 'Groq — Llama 3.3 70B (fast, 128k ctx)', baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', keyUrl: 'https://console.groq.com/keys' },
+  { label: 'OpenRouter — free models', baseUrl: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.3-70b-instruct:free', keyUrl: 'https://openrouter.ai/keys' },
+  { label: 'Cerebras — Llama 3.3 70B (very fast)', baseUrl: 'https://api.cerebras.ai/v1', model: 'llama-3.3-70b', keyUrl: 'https://cloud.cerebras.ai' },
+  { label: 'Together AI — free tier', baseUrl: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free', keyUrl: 'https://api.together.xyz/settings/api-keys' },
+];
 // Detect machine specs to recommend a local model size.
 function detectSpecs() {
   const ramGB = Math.max(1, Math.round(os.totalmem() / 1073741824));
@@ -226,7 +234,8 @@ const rawOk = !process.env.HELM_PLAIN && isTTY && typeof input.setRawMode === 'f
 // Keys the wizard owns; everything else in an existing .env (e.g. HELM_WIN_HOST for the Mac<->Windows
 // fleet/sync, custom vars) is PRESERVED so re-running setup never resets your fleet or sync config.
 const MANAGED = new Set(['DISCORD_TOKEN', 'OWNER_ID', 'GATEWAYS', 'AUTH_MODE', 'MODEL', 'PERMISSION_MODE',
-  'CLAUDE_BIN', 'WORKSPACE', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'ANTHROPIC_AUTH_TOKEN']);
+  'CLAUDE_BIN', 'WORKSPACE', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'ANTHROPIC_AUTH_TOKEN',
+  'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'PROXY_PORT']);
 function readEnvMap(p) {
   const m = {};
   try { for (const line of fs.readFileSync(p, 'utf8').split('\n')) { const s = line.trim(); if (!s || s.startsWith('#')) continue; const i = s.indexOf('='); if (i < 0) continue; m[s.slice(0, i).trim()] = s.slice(i + 1); } } catch {}
@@ -241,7 +250,13 @@ function buildEnv(cfg) {
     `GATEWAYS=${cfg.gateways.join(',')}`,
     `AUTH_MODE=${cfg.authMode}`,
     ...(cfg.authMode === 'apikey' ? [`ANTHROPIC_API_KEY=${cfg.apiKey}`] : []),
-    ...(cfg.authMode === 'custom' ? [`ANTHROPIC_BASE_URL=${cfg.baseUrl}`, `ANTHROPIC_MODEL=${cfg.modelId}`, ...(cfg.apiKey ? [`ANTHROPIC_API_KEY=${cfg.apiKey}`] : [])] : []),
+    // free ONLINE model: configure the OpenAI-compatible provider; index.js auto-starts the proxy
+    // and points Claude Code (ANTHROPIC_BASE_URL) at it. No ANTHROPIC_* endpoint needed here.
+    ...(cfg.authMode === 'custom' && cfg.online
+      ? [`OPENAI_BASE_URL=${cfg.openaiBase}`, `OPENAI_MODEL=${cfg.openaiModel}`, `OPENAI_API_KEY=${cfg.openaiKey || ''}`, 'PROXY_PORT=8787']
+      : []),
+    // local / direct Anthropic-compatible endpoint (e.g. Ollama native API)
+    ...(cfg.authMode === 'custom' && !cfg.online ? [`ANTHROPIC_BASE_URL=${cfg.baseUrl}`, `ANTHROPIC_MODEL=${cfg.modelId}`, ...(cfg.apiKey ? [`ANTHROPIC_API_KEY=${cfg.apiKey}`] : [])] : []),
     `MODEL=${cfg.model}`,
     `PERMISSION_MODE=${cfg.perm}`,
     `CLAUDE_BIN=${cfg.claudeBin}`,
@@ -266,6 +281,7 @@ function applyConfig(cfg) {
   console.log(cfg.svc ? `It's running in the background. Logs: ${ROOT}/agent.log` : `Start it:  cd "${ROOT}"  then  node index.js`);
   if (cfg.authMode === 'subscription') console.log("Backend: Claude subscription — make sure you've run 'claude' once and logged in.");
   else if (cfg.authMode === 'apikey') console.log('Backend: Anthropic API key (billed pay-as-you-go).');
+  else if (cfg.online) console.log(`Backend: free online model ${cfg.openaiModel} (${cfg.openaiBase}) — Helm auto-starts a local proxy to translate to it.${cfg.openaiKey ? '' : '\n!!  No API key entered — add OPENAI_API_KEY to .env before starting.'}`);
   else console.log(`Backend: free / local model (${cfg.modelId} @ ${cfg.baseUrl}) — make sure that endpoint is running.`);
   console.log(`Then DM your bot on Discord.${cfg.gateways.includes('imessage') ? '  (iMessage: grant node Full Disk Access in System Settings.)' : ''}`);
   console.log('Reminder: one Discord token = one running instance.');
@@ -286,16 +302,26 @@ async function runPlain() {
   const b = await ask('Power Helm with — 1) Claude subscription  2) Anthropic API key  3) Any other model (local/hosted)', '1');
   const authMode = b === '2' ? 'apikey' : b === '3' ? 'custom' : 'subscription';
   let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
+  let online = false, openaiBase = '', openaiModel = '', openaiKey = '';
   if (authMode === 'apikey') apiKey = await ask('Anthropic API key (https://console.anthropic.com/settings/keys)');
   else if (authMode === 'custom') {
     const specs = detectSpecs(); const rec = recommendIdx(specs);
     console.log(`  Your machine: ${specLine(specs)}`);
-    console.log('  Pick a model (1-3 are free local models that auto-download):');
-    LOCAL_MODELS.forEach((m, i) => console.log(`    ${i + 1}) ${m.label}${i === rec ? '  (recommended)' : ''}`));
-    console.log(`    ${LOCAL_MODELS.length + 1}) Custom endpoint (OpenAI / Gemini / Groq / your own URL)`);
-    const pick = parseInt(await ask('Choice', String(rec + 1)), 10) || (rec + 1);
-    if (pick >= 1 && pick <= LOCAL_MODELS.length) {
-      ollamaModel = LOCAL_MODELS[pick - 1].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
+    console.log('  Pick a model:');
+    FREE_ONLINE.forEach((p, i) => console.log(`    ${i + 1}) ${p.label}  [free online — needs a free key]`));
+    LOCAL_MODELS.forEach((m, i) => console.log(`    ${FREE_ONLINE.length + i + 1}) ${m.label}${i === rec ? '  (recommended)' : ''}  [free local]`));
+    console.log(`    ${FREE_ONLINE.length + LOCAL_MODELS.length + 1}) Custom endpoint (your own Anthropic-compatible URL / router)`);
+    const def = FREE_ONLINE.length + rec + 1;
+    const pick = parseInt(await ask('Choice', String(def)), 10) || def;
+    if (pick >= 1 && pick <= FREE_ONLINE.length) {
+      const p = FREE_ONLINE[pick - 1];
+      online = true; openaiBase = p.baseUrl; openaiModel = p.model;
+      console.log(`  Get a free API key: ${p.keyUrl}`);
+      openaiKey = await ask(`${p.label.split(' —')[0]} API key`);
+      const custom = await ask('Model id (Enter for default)', p.model);
+      if (custom) openaiModel = custom;
+    } else if (pick <= FREE_ONLINE.length + LOCAL_MODELS.length) {
+      ollamaModel = LOCAL_MODELS[pick - FREE_ONLINE.length - 1].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
     } else {
       baseUrl = await ask('Model endpoint URL', 'http://localhost:11434');
       modelId = await ask('Model name', 'llama3.1');
@@ -307,7 +333,7 @@ async function runPlain() {
   const perm = (await ask('Tool permissions — 1) bypassPermissions  2) default', '1')) === '2' ? 'default' : 'bypassPermissions';
   const svc = (await ask('Run 24/7 in the background? (y/n)', 'y')).toLowerCase().startsWith('y');
   rl.close();
-  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin: which('claude'), ollamaModel });
+  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin: which('claude'), ollamaModel, online, openaiBase, openaiModel, openaiKey });
 }
 
 async function main() {
@@ -342,19 +368,32 @@ async function main() {
   const backendIdx = await select('How do you want to power Helm?', backendItems);
   const authMode = backendIdx === 1 ? 'apikey' : backendIdx === 2 ? 'custom' : 'subscription';
   let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
+  let online = false, openaiBase = '', openaiModel = '', openaiKey = '';
   if (authMode === 'apikey') {
     apiKey = await text('Anthropic API key', { mask: true, hint: 'https://console.anthropic.com/settings/keys (starts with sk-ant-)' });
   } else if (authMode === 'custom') {
-    // Easy path: pick a free local model from a list (auto-downloaded), or choose a custom endpoint.
+    // Pick a free ONLINE provider (runs via Helm's proxy), a free LOCAL model (auto-downloaded),
+    // or a fully custom endpoint.
     const specs = detectSpecs();
     const rec = recommendIdx(specs);
-    const choices = [...LOCAL_MODELS.map((m, i) => ({ label: m.label + (i === rec ? '   ← recommended for your machine' : ''), hint: 'free · local · private · auto-downloads' })),
-      { label: 'Custom endpoint (OpenAI / Gemini / Groq / your own URL)', hint: 'advanced — bring an Anthropic-compatible endpoint or a router' }];
-    const mi = await select(`Pick a model   (detected: ${specLine(specs)})`, choices, rec);
-    if (mi < LOCAL_MODELS.length) {
-      ollamaModel = LOCAL_MODELS[mi].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
+    const choices = [
+      ...FREE_ONLINE.map(p => ({ label: p.label, hint: 'free online · needs a free API key · fast' })),
+      ...LOCAL_MODELS.map((m, i) => ({ label: m.label + (i === rec ? '   ← recommended for your machine' : ''), hint: 'free · local · private · auto-downloads' })),
+      { label: 'Custom endpoint (your own Anthropic-compatible URL / router)', hint: 'advanced — LiteLLM / claude-code-router / self-hosted' },
+    ];
+    const localRecIdx = FREE_ONLINE.length + rec;   // default-highlight the recommended local model
+    const mi = await select(`Pick a model   (detected: ${specLine(specs)})`, choices, localRecIdx);
+    if (mi < FREE_ONLINE.length) {
+      const p = FREE_ONLINE[mi];
+      online = true; openaiBase = p.baseUrl; openaiModel = p.model;
+      console.log(`\n  Get a free API key: ${p.keyUrl}`);
+      openaiKey = await text(`${p.label.split(' —')[0]} API key`, { mask: true, hint: `free tier — create one at ${p.keyUrl}` });
+      const custom = await text('Model id (Enter to use the default)', { def: p.model, hint: 'override only if you want a different model on this provider' });
+      if (custom) openaiModel = custom;
+    } else if (mi < FREE_ONLINE.length + LOCAL_MODELS.length) {
+      ollamaModel = LOCAL_MODELS[mi - FREE_ONLINE.length].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
     } else {
-      baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Anthropic-compatible endpoint, or a router (LiteLLM / claude-code-router) for OpenAI/Gemini/Groq' });
+      baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Anthropic-compatible endpoint, or a router (LiteLLM / claude-code-router)' });
       modelId = await text('Model name', { def: 'llama3.1', hint: 'e.g. gpt-4o, gemini-2.0, llama-3.1-70b' });
       apiKey = await text('API key for that endpoint', { mask: true, hint: 'leave blank if none' });
     }
@@ -388,14 +427,14 @@ async function main() {
   row('Owner ID', ownerId || `${C.yel}(none)${C.reset}`);
   row('Backend',
     authMode === 'apikey' ? `Anthropic API key ${apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}`
-    : authMode === 'custom' ? (ollamaModel ? `Local model ${C.teal}${ollamaModel}${C.reset} (auto-download)` : `Custom — ${C.teal}${modelId}${C.reset} @ ${baseUrl}`)
+    : authMode === 'custom' ? (online ? `Free online ${C.teal}${openaiModel}${C.reset} ${C.dim}(${openaiBase})${C.reset} ${openaiKey ? `${C.grn}key set${C.reset}` : `${C.yel}no key${C.reset}`}` : ollamaModel ? `Local model ${C.teal}${ollamaModel}${C.reset} (auto-download)` : `Custom — ${C.teal}${modelId}${C.reset} @ ${baseUrl}`)
     : 'Claude subscription (OAuth)');
   if (authMode !== 'custom') row('Model', model);
   row('Permissions', perm);
   row('Service', svc ? 'yes' : 'no');
   out.write('\n');
   if (!(await confirm('Write this config?', true))) { cleanup(); console.log('\nCancelled. Nothing written.'); process.exit(1); }
-  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin, ollamaModel });
+  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin, ollamaModel, online, openaiBase, openaiModel, openaiKey });
 }
 
 // If the fancy UI is unavailable or errors out, fall back to the plain Q&A rather than show nothing.
