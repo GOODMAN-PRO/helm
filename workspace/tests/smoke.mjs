@@ -1939,6 +1939,39 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- Skills system: loader + seed skills + index.js wiring ----
+{
+  const label = 'skills loader: listSkills() returns >= 3 seed skills, index.js wired';
+  try {
+    const loaderPath = path.join(WORKSPACE, 'skills/loader.mjs');
+    if (!existsSync(loaderPath)) throw new Error('workspace/skills/loader.mjs not found');
+    if (spawnSync('node', ['--check', loaderPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
+      throw new Error('loader.mjs syntax check failed');
+    const { listSkills, runSkillCommand } = await import(loaderPath);
+    const skills = await listSkills();
+    if (!Array.isArray(skills)) throw new Error('listSkills() did not return an array');
+    if (skills.length < 3) throw new Error(`expected >= 3 skills, got ${skills.length}`);
+    const names = skills.map(s => s.name);
+    if (!names.includes('helm-core')) throw new Error('helm-core skill missing');
+    if (!names.includes('reverse-engineering')) throw new Error('reverse-engineering skill missing');
+    if (!names.includes('screenshot-and-show')) throw new Error('screenshot-and-show skill missing');
+    // each skill should have a description
+    for (const s of skills) {
+      if (typeof s.description !== 'string' || !s.description.trim()) throw new Error(`skill ${s.name} has no description`);
+    }
+    // test running a skill (helm-core should succeed)
+    const result = await runSkillCommand('helm-core', '');
+    if (!result || typeof result !== 'string') throw new Error('helm-core returned non-string result');
+    if (!result.includes('online') && !result.includes('status')) throw new Error('helm-core result missing expected content');
+    // index.js must import and wire the skills loader
+    const idx = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!idx.includes("from './workspace/skills/loader.mjs'")) throw new Error('index.js does not import skills loader');
+    if (!idx.includes('runSkillCommand') || !idx.includes('listSkills')) throw new Error('index.js does not use skills functions');
+    if (!idx.includes('/skill')) throw new Error('index.js missing /skill command handler');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

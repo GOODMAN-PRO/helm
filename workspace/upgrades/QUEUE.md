@@ -6,9 +6,10 @@ unchecked ones, marks them done, runs the smoke gate, and commits — or auto-re
 You can add items from any chat ("Helm, add to your upgrade queue: ...") or by editing this file.
 
 ## Pending
-- [ ] Hermes gap-closure: build `workspace/skills/` from scratch on Mac (proposed files from Windows never synced). Implement: `workspace/skills/loader.mjs` (listSkills/runSkillCommand), seed skill files (helm-core, reverse-engineering, screenshot-and-show), wire into `index.js` (import loader at startup, register slash commands, prepend skill result to system prompt on fire), add smoke assertion `listSkills().length >= 3`. Sir gave go 2026-05-31 session.
+(none)
 
 ## Done
+- [x] Hermes gap-closure: built `workspace/skills/` on Mac with loader.mjs (listSkills/runSkillCommand), seed skill files (helm-core, reverse-engineering, screenshot-and-show), wired into index.js with /skill and /skills commands, added smoke assertion for >= 3 skills. All 69 smoke tests green. (2026-05-31 nightly self-upgrade)
 - [x] Scheduler `notify` flag exposed at add-time: `scheduler.add` now accepts `--notify true|false` (default true), `scheduler.list` surfaces it, `registry.json` documents it. Closes the §1.4 deferral from BUGS_REPORT — owner can opt housekeeping jobs out of completion DMs while keeping the proactive default on. Smoke #22. (2026-05-31 nightly)
 - [x] DB-level dedup guard for memory: UNIQUE index `facts_kind_key_uniq` on `facts(kind, key)` created in both `memory.mjs` boot init and `migrate.mjs` (after the dedup pass). Closes the deferred half of BUG-2 — direct SQL inserts can no longer reintroduce duplicates. Smoke #23. (2026-05-31 nightly)
 - [x] iMessage row-id SQL hardening: `newMessages(sinceRowId)` in `imessage.js` now coerces `sinceRowId` to a non-negative integer (`Math.max(0, Math.floor(Number(...) || 0))`) before interpolating into the chat.db sqlite3 CLI query, removing the raw-number-interpolation smell from PHASE1_REVIEW. (2026-05-31 nightly)

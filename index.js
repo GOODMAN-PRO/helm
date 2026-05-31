@@ -17,6 +17,7 @@ import { classifyComplexity, getModelPref, setModelPref } from './workspace/mode
 import { recordStuck } from './workspace/upgrades/stuck.mjs';
 import { exportTemplate, importTemplate, listTemplates } from './workspace/templates/templates.mjs';
 import { runHealthChecks } from './workspace/mcp/check.mjs';
+import { listSkills, runSkillCommand } from './workspace/skills/loader.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -515,6 +516,31 @@ client.on(Events.MessageCreate, async msg => {
     });
     const out = (r.stdout || r.stderr || '(no output)').trim();
     for (const part of chunks(out || '(done)')) await msg.reply(part);
+    return;
+  }
+
+  // ---- /skill: run a skill command (e.g. /skill helm-core, /skill reverse-engineering web <url>) ----
+  const skillM = text.match(/^\/?skill\s+(\w+(?:-\w+)*)\s*([\s\S]*)$/i);
+  if (skillM) {
+    const skillName = skillM[1].toLowerCase();
+    const skillArgs = (skillM[2] || '').trim();
+    try {
+      const result = await runSkillCommand(skillName, skillArgs);
+      await msg.reply(result);
+    } catch (e) {
+      await msg.reply(`skill error: ${e.message}`);
+    }
+    return;
+  }
+
+  // ---- /skill list: show available skills ----
+  if (/^\/?skills?\s*$/i.test(text)) {
+    try {
+      const skills = await listSkills();
+      if (!skills.length) { await msg.reply('No skills available yet.'); return; }
+      const lines = skills.map(s => `• **${s.name}** — ${s.description}`);
+      await msg.reply('Available skills:\n' + lines.join('\n'));
+    } catch (e) { await msg.reply(`skills error: ${e.message}`); }
     return;
   }
 
