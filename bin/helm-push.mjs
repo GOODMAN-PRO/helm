@@ -14,7 +14,7 @@ let env = {};
 try {
   for (const line of readFileSync(envPath, 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/i);
-    if (m) env[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
+    if (m) env[m[1]] = m[2].replace(/^['"]|['"]$/g, '').trim();
   }
 } catch (e) {
   console.error('cannot read .env:', e.message);
@@ -82,8 +82,8 @@ async function sendFile(channelId, fp, caption) {
     body: form,
   });
   const body = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${body}`);
-  return JSON.parse(body);
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}: ${body}`);
+  return body ? JSON.parse(body) : {};
 }
 
 try {
