@@ -36,11 +36,22 @@ const notify = msg => { try { sh('/usr/bin/env', ['node', path.join(ROOT, 'bin',
 
 function restartAndHealth() {
   const uid = process.getuid();
-  try { writeFileSync(AGENT_LOG, ''); } catch {}            // clear so we only see the fresh boot line
-  sh('launchctl', ['kickstart', '-k', `gui/${uid}/com.helm.discord`]);
+  // Track how much of the log pre-dates this restart so stale "Helm online" text
+  // from a previous boot isn't accepted as a successful health check.
+  let prevLen = 0;
+  try {
+    writeFileSync(AGENT_LOG, '');
+  } catch {
+    try { prevLen = readFileSync(AGENT_LOG, 'utf8').length; } catch {}
+  }
+  // Cap the launchctl call so a hung daemon doesn't stall the upgrade forever.
+  sh('launchctl', ['kickstart', '-k', `gui/${uid}/com.helm.discord`], { timeout: 15_000 });
   const start = Date.now();
   while (Date.now() - start < 30_000) {
-    try { if (readFileSync(AGENT_LOG, 'utf8').includes('Helm online')) return true; } catch {}
+    try {
+      const content = readFileSync(AGENT_LOG, 'utf8');
+      if (content.slice(prevLen).includes('Helm online')) return true;
+    } catch {}
     sh('sleep', ['2']);
   }
   return false;
@@ -52,13 +63,25 @@ function appendHistory(status, base, head, summary) {
 function rollback(base, why, summary) {
   log(`ROLLBACK (${why}) -> ${base}`);
   git('reset', '--hard', base);
+  git('clean', '-fd'); // remove untracked files created by the aborted upgrade pass
   sh('npm', ['ci', '--no-audit', '--no-fund'], { timeout: 5 * 60_000 }); // resync node_modules to restored lock
   const healthy = restartAndHealth();
   appendHistory(`REVERTED (${why})`, base, base, summary);
   notify(`Helm self-upgrade reverted (${why}). Code restored to ${base.slice(0, 7)}${healthy ? '' : ' — WARNING: bot still unhealthy, check manually'}.`);
 }
 
-if (existsSync(LOCK)) { log('lock present — another upgrade running; exit'); process.exit(0); }
+if (existsSync(LOCK)) {
+  // Check if the process that wrote the lock is still alive. A killed/crashed
+  // upgrader leaves the lock file behind permanently; treat that as stale.
+  let stale = false;
+  try {
+    const pid = parseInt(readFileSync(LOCK, 'utf8').trim(), 10);
+    if (isNaN(pid)) { stale = true; }
+    else { try { process.kill(pid, 0); } catch { stale = true; } } // ESRCH = not running
+  } catch { stale = true; }
+  if (stale) { log(`stale lock (pid gone) — removing and continuing`); rmSync(LOCK); }
+  else { log('lock present — another upgrade running; exit'); process.exit(0); }
+}
 writeFileSync(LOCK, String(process.pid));
 process.on('exit', () => { try { rmSync(LOCK); } catch {} });
 

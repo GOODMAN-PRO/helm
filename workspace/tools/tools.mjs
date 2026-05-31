@@ -12,6 +12,11 @@ import path from 'node:path';
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const REGISTRY   = path.join(__dirname, 'registry.json');
 const WORKSPACE  = path.resolve(__dirname, '..');
+// Registry exec paths are hardcoded to the canonical install root. When running
+// from a git worktree (e.g. during swarm/sweep tasks), remap them to the local
+// root so tool scripts read the correct local databases.
+const CANONICAL_ROOT = '/Users/owner/secondme';
+const LOCAL_ROOT     = path.resolve(WORKSPACE, '..');
 
 const [,, verb, name, ...rest] = process.argv;
 
@@ -59,7 +64,11 @@ if (verb === 'call') {
 
   // Build argv: each key=value as --key value
   if (typeof tool.exec !== 'string' || !tool.exec) die(`tool ${name}: registry entry missing exec`);
-  const argv = tool.exec.split(' ');
+  // Remap canonical root to local root so worktree runs use the correct scripts/DBs.
+  const localExec = LOCAL_ROOT !== CANONICAL_ROOT
+    ? tool.exec.replace(CANONICAL_ROOT, LOCAL_ROOT)
+    : tool.exec;
+  const argv = localExec.split(' ');
   const cmd  = argv[0];
   const cmdArgs = argv.slice(1);
   for (const [k, v] of Object.entries(args)) {
