@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helm — your own AI agent, on your own machine</title>
-<meta name="description" content="Helm is a personal AI agent that lives on your hardware. Message it from Discord, give it full shell, files, screen and your whole fleet. Powered by your Claude subscription or an API key.">
+<meta name="description" content="Helm is a personal AI agent that lives on your hardware. Message it from Discord, give it full shell, files, screen and your whole fleet. Runs on any model — your Claude subscription, an API key, or a free local model (no Anthropic account needed).">
 <style>
   :root{
     --bg:#080b11; --bg2:#0b111b; --panel:#0f1828; --panel2:#121d2e;
@@ -195,7 +195,7 @@
       </svg>
     </div>
     <h1>Your own AI agent,<br><span class="grad">on your own machine.</span></h1>
-    <p class="sub">Helm lives on your hardware with full shell, files, web and screen. You message it from Discord; it actually does the work and reports back. Owner-locked, private, and powered by your Claude subscription, an API key, or a free model.</p>
+    <p class="sub">Helm lives on your hardware with full shell, files, web and screen. You message it from Discord; it actually does the work and reports back. Owner-locked, private, and powered by any model you like — your Claude subscription, an API key, or a free local model.</p>
     <div class="cta">
       <a class="btn primary" href="#install">Install options</a>
       <a class="btn ghost" href="#compare">Compare</a>
@@ -227,10 +227,10 @@
           <button class="tcopy" onclick="copyTerm(this)">Copy</button>
         </div>
       </div>
-      <p class="term-note">Just needs Node 18+ (git optional). The installer sets up Claude Code — Helm's engine — for you, then the wizard handles gateways, backend (incl. free local models), and 24/7. macOS, Windows and Linux.</p>
+      <p class="term-note">Brings everything it needs — Node, Claude Code (the engine) and dependencies are installed for you. Then pick any model in the wizard; the free/local path (Ollama) needs no Anthropic account at all. macOS, Windows and Linux.</p>
       <div class="opts">
         <div class="opt"><h4>Multiple gateways</h4><p>A guided setup screen turns on Discord, iMessage, or both — more on the way.</p></div>
-        <div class="opt"><h4>Any backend — including free</h4><p>Your Claude subscription, an Anthropic API key, or a free / local model (Ollama, Groq, OpenRouter) at no cost.</p></div>
+        <div class="opt"><h4>Any model — including free</h4><p>Claude (subscription or API key), or any other model — local (Ollama) or hosted (OpenAI, Gemini, Groq, OpenRouter). The free/local path costs nothing and needs no Anthropic account.</p></div>
         <div class="opt"><h4>Run it 24/7</h4><p>Optionally install it as a background service so it's always there.</p></div>
       </div>
     </div>
@@ -248,7 +248,7 @@
       <div class="card"><div class="ic">⇄</div><h3>Your whole fleet</h3><p>Swap between your Mac and Windows box mid-conversation over Tailscale. One agent, every machine.</p></div>
       <div class="card"><div class="ic">▣</div><h3>Sees and drives your screen</h3><p>Takes screenshots, clicks and types. It can operate apps that have no API when it has to.</p></div>
       <div class="card"><div class="ic">↻</div><h3>Thinks 24/7, upgrades itself</h3><p>Background cognition during the day; nightly self-improvement gated by tests that auto-revert on failure.</p></div>
-      <div class="card"><div class="ic">⌁</div><h3>Powered your way — even free</h3><p>Your Claude Pro/Max subscription, a pay-as-you-go API key, or a free / local model (Ollama, Groq, OpenRouter) at no cost. Your choice at install.</p></div>
+      <div class="card"><div class="ic">⌁</div><h3>Runs on any model</h3><p>Claude (subscription or API key), or any other model — local (Ollama, $0, no account) or hosted (OpenAI, Gemini, Groq, OpenRouter). Your choice at install.</p></div>
       <div class="card"><div class="ic">⚿</div><h3>Encrypted secrets vault</h3><p>Hand it credentials safely — encrypted at rest, never echoed into chat, logs or git.</p></div>
     </div>
   </section>
@@ -259,7 +259,7 @@
     <p class="lead">The OpenClaw ecosystem and the hosted players each nail one slice — lightweight, secure, edge, or memory. Helm is the one that does all of it on your own hardware and ties your whole fleet together.</p>
     <div class="helmkey">
       <span class="chip"><b>✓</b> Discord + iMessage gateways</span>
-      <span class="chip"><b>✓</b> Free, local or subscription models</span>
+      <span class="chip"><b>✓</b> Runs on any model — free, local or hosted</span>
       <span class="chip"><b>✓</b> Multi-machine fleet (Mac + Windows)</span>
       <span class="chip"><b>✓</b> Persistent memory + synced brain</span>
       <span class="chip"><b>✓</b> Thinks 24/7 &amp; self-upgrades</span>
