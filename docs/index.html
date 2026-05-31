@@ -205,6 +205,16 @@
         <span>irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex</span>
         <button onclick="copyCmd(this)">Copy</button>
       </div>
+      <p class="oslab">Manual (git)</p>
+      <div class="code">
+        <span>git clone https://github.com/GOODMAN-PRO/helm.git helm &amp;&amp; cd helm &amp;&amp; npm install &amp;&amp; npm run setup</span>
+        <button onclick="copyCmd(this)">Copy</button>
+      </div>
+      <p class="oslab">No git (download tarball)</p>
+      <div class="code">
+        <span>mkdir helm &amp;&amp; curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main | tar -xz -C helm --strip-components=1 &amp;&amp; cd helm &amp;&amp; npm install &amp;&amp; npm run setup</span>
+        <button onclick="copyCmd(this)">Copy</button>
+      </div>
       <div class="opts">
         <div class="opt"><h4>Multiple gateways</h4><p>A guided setup screen turns on Discord, iMessage, or both — more on the way.</p></div>
         <div class="opt"><h4>Any backend — including free</h4><p>Your Claude subscription, an Anthropic API key, or a free / local model (Ollama, Groq, OpenRouter) at no cost.</p></div>
