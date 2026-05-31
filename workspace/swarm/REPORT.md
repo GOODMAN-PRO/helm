@@ -38,3 +38,10 @@
 - sweep-dashboard: merged (6589c7d)
 - sweep-bin: merged (d171878)
 - sweep-mcp-tests: merged (019aae7)
+
+## swarm run 2026-05-31T09:17:02.097Z 
+- up-resilience: merged (885c444)
+- up-memory: merged (368d619)
+- up-proactive: merged (58aa968)
+- up-gui: merged (36f906d)
+- up-dashboard: merged (dbc2907)
