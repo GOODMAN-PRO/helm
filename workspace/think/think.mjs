@@ -23,6 +23,10 @@ const { CLAUDE_BIN = 'claude' } = process.env;
 const MODEL = process.env.THINK_MODEL || 'sonnet';
 const INTERVAL = parseInt(process.env.THINK_INTERVAL_MIN || '15', 10) * 60_000;
 const WEEKLY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+// Safety guards: exit after MAX_TICKS iterations or MAX_WALL_MS wall time so launchd can restart fresh.
+const MAX_TICKS    = parseInt(process.env.THINK_MAX_TICKS || '500', 10);
+const MAX_WALL_MS  = parseInt(process.env.THINK_MAX_WALL_DAYS || '8', 10) * 24 * 60 * 60_000;
+const THINK_START  = Date.now();
 const JOURNAL_DIR = path.join(__dirname, 'journal');
 const THINK_LOCK = path.join(__dirname, '.think.lock');
 const UPGRADE_LOCK = path.join(ROOT, '.upgrade.lock');
@@ -151,8 +155,18 @@ function tick() {
   }
 }
 
-log(`background cognition online (every ${INTERVAL / 60_000} min, model ${MODEL})`);
+log(`background cognition online (every ${INTERVAL / 60_000} min, model ${MODEL}, maxTicks=${MAX_TICKS})`);
+let tickCount = 0;
 tick();
-setInterval(tick, INTERVAL);
-process.on('SIGTERM', () => { try { rmSync(THINK_LOCK); } catch {} process.exit(0); });
-process.on('SIGINT', () => { try { rmSync(THINK_LOCK); } catch {} process.exit(0); });
+const thinkInterval = setInterval(() => {
+  tick();
+  tickCount++;
+  if (tickCount >= MAX_TICKS || (Date.now() - THINK_START) >= MAX_WALL_MS) {
+    log(`guard: maxTicks=${MAX_TICKS} or maxWall reached (ticks=${tickCount}) — exiting for launchd restart`);
+    clearInterval(thinkInterval);
+    try { rmSync(THINK_LOCK); } catch {}
+    process.exit(0);
+  }
+}, INTERVAL);
+process.on('SIGTERM', () => { clearInterval(thinkInterval); try { rmSync(THINK_LOCK); } catch {} process.exit(0); });
+process.on('SIGINT',  () => { clearInterval(thinkInterval); try { rmSync(THINK_LOCK); } catch {} process.exit(0); });
