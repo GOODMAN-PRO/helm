@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { Client, GatewayIntentBits, Partials, Events } from 'discord.js';
 import { getSession, setSession, deleteSession } from './workspace/sessions.mjs';
+import { classifyComplexity, getModelPref, setModelPref } from './workspace/model-routing.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,11 @@ if (!DISCORD_TOKEN || !OWNER_ID) {
   process.exit(1);
 }
 mkdirSync(WORKSPACE, { recursive: true });
+
+// Pick --model for this turn: fixed pref overrides the complexity classifier.
+function pickModel(prompt) {
+  return getModelPref() ?? classifyComplexity(prompt);
+}
 
 // Returns an --mcp-config value: the path to workspace/mcp/servers.json when valid,
 // or an inline empty-servers JSON as a fallback so Helm always starts even if the
@@ -76,7 +82,7 @@ function runClaudeRemote(prompt) {
     const run = sid => {
       const resumeFlag = sid ? `--resume ${q(sid)} ` : '';
       // run INSIDE the synced brain dir so Claude auto-loads CLAUDE.md (+ @memory/INDEX.md)
-      const remoteCmd = `cd ${WIN_BRAIN} && ${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
+      const remoteCmd = `cd ${WIN_BRAIN} && ${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(pickModel(prompt))} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
       const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
       let out = '', err = '';
       const kill = setTimeout(() => child.kill(), 30 * 60_000);
@@ -171,9 +177,11 @@ function runClaude(args, prompt) {
 
 async function ask(prompt, onHeartbeat, target = 'mac') {
   if (target === 'windows') return runClaudeRemote(prompt);
+  const model = pickModel(prompt);
+  console.log(`[route] model=${model}`);
   const base = [
     '-p', '--output-format', 'json',
-    '--model', MODEL,
+    '--model', model,
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', PERSONA,
     '--add-dir', WORKSPACE,
@@ -237,9 +245,10 @@ function splitAttachments(s) {
   return { text, files };
 }
 
-client.once(Events.ClientReady, c =>
-  console.log(`✅ Helm online as ${c.user.tag}  ·  model=${MODEL}  ·  owner=${OWNER_ID}`)
-);
+client.once(Events.ClientReady, c => {
+  const pref = getModelPref();
+  console.log(`✅ Helm online as ${c.user.tag}  ·  model=${pref || 'auto-route'}  ·  owner=${OWNER_ID}`);
+});
 
 client.on(Events.MessageCreate, async msg => {
   if (msg.author.bot) return;
@@ -293,6 +302,25 @@ client.on(Events.MessageCreate, async msg => {
   }
   if (/^\/?(where|which|target|status)\b/.test(low)) {
     await msg.reply(`Active machine: **${getTarget()}**${getTarget() === 'windows' && !HELM_WIN_HOST ? ' (not configured)' : ''}.`);
+    return;
+  }
+
+  // !model: inspect or override per-message model routing
+  const modelCmdM = text.match(/^!model(?:\s+(\S+))?\s*$/i);
+  if (modelCmdM) {
+    if (!modelCmdM[1]) {
+      const pref = getModelPref();
+      await msg.reply(pref
+        ? `Fixed model: **${pref}**. Say \`!model auto\` to restore auto-routing.`
+        : 'Auto-routing active: haiku for short/trivial, opus for coding/building, sonnet for everything else.');
+    } else {
+      try {
+        const result = setModelPref(modelCmdM[1]);
+        await msg.reply(result === 'auto'
+          ? 'Model routing restored to auto (haiku/sonnet/opus by task type).'
+          : `Model fixed to **${result}** for all messages.`);
+      } catch (e) { await msg.reply(`Model error: ${e.message}`); }
+    }
     return;
   }
 

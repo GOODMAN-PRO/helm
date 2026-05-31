@@ -1014,6 +1014,59 @@ function fail(label, reason) {
   finally { if (server) server.close(); }
 }
 
+// ---- 43. model-routing: classifyComplexity returns valid tiers ----
+{
+  const label = 'model-routing: classifyComplexity returns haiku/sonnet/opus for known inputs';
+  try {
+    const { classifyComplexity } = await import(path.join(WORKSPACE, 'model-routing.mjs'));
+    const VALID = new Set(['haiku', 'sonnet', 'opus']);
+
+    const cases = [
+      ['',                           'haiku'],   // empty -> short -> haiku
+      ['hi',                         'haiku'],   // trivial greeting
+      ['ok',                         'haiku'],   // trivial ack
+      ['thanks',                     'haiku'],   // trivial
+      ['build a discord bot',        'opus'],    // build keyword
+      ['implement oauth login',      'opus'],    // implement keyword
+      ['debug this crash',           'opus'],    // debug keyword
+      ['fix the bug in auth.js',     'opus'],    // fix the bug pattern
+      ['create a REST api endpoint', 'opus'],    // create … api endpoint
+      ['x'.repeat(1001),             'opus'],    // length > 1000
+      ['explain the difference between TCP and UDP protocols', 'sonnet'],  // medium-length, no opus/haiku triggers
+    ];
+
+    for (const [input, expected] of cases) {
+      const tier = classifyComplexity(input);
+      if (!VALID.has(tier)) throw new Error(`classifyComplexity(${JSON.stringify(input.slice(0, 30))}) returned invalid tier ${JSON.stringify(tier)}`);
+      if (tier !== expected) throw new Error(`classifyComplexity(${JSON.stringify(input.slice(0, 30))}) = ${tier}, expected ${expected}`);
+    }
+
+    // Fuzz: ensure ALL outputs are valid tier strings
+    const extras = ['hello', 'what time is it', 'translate this', 'refactor the module',
+                    'deploy to staging', 'write a function', 'yes', 'where is the file'];
+    for (const input of extras) {
+      const tier = classifyComplexity(input);
+      if (!VALID.has(tier)) throw new Error(`classifyComplexity(${JSON.stringify(input)}) returned invalid tier: ${JSON.stringify(tier)}`);
+    }
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 44. model-routing: index.js wired (import + pickModel + !model handler) ----
+{
+  const label = 'model-routing: index.js imports classifyComplexity, has pickModel, has !model handler';
+  try {
+    const src = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!src.includes('classifyComplexity')) throw new Error('classifyComplexity not referenced in index.js');
+    if (!src.includes('model-routing')) throw new Error('model-routing import missing from index.js');
+    if (!src.includes('pickModel')) throw new Error('pickModel helper missing from index.js');
+    if (!src.includes('!model')) throw new Error('!model command handler missing from index.js');
+    if (!src.includes('setModelPref')) throw new Error('setModelPref call missing from index.js');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
