@@ -302,7 +302,8 @@ async function runPlain() {
       apiKey = await ask('API key for that endpoint (blank if none)', '');
     }
   }
-  const model = (await ask('Model — 1) opus  2) sonnet', '1')) === '2' ? 'sonnet' : 'opus';
+  let model = 'sonnet';
+  if (authMode !== 'custom') model = (await ask('Claude model — 1) opus  2) sonnet', '1')) === '2' ? 'sonnet' : 'opus';
   const perm = (await ask('Tool permissions — 1) bypassPermissions  2) default', '1')) === '2' ? 'default' : 'bypassPermissions';
   const svc = (await ask('Run 24/7 in the background? (y/n)', 'y')).toLowerCase().startsWith('y');
   rl.close();
@@ -359,11 +360,14 @@ async function main() {
     }
   }
 
-  // 3) model
-  const model = ['opus', 'sonnet'][await select('Model', [
-    { label: 'opus', hint: 'best reasoning — heavier on Max limits' },
-    { label: 'sonnet', hint: 'fast + sustainable' },
-  ])];
+  // 3) Claude model — only relevant for the Claude backends; a custom/local model is already chosen.
+  let model = 'sonnet';
+  if (authMode !== 'custom') {
+    model = ['opus', 'sonnet'][await select('Claude model', [
+      { label: 'opus', hint: 'best reasoning — heavier on Max limits' },
+      { label: 'sonnet', hint: 'fast + sustainable' },
+    ])];
+  }
 
   // 4) permissions
   const perm = ['bypassPermissions', 'default'][await select('Tool permissions', [
@@ -386,7 +390,7 @@ async function main() {
     authMode === 'apikey' ? `Anthropic API key ${apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}`
     : authMode === 'custom' ? (ollamaModel ? `Local model ${C.teal}${ollamaModel}${C.reset} (auto-download)` : `Custom — ${C.teal}${modelId}${C.reset} @ ${baseUrl}`)
     : 'Claude subscription (OAuth)');
-  row('Model', model);
+  if (authMode !== 'custom') row('Model', model);
   row('Permissions', perm);
   row('Service', svc ? 'yes' : 'no');
   out.write('\n');
