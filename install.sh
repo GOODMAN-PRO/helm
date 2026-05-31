@@ -27,13 +27,35 @@ die()  { printf "%b\n" "  ${c_r}xx${c_0}  $1" >&2; exit 1; }
 # read from the terminal even when the script itself arrived on stdin (curl | bash)
 ask()  { local p="$1" d="${2:-}" v=""; if [ -r /dev/tty ]; then printf "%b" "$p" > /dev/tty; read -r v < /dev/tty || true; fi; echo "${v:-$d}"; }
 
+# Ensure Node 18+ is available — install it (Homebrew, or the official binary, no sudo) if missing.
+ensure_node() {
+  if command -v node >/dev/null 2>&1; then
+    maj="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+    [ "${maj:-0}" -ge 18 ] 2>/dev/null && return 0
+    say "Node ${maj} is too old (need 18+) — installing a current version..."
+  else
+    say "Node not found — installing it for you..."
+  fi
+  if command -v brew >/dev/null 2>&1; then brew install node >/dev/null 2>&1 && command -v node >/dev/null 2>&1 && { ok "Node installed via Homebrew"; return 0; }; fi
+  command -v curl >/dev/null 2>&1 || die "Need curl to download Node. Install Node 18+ from https://nodejs.org then re-run."
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  case "$(uname -m)" in arm64|aarch64) arch=arm64;; x86_64|amd64) arch=x64;; *) die "Unsupported CPU $(uname -m) — install Node 18+ from https://nodejs.org";; esac
+  ver="$(curl -fsSL https://nodejs.org/dist/index.tab 2>/dev/null | awk -F '\t' 'NR>1 && $10!="-" {print $1; exit}')"
+  [ -n "$ver" ] || ver="v22.14.0"
+  pkg="node-${ver}-${os}-${arch}"
+  say "Downloading Node ${ver} (${os}-${arch})..."
+  mkdir -p "$HOME/.local"
+  curl -fsSL "https://nodejs.org/dist/${ver}/${pkg}.tar.gz" | tar -xz -C "$HOME/.local" || die "Node download failed — install from https://nodejs.org"
+  export PATH="$HOME/.local/${pkg}/bin:$PATH"
+  command -v node >/dev/null 2>&1 || die "Node still not found after install."
+  ok "Node ${ver} installed to ~/.local/${pkg} (add that bin to your PATH to keep it)"
+}
+
 say "${c_b}== Helm installer ==${c_0}"
 
 # 1) prerequisites ----------------------------------------------------------
-command -v node  >/dev/null || die "Node not found. Install Node 18+ first (https://nodejs.org), then re-run."
+ensure_node
 command -v git >/dev/null || command -v curl >/dev/null || die "Need either git or curl to fetch Helm."
-NODE_MAJ="$(node -p 'process.versions.node.split(".")[0]')"
-[ "$NODE_MAJ" -ge 18 ] || die "Node $(node -v 2>/dev/null) is too old; need 18+."
 # Claude Code is the engine Helm runs on — auto-install it if missing.
 if ! command -v claude >/dev/null; then
   say "Claude Code (Helm's engine) not found — installing it with npm..."

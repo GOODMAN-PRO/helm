@@ -16,8 +16,18 @@ function Need($cmd, $msg) { if (-not (Get-Command $cmd -ErrorAction SilentlyCont
 Write-Host "== Helm installer (Windows) ==" -ForegroundColor Cyan
 
 # 1) prerequisites
-Need node "Node 18+ not found. Install from https://nodejs.org then re-run."
-Need git  "git not found. Install Git for Windows (https://git-scm.com) then re-run."
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+  if (Get-Command winget -ErrorAction SilentlyContinue) {
+    Write-Host "Node not found — installing it via winget..." -ForegroundColor Cyan
+    winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+    # refresh PATH for this session so node/npm are found right away
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+  }
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Host "xx  Node still not on PATH. Install from https://nodejs.org (or restart PowerShell after winget) and re-run." -ForegroundColor Red; exit 1
+  }
+}
+Need git "git not found. Install Git for Windows (https://git-scm.com) then re-run."
 $nodeMajor = [int](node -p "process.versions.node.split('.')[0]")
 if ($nodeMajor -lt 18) { Write-Host "xx  Node too old; need 18+." -ForegroundColor Red; exit 1 }
 # Claude Code is the engine Helm runs on — auto-install it if missing.

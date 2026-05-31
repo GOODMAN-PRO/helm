@@ -1,0 +1,69 @@
+# secrets / deps / state
+node_modules/
+.env
+*.log
+*.db
+*.db-wal
+*.db-shm
+
+# session + run artifacts
+workspace/.sessions.json
+workspace/.imessage-sessions.json
+workspace/runs/*
+!workspace/runs/*.mjs
+workspace/browser-profile/
+
+# captured media (screenshots, audio, ocr buffers)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.wav
+*.mp3
+*.m4a
+
+# compiled binaries (rebuilt from source)
+bin/guicontrol
+bin/ocr-helper
+
+# self-upgrade lock
+.upgrade.lock
+
+# background cognition (derived/state)
+workspace/think/journal/
+workspace/think/.think.lock
+workspace/memory/INDEX.md
+
+# fleet: per-machine active target
+workspace/active-target
+
+# swarm worktrees
+.swarm/
+workspace/swarm/swarm.log
+
+workspace/swarm/diffs/
+workspace/swarm/bugsweep.json.bak
+
+# secrets vault (encrypted, but never commit)
+workspace/secrets/vault.json
+
+workspace/inbox/
+
+workspace/research/reports/
+workspace/research/research.log
+
+workspace/conversations/
+
+workspace/reverse/
+workspace/costs/*.db
+
+# stuck queue (runtime state for nightly self-upgrade)
+workspace/upgrades/stuck-queue.jsonl
+workspace/upgrades/stuck-archive.jsonl
+
+# per-install template flavor + exported templates (user-generated/shareable)
+workspace/persona.local.md
+workspace/templates/*.helmtemplate.json
+
+# Helm Mind nightly agent log
+workspace/mind/mind.log

@@ -43,10 +43,10 @@ curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | 
 irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex
 ```
 
-Only prerequisite is **Node 18+** (**git** optional — a tarball is used otherwise). The installer sets
-up **Claude Code** — Helm's engine — for you. The setup wizard then lets you choose your gateways
-(Discord / iMessage), your backend (subscription / API key / **free local model**), and whether to run
-24/7 as a background service.
+The `curl` / PowerShell installers set up **everything they need** — Node, Claude Code (Helm's engine),
+and dependencies (git is optional; a tarball is used otherwise). The **npx** method needs Node already
+(it runs on Node). The setup wizard then lets you choose your gateways (Discord / iMessage), your
+backend (subscription / API key / **free local model**), and whether to run 24/7 as a background service.
 
 <details>
 <summary>More ways</summary>
