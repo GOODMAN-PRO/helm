@@ -85,8 +85,9 @@ function scpFromWin(winPath) {
   if (!HELM_WIN_HOST) return null;
   const INBOX = path.join(WORKSPACE, 'inbox');
   mkdirSync(INBOX, { recursive: true });
-  const local = path.join(INBOX, `win-${Date.now()}-${path.basename(winPath.replace(/\\/g, '/')) || 'file'}`);
-  const r = spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', `${HELM_WIN_HOST}:${winPath}`, local], { encoding: 'utf8' });
+  const fwd = winPath.replace(/\\/g, '/');   // scp needs forward slashes; backslash paths fail
+  const local = path.join(INBOX, `win-${Date.now()}-${path.basename(fwd) || 'file'}`);
+  const r = spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', `${HELM_WIN_HOST}:${fwd}`, local], { encoding: 'utf8' });
   return r.status === 0 ? local : null;
 }
 
