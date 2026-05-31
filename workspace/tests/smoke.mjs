@@ -656,12 +656,54 @@ function fail(label, reason) {
     if (!next) throw new Error('nextCronDate returned null for 5/15');
     if (next.getUTCMinutes() !== 20)
       throw new Error(`expected next minute=20, got ${next.getUTCMinutes()} (${next.toISOString()})`);
-
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 30. scheduler: in-flight tracking present (overlap fix) ----
+// ---- 30. plan.mjs: add-step reactivates done plan; complete rejects already-done step ----
+{
+  const label = 'plan.mjs: add-step reactivates done plan; complete rejects already-done step';
+  const PLAN = path.join(WORKSPACE, 'plans/plan.mjs');
+  try {
+    // Create plan and add + complete one step so plan auto-closes
+    const p = JSON.parse(spawnSync('node', [PLAN, 'create', 'smoke-plan-25'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    const pid = p.id;
+
+    const s1 = JSON.parse(spawnSync('node', [PLAN, 'add-step', String(pid), 'step one'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+
+    const done1 = JSON.parse(spawnSync('node', [PLAN, 'complete', String(pid), String(s1.id)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (done1.status !== 'done') throw new Error(`step should be done, got ${done1.status}`);
+
+    const after1 = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (after1.status !== 'done') throw new Error(`plan should be done after all steps complete, got ${after1.status}`);
+
+    // Fix 1: add-step to a done plan must reactivate it
+    spawnSync('node', [PLAN, 'add-step', String(pid), 'step two'],
+      { encoding: 'utf8', timeout: 10_000 });
+    const after2 = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (after2.status !== 'active')
+      throw new Error(`plan should be reactivated after add-step, got ${after2.status}`);
+
+    // next must return the pending step, not null
+    const nxt = JSON.parse(spawnSync('node', [PLAN, 'next', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (!nxt.step) throw new Error('next should return pending step after reopen, got null');
+    if (nxt.step.task !== 'step two') throw new Error(`unexpected step task: ${nxt.step.task}`);
+
+    // Fix 2: complete an already-done step must exit non-zero
+    const r2 = spawnSync('node', [PLAN, 'complete', String(pid), String(s1.id)],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r2.status === 0) throw new Error('completing an already-done step should exit non-zero');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 31. scheduler: in-flight tracking present (overlap fix) ----
 {
   const label = 'scheduler.mjs: in-flight Set prevents concurrent execution of the same job';
   try {
@@ -678,7 +720,7 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 31. scheduler: overdue jobs fire regardless of cronMatches (catch-up fix) ----
+// ---- 32. scheduler: overdue jobs fire regardless of cronMatches (catch-up fix) ----
 {
   const label = 'scheduler.mjs: overdue jobs (next_run in past) fire as catch-up, not silently dropped';
   try {
@@ -695,7 +737,7 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 32. scheduler: stmtSchedule used on new-job path (last_run not poisoned) ----
+// ---- 33. scheduler: stmtSchedule used on new-job path (last_run not poisoned) ----
 {
   const label = 'scheduler.mjs: new-job schedule path uses stmtSchedule (not stmtUpdate) so last_run stays NULL';
   try {
@@ -711,7 +753,7 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 33. vision: scale-math fix — invalid --scale string must not produce NaN ----
+// ---- 34. vision: scale-math fix — invalid --scale string must not produce NaN ----
 {
   const label = 'vision: invalid --scale string falls back to SCALE_DEFAULT, not NaN';
   try {
