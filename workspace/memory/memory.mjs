@@ -209,11 +209,11 @@ switch (verb) {
       const k = keywordScore(f);
       const s = semScore(f, i);
       const e = embedScores ? embedScores[i] : null;
-      // Blend: take the better of keyword score and semantic score. The 0.9
-      // discount was removed — it suppressed the semantic signal below the
-      // keyword floor even when the semantic score was higher, making the
-      // tiebreaker useless for facts sharing the same keyword score.
-      const score = e !== null ? Math.max(k, e) : Math.max(k, s);
+      // Blend: take the better of keyword score and semantic score, then
+      // weight by confidence so well-confirmed facts outrank provisional ones
+      // with the same relevance. confidence=1.0 → weight 1.0; confidence=0.7
+      // → weight 0.91; confidence=0.3 → weight 0.79.
+      const score = (e !== null ? Math.max(k, e) : Math.max(k, s)) * (0.7 + 0.3 * f.confidence);
       return { ...f, _score: score, _k: k, _s: s };
     });
 
