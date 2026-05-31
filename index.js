@@ -91,6 +91,16 @@ function scpFromWin(winPath) {
   return r.status === 0 ? local : null;
 }
 
+// Push a local file TO the Windows box so the windows brain can read it (e.g. an attachment the
+// owner sent while on the windows target). Returns a path the windows brain can Read, or null.
+function scpToWin(localPath) {
+  if (!HELM_WIN_HOST) return null;
+  const base = path.basename(localPath).replace(/[^\w.\-]/g, '_');
+  spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, 'if not exist helm-inbox mkdir helm-inbox'], { encoding: 'utf8' });
+  const r = spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', localPath, `${HELM_WIN_HOST}:helm-inbox/${base}`], { encoding: 'utf8' });
+  return r.status === 0 ? `helm-inbox/${base}` : null;  // relative to the windows home (where the ssh brain runs)
+}
+
 // ---- persona: appended to Claude Code's own (tool-enabled) system prompt ----
 const PERSONA =
   'You are Helm, a personal AI agent talking to your owner over Discord DMs. ' +
@@ -279,8 +289,11 @@ client.on(Events.MessageCreate, async msg => {
         writeFileSync(p, buf); saved.push(p);
       } catch { /* skip a failed download */ }
     }
-    if (saved.length) prompt = (text || '(no caption)') +
-      `\n\n[The owner attached ${saved.length} file(s) — look at them NOW with your Read tool (Read handles images): ${saved.join(' , ')}]`;
+    // On the windows target, push the files to the PC so the remote brain can read them.
+    let refs = saved;
+    if (target === 'windows' && saved.length) refs = saved.map(scpToWin).filter(Boolean);
+    if (refs.length) prompt = (text || '(no caption)') +
+      `\n\n[The owner attached ${refs.length} file(s) — look at them NOW with your Read tool (Read handles images): ${refs.join(' , ')}]`;
   }
   console.log(`📩 [${target}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
