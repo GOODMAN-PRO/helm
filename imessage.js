@@ -278,4 +278,7 @@ async function tick() {
     busy = false;
   }
 }
+// Prevent any stray unhandled async rejection from killing the polling loop.
+process.on('unhandledRejection', reason => console.error('Unhandled rejection:', reason));
+
 setInterval(tick, 3000);

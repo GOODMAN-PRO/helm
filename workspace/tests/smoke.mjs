@@ -862,6 +862,23 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 38. Both bots have crash-guard handlers (unhandledRejection + Discord error listener) ----
+{
+  const label = 'Both bots: unhandledRejection guard present; index.js has Discord error listener';
+  try {
+    const dSrc = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    const iSrc = readFileSync(path.join(ROOT, 'imessage.js'), 'utf8');
+    if (!dSrc.includes("process.on('unhandledRejection'"))
+      throw new Error('index.js missing unhandledRejection handler');
+    if (!iSrc.includes("process.on('unhandledRejection'"))
+      throw new Error('imessage.js missing unhandledRejection handler');
+    // Discord client emits 'error' events; without a listener Node crashes the process.
+    if (!dSrc.includes("client.on('error'"))
+      throw new Error("index.js missing client.on('error') listener — Discord WebSocket errors would crash the bot");
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
