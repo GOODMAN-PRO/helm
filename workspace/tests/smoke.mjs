@@ -490,8 +490,11 @@ function fail(label, reason) {
     const added = JSON.parse(r1.stdout);
     if (added.notify !== false) throw new Error(`add returned notify=${added.notify}, expected false`);
 
-    // List should show it with notify=false
-    const r2 = spawnSync('node', [path.join(WORKSPACE, 'tools/tools.mjs'), 'call', 'scheduler.list'],
+    // List should show it with notify=false.
+    // Call scheduler.list.mjs directly (same as add above) so both read/write the same local
+    // jobs.db; going through tools.mjs call would invoke the registry exec path which resolves
+    // relative to the production install, not this worktree.
+    const r2 = spawnSync('node', [path.join(WORKSPACE, 'tools/impl/scheduler.list.mjs')],
       { encoding: 'utf8', timeout: 10_000 });
     if (r2.status !== 0) throw new Error(`list failed: ${r2.stderr}`);
     const jobs = JSON.parse(r2.stdout);
@@ -814,7 +817,47 @@ function fail(label, reason) {
     const sendFileBody = src.slice(sendFileIdx);
     if (!sendFileBody.includes('res.statusText'))
       throw new Error('sendFile error missing res.statusText — error messages inconsistent with api()');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
 
+// ---- 37. MCP wiring completeness: both bots wired, all servers have command, fetch present ----
+{
+  const label = 'MCP: imessage.js wired; --strict-mcp-config in both bots; all servers have command; fetch server present';
+  try {
+    const configPath = path.join(ROOT, 'workspace/mcp/servers.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    const servers = config.mcpServers;
+
+    // Every declared server must have a command field — missing command would hang the MCP launch.
+    for (const [key, entry] of Object.entries(servers)) {
+      if (!entry.command || typeof entry.command !== 'string')
+        throw new Error(`server "${key}" has no command field — would hang on launch`);
+    }
+
+    // The fetch server must be present (documented in CLAUDE.md; both bots comment "filesystem + fetch").
+    if (!servers.fetch)
+      throw new Error('"fetch" server missing from mcpServers — HTTP fetch tool unavailable');
+
+    // imessage.js must also reference the config (test 18 only checks index.js).
+    const iSrc = readFileSync(path.join(ROOT, 'imessage.js'), 'utf8');
+    if (!iSrc.includes('workspace/mcp/servers.json'))
+      throw new Error('imessage.js does not reference workspace/mcp/servers.json');
+
+    // Both bots must pass --strict-mcp-config so the user's global MCP config is not leaked in.
+    const dSrc = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!dSrc.includes('--strict-mcp-config'))
+      throw new Error('index.js missing --strict-mcp-config flag');
+    if (!iSrc.includes('--strict-mcp-config'))
+      throw new Error('imessage.js missing --strict-mcp-config flag');
+
+    // Both bots must have the fallback that returns empty-config JSON when servers.json is bad
+    // (protects against a malformed file hanging the bot at startup).
+    const fallback = '{"mcpServers":{}}';
+    if (!dSrc.includes(fallback))
+      throw new Error(`index.js missing mcpConfigArg fallback string '${fallback}'`);
+    if (!iSrc.includes(fallback))
+      throw new Error(`imessage.js missing mcpConfigArg fallback string '${fallback}'`);
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
