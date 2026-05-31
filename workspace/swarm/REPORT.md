@@ -45,3 +45,16 @@
 - up-proactive: merged (58aa968)
 - up-gui: merged (36f906d)
 - up-dashboard: merged (dbc2907)
+
+## swarm run 2026-05-31T11:58:33.203Z 
+- up-reliability: merged (e4de87c)
+- up-plan-act: merged (a8f9ef5)
+- up-memory: merged (8772103)
+- up-gui: merged (fbbb37c)
+- up-model-routing: merged (a0332e6)
+- up-swarm2: merged (7d4213c)
+- up-context: merged (5f2b4c7)
+- up-proactive: merged (1a73b59)
+- up-planning: merged (f064e94)
+- up-mcp: merged (e2f83c0)
+- up-reverse: merged (7524c27)
