@@ -1692,6 +1692,54 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 64. MCP expansion: github/google-workspace/brave-search + check.mjs ----
+{
+  const label = 'MCP expansion: 3 new servers in servers.json; check.mjs syntax valid + importable; bots wired';
+  try {
+    // 1. check.mjs passes node --check
+    const rc = spawnSync('node', ['--check', path.join(WORKSPACE, 'mcp/check.mjs')],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rc.status !== 0) throw new Error(`check.mjs syntax error: ${rc.stderr}`);
+
+    // 2. All 3 wrapper scripts pass node --check
+    for (const w of ['wrap-github.mjs', 'wrap-google-workspace.mjs', 'wrap-brave-search.mjs']) {
+      const rw = spawnSync('node', ['--check', path.join(WORKSPACE, 'mcp', w)],
+        { encoding: 'utf8', timeout: 10_000 });
+      if (rw.status !== 0) throw new Error(`${w} syntax error: ${rw.stderr}`);
+    }
+
+    // 3. servers.json has all 3 new servers with required Helm schema fields
+    const config = JSON.parse(readFileSync(path.join(WORKSPACE, 'mcp/servers.json'), 'utf8'));
+    const servers = config.mcpServers;
+    for (const name of ['github', 'google-workspace', 'brave-search']) {
+      if (!servers[name]) throw new Error(`server "${name}" missing from servers.json`);
+      const s = servers[name];
+      if (!('healthCheck' in s)) throw new Error(`server "${name}" missing healthCheck field`);
+      if (!('enabled' in s)) throw new Error(`server "${name}" missing enabled field`);
+      if (s.healthCheck !== 'initialize')
+        throw new Error(`server "${name}" healthCheck should be "initialize", got ${JSON.stringify(s.healthCheck)}`);
+    }
+
+    // 4. check.mjs imports cleanly and exports runHealthChecks (no network, no keys required)
+    const { runHealthChecks } = await import(path.join(WORKSPACE, 'mcp/check.mjs'));
+    if (typeof runHealthChecks !== 'function')
+      throw new Error('runHealthChecks not exported from check.mjs');
+
+    // 5. Both bots import runHealthChecks from check.mjs (startup wiring)
+    const dSrc = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    const iSrc = readFileSync(path.join(ROOT, 'imessage.js'), 'utf8');
+    if (!dSrc.includes('workspace/mcp/check.mjs'))
+      throw new Error('index.js does not import workspace/mcp/check.mjs');
+    if (!iSrc.includes('workspace/mcp/check.mjs'))
+      throw new Error('imessage.js does not import workspace/mcp/check.mjs');
+    if (!dSrc.includes('runHealthChecks'))
+      throw new Error('index.js missing runHealthChecks call');
+    if (!iSrc.includes('runHealthChecks'))
+      throw new Error('imessage.js missing runHealthChecks call');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- 60. think.mjs: computeInterruptScore function + 0.65 threshold gate present ----
 {
   const label = 'think.mjs: computeInterruptScore named function + 0.65 threshold gate present';

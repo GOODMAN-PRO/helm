@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { getSession, setSession, deleteSession } from './workspace/sessions.mjs';
 import { classifyComplexity, getModelPref, setModelPref } from './workspace/model-routing.mjs';
+import { runHealthChecks } from './workspace/mcp/check.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.join(__dirname, '.env') });
@@ -51,13 +52,22 @@ function pickModel(prompt) {
   return getModelPref() ?? classifyComplexity(prompt);
 }
 
-// Returns an --mcp-config value: the path to workspace/mcp/servers.json when valid,
-// or an inline empty-servers JSON as a fallback so Helm always starts even if the
-// config file is missing or malformed.
+// Returns an inline MCP config JSON string built from workspace/mcp/servers.json.
+// Only includes servers with enabled !== false. Strips Helm-only schema fields
+// (healthCheck, enabled) before passing to Claude Code. Falls back to empty config
+// if the file is missing or malformed — bot starts regardless.
 function mcpConfigArg() {
   const p = path.join(__dirname, 'workspace/mcp/servers.json');
-  try { JSON.parse(readFileSync(p, 'utf8')); return p; }
-  catch { return '{"mcpServers":{}}'; }
+  try {
+    const raw = JSON.parse(readFileSync(p, 'utf8'));
+    const filtered = {};
+    for (const [name, entry] of Object.entries(raw.mcpServers || {})) {
+      if (entry.enabled === false) continue;
+      const { healthCheck: _h, enabled: _e, ...mcpEntry } = entry;
+      filtered[name] = mcpEntry;
+    }
+    return JSON.stringify({ mcpServers: filtered });
+  } catch { return '{"mcpServers":{}}'; }
 }
 
 const PERSONA =
@@ -249,6 +259,9 @@ function sendiMessage(text, handle) {
   if (r.status !== 0) throw new Error((r.stderr || 'osascript send failed').trim());
   markSent(text);
 }
+
+// Fire-and-forget MCP health check at startup — bot starts regardless of results.
+runHealthChecks().catch(() => {});
 
 // ---- main loop ----
 let cursor = maxRowId(); // ignore history; only react to messages that arrive after startup
