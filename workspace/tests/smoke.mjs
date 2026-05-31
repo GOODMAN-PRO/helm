@@ -879,6 +879,47 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 39. recall ranks high-confidence fact above low-confidence same-keyword fact ----
+{
+  const label = 'memory recall: confidence weighting ranks high-confidence fact above low-confidence match';
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    const KIND = 'preference';
+    const KEY_HI = '__smoke_conf_hi';
+    const KEY_LO = '__smoke_conf_lo';
+    // Clean up any prior run
+    db.prepare(`DELETE FROM facts WHERE kind = ? AND key IN (?, ?)`).run(KIND, KEY_HI, KEY_LO);
+    // Insert two facts with identical keyword content but different confidence
+    db.prepare(
+      `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, updated)
+       VALUES (?, ?, 'helmconftest alpha bravo', 'smoke', 0.95, 5, unixepoch(), unixepoch())`
+    ).run(KIND, KEY_HI);
+    db.prepare(
+      `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, updated)
+       VALUES (?, ?, 'helmconftest alpha bravo', 'smoke', 0.3, 1, unixepoch(), unixepoch())`
+    ).run(KIND, KEY_LO);
+    db.close();
+
+    const r = spawnSync('node',
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'helmconftest alpha bravo', '--keyword-only'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`recall failed: ${r.stderr}`);
+    const arr = JSON.parse(r.stdout);
+
+    // Clean up
+    const db2 = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db2.prepare(`DELETE FROM facts WHERE kind = ? AND key IN (?, ?)`).run(KIND, KEY_HI, KEY_LO);
+    db2.close();
+
+    const hiIdx = arr.findIndex(f => f.key === KEY_HI);
+    const loIdx = arr.findIndex(f => f.key === KEY_LO);
+    if (hiIdx === -1 || loIdx === -1) throw new Error(`test facts not in recall results (hi=${hiIdx}, lo=${loIdx})`);
+    if (hiIdx >= loIdx) throw new Error(`high-confidence fact (idx ${hiIdx}) did not rank above low-confidence (idx ${loIdx})`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
