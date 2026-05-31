@@ -134,6 +134,28 @@ function gitLog() {
   }
 }
 
+function recentRuns() {
+  const runsDir = path.join(WORKSPACE, 'runs');
+  if (!existsSync(runsDir)) return [];
+  try {
+    const entries = readdirSync(runsDir, { withFileTypes: true })
+      .filter(e => e.isDirectory())
+      .map(e => e.name)
+      .sort()
+      .slice(-5)
+      .reverse();
+    return entries.map(name => {
+      const resultPath = path.join(runsDir, name, 'result.md');
+      const result = existsSync(resultPath)
+        ? readFileSync(resultPath, 'utf8').slice(0, 400)
+        : null;
+      return { name, result };
+    });
+  } catch {
+    return [];
+  }
+}
+
 function buildState() {
   return {
     ts: new Date().toISOString(),
@@ -144,6 +166,7 @@ function buildState() {
     upgradeHistory: upgradeHistory(),
     fleetTarget: fleetTarget(),
     gitLog: gitLog(),
+    recentRuns: recentRuns(),
   };
 }
 
@@ -223,6 +246,17 @@ function renderUpgrades(sections) {
 function renderGit(commits) {
   if (!commits.length) return '<p class="dim">No commits.</p>';
   return `<ol>${commits.map(c => `<li class="mono">${esc(c)}</li>`).join('')}</ol>`;
+}
+
+function renderRuns(runs) {
+  if (!runs.length) return '<p class="dim">No runs yet.</p>';
+  return runs.map(r => `
+    <details>
+      <summary class="mono">${esc(r.name)}</summary>
+      ${r.result != null
+        ? `<pre>${esc(r.result)}${r.result.length >= 400 ? '\n…' : ''}</pre>`
+        : '<p class="dim">No result.md</p>'}
+    </details>`).join('');
 }
 
 function buildHTML(state) {
@@ -354,6 +388,16 @@ ${renderAllCards(state)}
     if (!commits.length) return '<p class="dim">No commits.</p>';
     return '<ol>' + commits.map(c => '<li class="mono">' + esc(c) + '</li>').join('') + '</ol>';
   }
+  function renderRuns(runs) {
+    if (!runs || !runs.length) return '<p class="dim">No runs yet.</p>';
+    return runs.map(r =>
+      '<details><summary class="mono">' + esc(r.name) + '</summary>' +
+      (r.result != null
+        ? '<pre>' + esc(r.result) + (r.result.length >= 400 ? '\n…' : '') + '</pre>'
+        : '<p class="dim">No result.md</p>') +
+      '</details>'
+    ).join('');
+  }
   function renderAllCards(state) {
     return '<div class="card"><h2>Services</h2>' + renderServices(state.services) + '</div>' +
       '<div class="card"><h2>Fleet Target</h2><p class="fleet-badge">' + esc(state.fleetTarget) + '</p>' +
@@ -362,6 +406,7 @@ ${renderAllCards(state)}
       '<div class="card full"><h2>Scheduler Jobs</h2>' + renderJobs(state.jobs) + '</div>' +
       '<div class="card"><h2>Think Journal</h2>' + renderJournal(state.journal) + '</div>' +
       '<div class="card"><h2>Self-Upgrade History</h2>' + renderUpgrades(state.upgradeHistory) + '</div>' +
+      '<div class="card"><h2>Recent Job Runs</h2>' + renderRuns(state.recentRuns) + '</div>' +
       '<div class="card"><h2>Git Log (last 5)</h2>' + renderGit(state.gitLog) + '</div>';
   }
 
@@ -424,6 +469,10 @@ function renderAllCards(state) {
   <div class="card">
     <h2>Self-Upgrade History</h2>
     ${renderUpgrades(state.upgradeHistory)}
+  </div>
+  <div class="card">
+    <h2>Recent Job Runs</h2>
+    ${renderRuns(state.recentRuns)}
   </div>
   <div class="card">
     <h2>Git Log (last 5)</h2>
