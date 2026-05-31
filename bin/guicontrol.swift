@@ -65,5 +65,6 @@ case "type":         guard a.count > 2 else { die("type needs text") }; typeText
 case "key":          key(CGKeyCode(Int(num(2))), flags(a.count > 3 ? a[3] : nil))
 case "scroll":       post(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: Int32(num(2)), wheel2: 0, wheel3: 0))
 case "trusted":      print(AXIsProcessTrusted() ? "ACCESSIBILITY_OK" : "ACCESSIBILITY_DENIED")
+case "pos":          if let p = CGEvent(source: nil)?.location { print("\(Int(p.x)),\(Int(p.y))") } else { print("unknown") }
 default:             die("unknown command: \(a[1])")
 }

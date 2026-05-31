@@ -4,7 +4,7 @@
 //
 // No framework, no plugins, no gateway service. Read it top to bottom.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -211,6 +211,29 @@ client.on(Events.MessageCreate, async msg => {
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) {
     const n = killAll();
     await msg.reply(n ? `Stopped — killed ${n} running task(s).` : 'Nothing was running.');
+    return;
+  }
+
+  // ---- vault: store a secret straight from chat ("vault NAME value" / "vault list") ----
+  if (/^vault(\s|$)/i.test(text)) {
+    if (/^vault\s+list\s*$/i.test(text)) {
+      const r = spawnSync(process.execPath, ['workspace/secrets/secrets.mjs', 'list'], { cwd: __dirname, encoding: 'utf8' });
+      await msg.reply('Vault names:\n' + (r.stdout || r.stderr || '[]').trim());
+      return;
+    }
+    const m = text.match(/^vault\s+(\S+)\s+([\s\S]+)$/i);
+    if (!m) { await msg.reply('Usage: `vault <NAME> <value>` to store · `vault list` for names. (I never print values back.)'); return; }
+    const [, name, value] = m;
+    const r = spawnSync(process.execPath, ['workspace/secrets/secrets.mjs', 'set', name], { cwd: __dirname, input: value, encoding: 'utf8' });
+    if (r.status === 0) {
+      let deleted = false;
+      try { await msg.delete(); deleted = true; } catch {}
+      await msg.channel.send(`Stored **${name}** in the vault (encrypted).` + (deleted
+        ? ' Deleted your message.'
+        : " I can't delete messages in a DM — delete yours so the secret isn't left in the chat. (It also passed through Discord; for max privacy use the terminal vault command.)"));
+    } else {
+      await msg.channel.send('Vault error: ' + ((r.stderr || r.stdout || 'unknown').trim().slice(0, 300)));
+    }
     return;
   }
 
