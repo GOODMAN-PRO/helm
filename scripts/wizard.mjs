@@ -6,7 +6,7 @@ import tty from 'node:tty';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync, execSync } from 'node:child_process';
+import { spawnSync, execSync, spawn } from 'node:child_process';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IS_MAC = process.platform === 'darwin';
@@ -151,6 +151,45 @@ function which(bin) {
   try { return execSync(`${IS_WIN ? 'where' : 'command -v'} ${bin}`, { encoding: 'utf8' }).trim().split(/\r?\n/)[0]; }
   catch { return bin; }
 }
+const sleep = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} };
+
+// Curated local models the wizard can auto-download via Ollama (free, private, no account).
+const LOCAL_MODELS = [
+  { label: 'Llama 3.2 (3B) — small & fast (~2 GB)', id: 'llama3.2' },
+  { label: 'Llama 3.1 (8B) — balanced (~5 GB)', id: 'llama3.1' },
+  { label: 'Qwen2.5 Coder (7B) — best for coding (~5 GB)', id: 'qwen2.5-coder' },
+];
+function ollamaBin() {
+  const r = spawnSync(IS_WIN ? 'where' : 'which', ['ollama'], { encoding: 'utf8' });
+  if (r.status === 0 && r.stdout.trim()) return r.stdout.trim().split(/\r?\n/)[0];
+  const cands = IS_WIN ? [path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama.exe')]
+    : process.platform === 'darwin' ? ['/usr/local/bin/ollama', '/opt/homebrew/bin/ollama', '/Applications/Ollama.app/Contents/Resources/ollama']
+    : ['/usr/local/bin/ollama', '/usr/bin/ollama'];
+  for (const c of cands) { if (c && fs.existsSync(c)) return c; }
+  return null;
+}
+// Install Ollama if needed, make sure it's serving, and pull the chosen model — "does the rest".
+function ensureOllama(model) {
+  if (process.env.HELM_SKIP_MODEL_DOWNLOAD) { console.log(`(skipping model download — run later:  ollama pull ${model})`); return; }
+  let bin = ollamaBin();
+  if (!bin) {
+    console.log('\nInstalling Ollama (free local model runtime)...');
+    if (IS_WIN) spawnSync('winget', ['install', '-e', '--id', 'Ollama.Ollama', '--accept-source-agreements', '--accept-package-agreements'], { stdio: 'inherit' });
+    else if (process.platform === 'darwin') { if (spawnSync('which', ['brew']).status === 0) spawnSync('brew', ['install', 'ollama'], { stdio: 'inherit' }); }
+    else spawnSync('sh', ['-c', 'curl -fsSL https://ollama.com/install.sh | sh'], { stdio: 'inherit' });
+    bin = ollamaBin();
+  }
+  if (!bin) { console.log(`Could not auto-install Ollama. Install it from https://ollama.com, then run:  ollama pull ${model}`); return; }
+  // ensure the local server is up
+  if (spawnSync(bin, ['list'], { encoding: 'utf8', timeout: 8000 }).status !== 0) {
+    try { const s = spawn(bin, ['serve'], { detached: true, stdio: 'ignore' }); s.unref(); } catch {}
+    for (let i = 0; i < 15; i++) { sleep(1000); if (spawnSync(bin, ['list'], { encoding: 'utf8', timeout: 8000 }).status === 0) break; }
+  }
+  console.log(`\nDownloading the model "${model}" (a few GB, one-time)...`);
+  const r = spawnSync(bin, ['pull', model], { stdio: 'inherit' });
+  if (r.status === 0) console.log(`Model "${model}" is ready — Helm runs on it for free.`);
+  else console.log(`Couldn't pull "${model}". Open the Ollama app (or run 'ollama serve'), then: ollama pull ${model}`);
+}
 // the fancy full-screen UI needs a raw-mode TTY; otherwise we use a plain Q&A that works anywhere.
 // Set HELM_PLAIN=1 to force the plain flow (handy if a terminal mangles the full-screen UI).
 const rawOk = !process.env.HELM_PLAIN && isTTY && typeof input.setRawMode === 'function';
@@ -188,6 +227,7 @@ function applyConfig(cfg) {
   fs.writeFileSync(path.join(ROOT, '.env'), buildEnv(cfg), { mode: 0o600 });
   cleanup();
   console.log(`\nok  wrote ${path.join(ROOT, '.env')}`);
+  if (cfg.ollamaModel) ensureOllama(cfg.ollamaModel);
   if (cfg.svc) {
     const r = (IS_MAC || IS_LINUX)
       ? spawnSync('bash', [path.join(ROOT, 'scripts', 'install-service.sh')], { stdio: 'inherit' })
@@ -217,14 +257,26 @@ async function runPlain() {
   const ownerId = await ask('Your Discord user ID (enable Developer Mode, right-click your name -> Copy User ID)');
   const b = await ask('Power Helm with — 1) Claude subscription  2) Anthropic API key  3) Any other model (local/hosted)', '1');
   const authMode = b === '2' ? 'apikey' : b === '3' ? 'custom' : 'subscription';
-  let apiKey = '', baseUrl = '', modelId = '';
+  let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
   if (authMode === 'apikey') apiKey = await ask('Anthropic API key (https://console.anthropic.com/settings/keys)');
-  else if (authMode === 'custom') { baseUrl = await ask('Model endpoint URL — Ollama is https://ollama.com', 'http://localhost:11434'); modelId = await ask('Model name', 'llama3.1'); apiKey = await ask('API key for that endpoint (blank if none)', ''); }
+  else if (authMode === 'custom') {
+    console.log('  Pick a model (1-3 are free local models that auto-download):');
+    LOCAL_MODELS.forEach((m, i) => console.log(`    ${i + 1}) ${m.label}`));
+    console.log(`    ${LOCAL_MODELS.length + 1}) Custom endpoint (OpenAI / Gemini / Groq / your own URL)`);
+    const pick = parseInt(await ask('Choice', '1'), 10) || 1;
+    if (pick >= 1 && pick <= LOCAL_MODELS.length) {
+      ollamaModel = LOCAL_MODELS[pick - 1].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
+    } else {
+      baseUrl = await ask('Model endpoint URL', 'http://localhost:11434');
+      modelId = await ask('Model name', 'llama3.1');
+      apiKey = await ask('API key for that endpoint (blank if none)', '');
+    }
+  }
   const model = (await ask('Model — 1) opus  2) sonnet', '1')) === '2' ? 'sonnet' : 'opus';
   const perm = (await ask('Tool permissions — 1) bypassPermissions  2) default', '1')) === '2' ? 'default' : 'bypassPermissions';
   const svc = (await ask('Run 24/7 in the background? (y/n)', 'y')).toLowerCase().startsWith('y');
   rl.close();
-  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin: which('claude') });
+  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin: which('claude'), ollamaModel });
 }
 
 async function main() {
@@ -258,13 +310,21 @@ async function main() {
   ];
   const backendIdx = await select('How do you want to power Helm?', backendItems);
   const authMode = backendIdx === 1 ? 'apikey' : backendIdx === 2 ? 'custom' : 'subscription';
-  let apiKey = '', baseUrl = '', modelId = '';
+  let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
   if (authMode === 'apikey') {
     apiKey = await text('Anthropic API key', { mask: true, hint: 'https://console.anthropic.com/settings/keys (starts with sk-ant-)' });
   } else if (authMode === 'custom') {
-    baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Ollama (free, local — install from https://ollama.com) -> http://localhost:11434. OpenAI/Gemini/Groq/OpenRouter -> a router URL (LiteLLM / claude-code-router)' });
-    modelId = await text('Model name', { def: 'llama3.1', hint: 'e.g. llama3.1, qwen3-coder (Ollama) · gpt-4o, gemini-2.0, llama-3.1-70b (via router)' });
-    apiKey = await text('API key for that endpoint', { mask: true, hint: 'leave blank for a local model that needs none (e.g. Ollama)' });
+    // Easy path: pick a free local model from a list (auto-downloaded), or choose a custom endpoint.
+    const choices = [...LOCAL_MODELS.map(m => ({ label: m.label, hint: 'free · local · private · auto-downloads' })),
+      { label: 'Custom endpoint (OpenAI / Gemini / Groq / your own URL)', hint: 'advanced — bring an Anthropic-compatible endpoint or a router' }];
+    const mi = await select('Pick a model', choices);
+    if (mi < LOCAL_MODELS.length) {
+      ollamaModel = LOCAL_MODELS[mi].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
+    } else {
+      baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Anthropic-compatible endpoint, or a router (LiteLLM / claude-code-router) for OpenAI/Gemini/Groq' });
+      modelId = await text('Model name', { def: 'llama3.1', hint: 'e.g. gpt-4o, gemini-2.0, llama-3.1-70b' });
+      apiKey = await text('API key for that endpoint', { mask: true, hint: 'leave blank if none' });
+    }
   }
 
   // 3) model
@@ -292,14 +352,14 @@ async function main() {
   row('Owner ID', ownerId || `${C.yel}(none)${C.reset}`);
   row('Backend',
     authMode === 'apikey' ? `Anthropic API key ${apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}`
-    : authMode === 'custom' ? `Free / local — ${C.teal}${modelId}${C.reset} @ ${baseUrl}`
+    : authMode === 'custom' ? (ollamaModel ? `Local model ${C.teal}${ollamaModel}${C.reset} (auto-download)` : `Custom — ${C.teal}${modelId}${C.reset} @ ${baseUrl}`)
     : 'Claude subscription (OAuth)');
   row('Model', model);
   row('Permissions', perm);
   row('Service', svc ? 'yes' : 'no');
   out.write('\n');
   if (!(await confirm('Write this config?', true))) { cleanup(); console.log('\nCancelled. Nothing written.'); process.exit(1); }
-  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin });
+  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin, ollamaModel });
 }
 
 // If the fancy UI is unavailable or errors out, fall back to the plain Q&A rather than show nothing.
