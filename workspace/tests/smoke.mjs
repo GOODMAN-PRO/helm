@@ -124,6 +124,10 @@ function fail(label, reason) {
     deleteSession('smoke-test');
     const v2 = getSession('smoke-test');
     if (v2 !== null) throw new Error(`expected null after delete, got ${v2}`);
+    // null guard: setSession with null/undefined sessionId must throw
+    let threw = false;
+    try { setSession('smoke-null-guard', null); } catch { threw = true; }
+    if (!threw) throw new Error('setSession with null sessionId should throw');
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
