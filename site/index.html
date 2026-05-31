@@ -93,6 +93,20 @@
   .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:14px}
   .legend span b{font-weight:800;margin-right:6px}
   .note{color:var(--faint);font-size:12.5px;margin-top:12px;max-width:760px}
+  td.agent{min-width:230px}
+  td.agent b{display:block;font-weight:600;color:var(--ink)}
+  td.agent span{display:block;color:var(--muted);font-size:11.5px;margin-top:1px;font-weight:400}
+  tr.cat td{background:#0a131f;color:var(--cyan);font-size:11px;letter-spacing:1.6px;text-transform:uppercase;font-weight:700;text-align:left;padding:9px 12px}
+  tr.helmrow td{background:#0b1a22}
+  tr.helmrow td.agent b{color:var(--teal)}
+
+  /* hero install command */
+  .herocode{display:flex;align-items:center;gap:10px;max-width:600px;margin:4px auto 20px;
+    background:#06090f;border:1px solid #1b2740;border-radius:12px;padding:12px 14px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:#cfeaf2;overflow-x:auto}
+  .herocode code{white-space:nowrap}
+  .herocode button{flex:none;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .herocode button:hover{border-color:var(--cyan)}
 
   /* install */
   .install{background:linear-gradient(180deg,var(--panel2),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:34px}
@@ -155,9 +169,13 @@
     </div>
     <h1>Your own AI agent,<br><span class="grad">on your own machine.</span></h1>
     <p class="sub">Helm lives on your hardware with full shell, files, web and screen. You message it from Discord; it actually does the work and reports back. Owner-locked, private, and powered by the Claude subscription you already pay for.</p>
+    <div class="herocode">
+      <code>curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash</code>
+      <button onclick="copyCmd(this)">Copy</button>
+    </div>
     <div class="cta">
-      <a class="btn primary" href="#install">Install Helm</a>
-      <a class="btn ghost" href="#compare">See how it compares</a>
+      <a class="btn primary" href="#install">Install options</a>
+      <a class="btn ghost" href="#compare">Compare</a>
     </div>
     <div class="tagrow">Runs on macOS, Windows and Linux · Discord &amp; iMessage · No new SaaS bill</div>
   </header>
@@ -184,36 +202,47 @@
   <section id="compare">
     <p class="eyebrow">How Helm compares</p>
     <h2>Built for <span class="grad">you</span>, not a data center.</h2>
-    <p class="lead">openclaw, Hermes and Cursor are all capable — but most are one bot on one machine, or a coding tool bound to your editor. Helm is a persistent personal agent that lives across your whole fleet, remembers you, and improves itself.</p>
+    <p class="lead">The OpenClaw ecosystem and the hosted players each nail one slice — lightweight, secure, edge, or memory. Helm is the one that does all of it on your own hardware and ties your whole fleet together.</p>
     <div class="tablewrap">
       <table>
         <thead><tr>
-          <th>Capability</th>
-          <th class="helm">Helm</th>
-          <th>openclaw</th>
-          <th>Hermes</th>
-          <th>Cursor</th>
+          <th>Agent</th>
+          <th class="helm">On&nbsp;your machine</th>
+          <th>Open / self-host</th>
+          <th>Discord / iMessage</th>
+          <th>Persistent memory</th>
+          <th>Multi-machine fleet</th>
+          <th>Self-upgrades</th>
+          <th>Your sub / BYO key</th>
         </tr></thead>
         <tbody>
-          <tr><td>Runs on your own machine</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-          <tr><td>Chat from Discord / iMessage</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Private &amp; owner-locked</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
-          <tr><td>Full shell + file access on your box</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-          <tr><td>Clicks &amp; types in any app (no API needed)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Persistent memory + synced brain</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
-          <tr><td>Multi-machine fleet (Mac + Windows)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Thinks 24/7 &amp; self-upgrades</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Rides your existing Claude subscription</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Open &amp; self-installed</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr class="helmrow">
+            <td class="agent"><b>Helm</b><span>Personal agent across your whole fleet</span></td>
+            <td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td>
+          </tr>
+
+          <tr class="cat"><td colspan="8">Open-source &amp; local</td></tr>
+          <tr><td class="agent"><b>Hermes Agent</b><span>Closest open-source OpenClaw alternative</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td class="agent"><b>TrustClaw</b><span>Secure app-connected automation</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
+          <tr><td class="agent"><b>ZeroClaw</b><span>Lightweight local agents</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
+          <tr><td class="agent"><b>PicoClaw</b><span>Edge devices &amp; low-power hardware</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
+          <tr><td class="agent"><b>NanoClaw</b><span>Container-isolated local execution</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
+
+          <tr class="cat"><td colspan="8">Managed &amp; hosted</td></tr>
+          <tr><td class="agent"><b>Claude Cowork</b><span>Hosted workflows for Claude users</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td class="agent"><b>Manus</b><span>Polished managed agent workflows</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td class="agent"><b>Perplexity Computer</b><span>Browser-heavy research &amp; monitoring</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td class="agent"><b>Kimi Claw</b><span>Hosted OpenClaw experience</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td class="agent"><b>Vellum</b><span>Personal memory-first AI assistant</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
         </tbody>
       </table>
     </div>
     <div class="legend">
       <span><b class="yes">✓</b>Yes</span>
-      <span><b class="part">~</b>Partial / cloud-sandboxed only</span>
+      <span><b class="part">~</b>Partial / limited</span>
       <span><b class="no">—</b>No</span>
     </div>
-    <p class="note">Comparison reflects each tool's primary, out-of-the-box model. "Partial" means a capability exists but only inside a hosted sandbox (e.g. cloud code execution or API-only computer-use), not on your own machine. Product names belong to their owners; this is an honest positioning, not an exhaustive benchmark.</p>
+    <p class="note">Positioning based on each project's public description, not an exhaustive benchmark. "Partial" means the capability is limited or hosted-only. Product names belong to their owners. Tell us where we've got a row wrong and we'll fix it.</p>
   </section>
 
   <section id="how">
@@ -232,7 +261,7 @@
     <div class="install">
       <div class="code">
         <span id="cmd">curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash</span>
-        <button onclick="copyCmd()">Copy</button>
+        <button onclick="copyCmd(this)">Copy</button>
       </div>
       <div class="opts">
         <div class="opt"><h4>Pick your gateways</h4><p>A guided setup screen lets you turn on Discord, iMessage, or both.</p></div>
@@ -249,10 +278,10 @@
 </footer>
 
 <script>
-function copyCmd(){
-  const t=document.getElementById('cmd').textContent;
+function copyCmd(btn){
+  const t=btn.previousElementSibling.textContent;
   navigator.clipboard.writeText(t).then(()=>{
-    const b=event.target; const o=b.textContent; b.textContent='Copied'; setTimeout(()=>b.textContent=o,1400);
+    const o=btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=o,1400);
   });
 }
 </script>
