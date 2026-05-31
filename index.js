@@ -644,4 +644,17 @@ process.on('unhandledRejection', reason => console.error('Unhandled rejection:',
 // Fire-and-forget MCP health check at startup — bot starts regardless of results.
 runHealthChecks().catch(() => {});
 
-client.login(DISCORD_TOKEN);
+// Connect to Discord, with a clear reason if it can't (so "offline" isn't a mystery).
+if (/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
+  console.error('✋ DISCORD_TOKEN is still the placeholder. Run `npm run wizard` and paste your bot token (Developer Portal → your app → Bot → Reset Token).');
+  process.exit(1);
+}
+client.login(DISCORD_TOKEN).catch(e => {
+  const m = String(e?.message || e);
+  if (/token/i.test(m)) {
+    console.error('✋ Discord login failed: invalid DISCORD_TOKEN. Each bot needs its OWN token — get one at Developer Portal → your app → Bot → Reset Token, then `npm run wizard`. (One token = one running bot.)');
+  } else {
+    console.error('✋ Could not connect to Discord (network/proxy/firewall?). If git also failed earlier, your network is blocking it. Error: ' + m.slice(0, 200));
+  }
+  process.exit(1);
+});
