@@ -4,6 +4,7 @@
 // Reads /dev/tty directly so it works even when launched from `curl ... | bash` (piped stdin).
 import tty from 'node:tty';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execSync, spawn } from 'node:child_process';
@@ -159,6 +160,33 @@ const LOCAL_MODELS = [
   { label: 'Llama 3.1 (8B) — balanced (~5 GB)', id: 'llama3.1' },
   { label: 'Qwen2.5 Coder (7B) — best for coding (~5 GB)', id: 'qwen2.5-coder' },
 ];
+// Detect machine specs to recommend a local model size.
+function detectSpecs() {
+  const ramGB = Math.max(1, Math.round(os.totalmem() / 1073741824));
+  const cpus = (os.cpus() || []).length;
+  const apple = process.platform === 'darwin' && os.arch() === 'arm64';
+  let vramGB = 0, gpu = '';
+  try {
+    const r = spawnSync('nvidia-smi', ['--query-gpu=name,memory.total', '--format=csv,noheader,nounits'], { encoding: 'utf8', timeout: 4000 });
+    if (r.status === 0 && r.stdout && r.stdout.trim()) {
+      const [name, mb] = r.stdout.trim().split('\n')[0].split(',').map(s => s.trim());
+      gpu = name; const m = parseInt(mb, 10); if (m > 0) vramGB = Math.round(m / 1024);
+    }
+  } catch {}
+  return { ramGB, cpus, apple, vramGB, gpu };
+}
+// Memory budget for local inference: Apple Silicon shares RAM; else max(VRAM, half of RAM).
+function recommendIdx(s) {
+  const budget = s.apple ? s.ramGB : Math.max(s.vramGB, Math.floor(s.ramGB / 2));
+  return budget >= 8 ? 1 : 0;   // 8B if comfortable, else the small 3B
+}
+function specLine(s) {
+  const parts = [`${s.ramGB} GB RAM`];
+  if (s.cpus) parts.push(`${s.cpus} cores`);
+  if (s.apple) parts.push('Apple Silicon');
+  if (s.vramGB) parts.push(`${s.gpu || 'GPU'} ${s.vramGB} GB`);
+  return parts.join(' · ');
+}
 function ollamaBin() {
   const r = spawnSync(IS_WIN ? 'where' : 'which', ['ollama'], { encoding: 'utf8' });
   if (r.status === 0 && r.stdout.trim()) return r.stdout.trim().split(/\r?\n/)[0];
@@ -260,10 +288,12 @@ async function runPlain() {
   let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
   if (authMode === 'apikey') apiKey = await ask('Anthropic API key (https://console.anthropic.com/settings/keys)');
   else if (authMode === 'custom') {
+    const specs = detectSpecs(); const rec = recommendIdx(specs);
+    console.log(`  Your machine: ${specLine(specs)}`);
     console.log('  Pick a model (1-3 are free local models that auto-download):');
-    LOCAL_MODELS.forEach((m, i) => console.log(`    ${i + 1}) ${m.label}`));
+    LOCAL_MODELS.forEach((m, i) => console.log(`    ${i + 1}) ${m.label}${i === rec ? '  (recommended)' : ''}`));
     console.log(`    ${LOCAL_MODELS.length + 1}) Custom endpoint (OpenAI / Gemini / Groq / your own URL)`);
-    const pick = parseInt(await ask('Choice', '1'), 10) || 1;
+    const pick = parseInt(await ask('Choice', String(rec + 1)), 10) || (rec + 1);
     if (pick >= 1 && pick <= LOCAL_MODELS.length) {
       ollamaModel = LOCAL_MODELS[pick - 1].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
     } else {
@@ -315,9 +345,11 @@ async function main() {
     apiKey = await text('Anthropic API key', { mask: true, hint: 'https://console.anthropic.com/settings/keys (starts with sk-ant-)' });
   } else if (authMode === 'custom') {
     // Easy path: pick a free local model from a list (auto-downloaded), or choose a custom endpoint.
-    const choices = [...LOCAL_MODELS.map(m => ({ label: m.label, hint: 'free · local · private · auto-downloads' })),
+    const specs = detectSpecs();
+    const rec = recommendIdx(specs);
+    const choices = [...LOCAL_MODELS.map((m, i) => ({ label: m.label + (i === rec ? '   ← recommended for your machine' : ''), hint: 'free · local · private · auto-downloads' })),
       { label: 'Custom endpoint (OpenAI / Gemini / Groq / your own URL)', hint: 'advanced — bring an Anthropic-compatible endpoint or a router' }];
-    const mi = await select('Pick a model', choices);
+    const mi = await select(`Pick a model   (detected: ${specLine(specs)})`, choices, rec);
     if (mi < LOCAL_MODELS.length) {
       ollamaModel = LOCAL_MODELS[mi].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
     } else {
