@@ -42,6 +42,9 @@ curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | 
 ```powershell
 irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex
 ```
+> Windows tip: this installer works even when PowerShell's script policy is "Restricted". If a bare
+> `npx` command fails with *"running scripts is disabled"*, use this PowerShell line instead, or run
+> `npx.cmd github:GOODMAN-PRO/helm`, or once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
 The `curl` / PowerShell installers set up **everything they need** — Node, Claude Code (Helm's engine),
 and dependencies (git is optional; a tarball is used otherwise). The **npx** method needs Node already

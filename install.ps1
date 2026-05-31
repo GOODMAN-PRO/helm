@@ -6,6 +6,9 @@
 #
 # Env overrides:  $env:HELM_REPO, $env:HELM_DIR, $env:HELM_SRC, $env:HELM_NONINTERACTIVE=1
 $ErrorActionPreference = "Stop"
+# Many Windows machines block running .ps1 scripts (Restricted policy), which breaks npm.ps1/npx.ps1.
+# Relax it for THIS process only (no admin, nothing persisted), and we call npm.cmd directly below.
+try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force } catch {}
 
 $Repo = if ($env:HELM_REPO) { $env:HELM_REPO } else { "https://github.com/GOODMAN-PRO/helm.git" }
 $Dir  = if ($env:HELM_DIR)  { $env:HELM_DIR }  else { Join-Path $env:USERPROFILE "helm" }
@@ -33,7 +36,7 @@ if ($nodeMajor -lt 18) { Write-Host "xx  Node too old; need 18+." -ForegroundCol
 # Claude Code is the engine Helm runs on — auto-install it if missing.
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
   Write-Host "Claude Code (Helm's engine) not found — installing it with npm..." -ForegroundColor Cyan
-  npm install -g @anthropic-ai/claude-code
+  npm.cmd install -g @anthropic-ai/claude-code
 }
 $claudeState = if (Get-Command claude -ErrorAction SilentlyContinue) { "claude present" } else { "claude installed (restart shell if not found)" }
 Write-Host "ok  node $(node -v)   git present   $claudeState" -ForegroundColor Green
@@ -54,7 +57,7 @@ Set-Location $Dir
 
 # 3) dependencies
 Write-Host "Installing dependencies (npm install)..."
-npm install --no-audit --no-fund | Out-Null
+npm.cmd install --no-audit --no-fund | Out-Null
 if ($LASTEXITCODE -ne 0) { Write-Host "xx  npm install failed — run 'npm install' in $Dir to see why." -ForegroundColor Red; exit 1 }
 Write-Host "ok  dependencies installed" -ForegroundColor Green
 
@@ -63,7 +66,8 @@ node --check index.js
 Write-Host "ok  index.js syntax valid" -ForegroundColor Green
 
 # 5) configure
-$claudePath = (Get-Command claude).Source
+$claudePath = (Get-Command claude -ErrorAction SilentlyContinue).Source
+if (-not $claudePath) { $claudePath = "claude" }
 if (Test-Path ".env") {
   Write-Host "!!  .env already exists — leaving it. Start with: npm start" -ForegroundColor Yellow
 } elseif ($env:HELM_NONINTERACTIVE -eq "1") {
