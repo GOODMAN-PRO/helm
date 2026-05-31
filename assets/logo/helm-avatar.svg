@@ -1,49 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Helm">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="36%" r="75%">
-      <stop offset="0%" stop-color="#1b2942"/>
-      <stop offset="55%" stop-color="#0f1722"/>
-      <stop offset="100%" stop-color="#070a10"/>
+    <radialGradient id="bg" cx="50%" cy="34%" r="80%">
+      <stop offset="0%" stop-color="#19293f"/><stop offset="60%" stop-color="#101a27"/><stop offset="100%" stop-color="#070a10"/>
     </radialGradient>
-    <linearGradient id="wheel" gradientUnits="userSpaceOnUse" x1="120" y1="100" x2="392" y2="412">
-      <stop offset="0%" stop-color="#7df0dc"/>
-      <stop offset="50%" stop-color="#22d3ee"/>
-      <stop offset="100%" stop-color="#38bdf8"/>
+    <linearGradient id="wheel" gradientUnits="userSpaceOnUse" x1="170" y1="110" x2="342" y2="290">
+      <stop offset="0%" stop-color="#7df0dc"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/>
     </linearGradient>
     <radialGradient id="core" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#e6fffb"/>
-      <stop offset="60%" stop-color="#5eead4"/>
-      <stop offset="100%" stop-color="#14b8a6"/>
+      <stop offset="0%" stop-color="#e6fffb"/><stop offset="60%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/>
     </radialGradient>
     <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="3" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      <feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
-  <!-- full-bleed circular avatar background -->
+  <!-- circular background -->
   <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
-  <circle cx="256" cy="256" r="250" fill="none" stroke="#2a3a54" stroke-width="3" opacity="0.5"/>
 
-  <g transform="translate(256,256)" filter="url(#glow)" fill="none"
+  <!-- white shoulders / bust (broad shoulders, short neck) -->
+  <path d="M230 292 L230 330
+           C230 350 198 360 168 366
+           C140 372 116 386 104 414
+           C96 444 92 478 92 512
+           L420 512
+           C420 478 416 444 408 414
+           C396 386 372 372 344 366
+           C314 360 282 350 282 330
+           L282 292 Z" fill="#eef2f6"/>
+  <!-- subtle neck shadow where the head meets the shoulders -->
+  <ellipse cx="256" cy="300" rx="30" ry="9" fill="#cdd6df" opacity="0.5"/>
+
+  <!-- wheel as the head -->
+  <g transform="translate(256,202)" filter="url(#glow)" fill="none"
      stroke="url(#wheel)" stroke-linecap="round" stroke-linejoin="round">
-    <!-- 8 bold spokes / handle pegs -->
-    <g stroke-width="22">
-      <line y2="-190"/>
-      <line y2="-190" transform="rotate(45)"/>
-      <line y2="-190" transform="rotate(90)"/>
-      <line y2="-190" transform="rotate(135)"/>
-      <line y2="-190" transform="rotate(180)"/>
-      <line y2="-190" transform="rotate(225)"/>
-      <line y2="-190" transform="rotate(270)"/>
-      <line y2="-190" transform="rotate(315)"/>
+    <g stroke-width="14">
+      <line y2="-104"/>
+      <line y2="-104" transform="rotate(45)"/>
+      <line y2="-104" transform="rotate(90)"/>
+      <line y2="-104" transform="rotate(135)"/>
+      <line y2="-104" transform="rotate(180)"/>
+      <line y2="-104" transform="rotate(225)"/>
+      <line y2="-104" transform="rotate(270)"/>
+      <line y2="-104" transform="rotate(315)"/>
     </g>
-    <!-- bold outer ring -->
-    <circle r="150" stroke-width="30"/>
+    <circle r="80" stroke-width="17"/>
   </g>
-
-  <!-- hub: dark disc + ring + glowing core -->
-  <circle cx="256" cy="256" r="58" fill="#070a10"/>
-  <circle cx="256" cy="256" r="58" fill="none" stroke="url(#wheel)" stroke-width="9"/>
-  <circle cx="256" cy="256" r="22" fill="url(#core)" filter="url(#glow)"/>
+  <!-- hub punched over the spokes + glowing core -->
+  <circle cx="256" cy="202" r="31" fill="#070a10"/>
+  <circle cx="256" cy="202" r="31" fill="none" stroke="url(#wheel)" stroke-width="5"/>
+  <circle cx="256" cy="202" r="12" fill="url(#core)" filter="url(#glow)"/>
 </svg>
