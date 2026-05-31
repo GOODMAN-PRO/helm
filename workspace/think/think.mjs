@@ -29,6 +29,7 @@ const UPGRADE_LOCK = path.join(ROOT, '.upgrade.lock');
 const REFRESH = path.join(WORKSPACE, 'memory', 'refresh-index.mjs');
 const CONSOLIDATE = path.join(WORKSPACE, 'memory', 'consolidate.mjs');
 const WEEKLY_MARK = path.join(__dirname, '.last-weekly-review');
+const PUSH_BIN = path.join(ROOT, 'bin', 'helm-push.mjs');
 // Local time intentional — aligns with launchd's local-time StartCalendarInterval used by
 // com.helm.selfupgrade and com.helm.discord. Window follows owner's overnight on whichever
 // machine Helm is running on.
@@ -79,6 +80,60 @@ const WEEKLY_PROMPT = [
   'Output 2-4 sentences: what you found, what you persisted, any job proposal. No emojis, no preamble.',
 ].join('\n');
 
+// Urgency keywords that signal the finding warrants interrupting the owner.
+const URGENCY_KEYWORDS = [
+  'deadline', 'urgent', 'asap', 'due', 'exam', 'tomorrow',
+  'critical', 'emergency', 'failing', 'overdue', 'expir',
+  'alert', 'warning', 'must', 'immediately',
+];
+
+// Compute a 0-1 score combining urgency (keyword density) and relevance (memory recall).
+// Only push the owner when score > 0.65 — keeps Helm quiet by default.
+function computeInterruptScore(finding, recentActivity = [], activeGoals = []) {
+  if (!finding || typeof finding !== 'string') return 0;
+
+  // Urgency: count distinct keyword matches, saturate at 3 hits → score 1.0
+  const lower = finding.toLowerCase();
+  const hits = URGENCY_KEYWORDS.filter(k => lower.includes(k)).length;
+  const urgency = Math.min(hits / 3, 1.0);
+
+  // Relevance: average confidence of top memory-recall results for this finding.
+  let relevance = 0;
+  try {
+    const query = finding.replace(/["\n\r]/g, ' ').trim().slice(0, 150);
+    if (query) {
+      const r = spawnSync('node', [
+        path.join(WORKSPACE, 'memory', 'memory.mjs'), 'recall', query,
+        '--keyword-only', '--limit', '3',
+      ], { encoding: 'utf8', timeout: 5_000 });
+      if (r.status === 0) {
+        const facts = JSON.parse(r.stdout || '[]');
+        if (facts.length > 0) {
+          relevance = facts.reduce((s, f) => s + (f.confidence || 0), 0) / facts.length;
+        }
+      }
+    }
+  } catch { /* non-fatal: relevance stays 0 */ }
+
+  // Active-goal overlap: boost relevance when the finding mentions a known goal
+  if (activeGoals.length > 0 && activeGoals.some(g => g && lower.includes(g.toLowerCase()))) {
+    relevance = Math.min(relevance + 0.2, 1.0);
+  }
+
+  return Math.min(0.7 * urgency + 0.3 * relevance, 1.0);
+}
+
+// Load active goal values from the memory store (kind=goal).
+function loadActiveGoals() {
+  try {
+    const r = spawnSync('node', [
+      path.join(WORKSPACE, 'memory', 'memory.mjs'), 'dump', '--kind', 'goal',
+    ], { encoding: 'utf8', timeout: 5_000 });
+    if (r.status === 0) return JSON.parse(r.stdout || '[]').map(f => String(f.value));
+  } catch {}
+  return [];
+}
+
 function weeklyDue() {
   try {
     const last = parseInt(readFileSync(WEEKLY_MARK, 'utf8').trim(), 10);
@@ -124,6 +179,22 @@ function tick() {
     const tag = deep ? '[WEEKLY] ' : '';
     appendFileSync(path.join(JOURNAL_DIR, ts().slice(0, 10) + '.md'),
       `- ${ts()} ${tag}${(thought || '(no output)').replace(/\n+/g, ' ')}\n`);
+
+    // Interrupt gate: only DM the owner if the thought is genuinely urgent/relevant.
+    if (thought) {
+      try {
+        const goals = loadActiveGoals();
+        const score = computeInterruptScore(thought, [], goals);
+        log(`interrupt score: ${score.toFixed(3)}`);
+        if (score > 0.65) {
+          const summary = thought.length > 280 ? thought.slice(0, 277) + '...' : thought;
+          const pr = spawnSync('/usr/bin/env', ['node', PUSH_BIN, `[Helm] ${summary}`],
+            { encoding: 'utf8', timeout: 15_000 });
+          if (pr.status === 0) log('pushed interrupt DM to owner');
+          else log('push failed: ' + (pr.stderr || '').trim().slice(0, 100));
+        }
+      } catch (e) { log('interrupt gate error: ' + (e.message || e)); }
+    }
 
     if (deep) {
       // Run consolidation immediately after the weekly review so any decay/dedupe
