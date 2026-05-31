@@ -132,7 +132,14 @@ function tick() {
         const c = spawnSync('/usr/bin/env', ['node', CONSOLIDATE], { encoding: 'utf8', timeout: 60_000 });
         log('consolidate: ' + ((c.stdout || '').trim().slice(0, 200).replace(/\s+/g, ' ')));
       } catch (e) { log('consolidate error ' + (e.message || e)); }
-      try { writeFileSync(WEEKLY_MARK, String(Date.now())); } catch {}
+      // Only stamp the weekly mark when claude actually completed successfully.
+      // If it timed out (r.signal === 'SIGTERM') or exited non-zero, leave the mark
+      // untouched so the review is retried next tick rather than suppressed for 7 days.
+      if (r.status === 0 && !r.signal) {
+        try { writeFileSync(WEEKLY_MARK, String(Date.now())); } catch {}
+      } else {
+        log(`weekly review did not complete (status=${r.status} signal=${r.signal}) — mark not updated`);
+      }
     }
 
     spawnSync('/usr/bin/env', ['node', REFRESH], { cwd: ROOT, encoding: 'utf8' });

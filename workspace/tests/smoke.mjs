@@ -771,6 +771,25 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 35. think.mjs: weekly mark guarded by r.status/r.signal ----
+{
+  const label = 'think.mjs: weekly mark write guarded by r.status === 0 && !r.signal';
+  try {
+    const src = readFileSync(path.join(WORKSPACE, 'think/think.mjs'), 'utf8');
+    // The guard must appear inside the if(deep) block, before the writeFileSync(WEEKLY_MARK call.
+    const deepIdx = src.indexOf('if (deep) {');
+    const markIdx = src.indexOf('writeFileSync(WEEKLY_MARK', deepIdx);
+    if (deepIdx === -1 || markIdx === -1)
+      throw new Error('if(deep) block or writeFileSync(WEEKLY_MARK not found');
+    const between = src.slice(deepIdx, markIdx);
+    if (!between.includes('r.status === 0'))
+      throw new Error('r.status === 0 guard missing before writeFileSync(WEEKLY_MARK');
+    if (!between.includes('!r.signal'))
+      throw new Error('!r.signal guard missing before writeFileSync(WEEKLY_MARK');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
