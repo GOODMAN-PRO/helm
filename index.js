@@ -629,9 +629,14 @@ client.on(Events.MessageCreate, async msg => {
           : `Failed on "${(text || '(attachment)').slice(0, 60)}": ${String(e.message || e).slice(0, 140)}`,
         String(e.message || e).slice(0, 500), 'auto');
     } catch {}
+    // On a free/local backend, a failure is usually the model endpoint being down or the model not pulled.
+    const errStr = String(e.message || e);
+    const localHint = (AUTH_MODE === 'custom' && /econnrefused|connect|fetch failed|not found|404|model|11434/i.test(errStr))
+      ? `\n\n_Local model issue: make sure Ollama is running and the model is pulled — \`ollama pull ${process.env.ANTHROPIC_MODEL || 'llama3.1'}\`. Endpoint: ${process.env.ANTHROPIC_BASE_URL || '(unset)'}._`
+      : '';
     const m = e.timedOut
       ? '⚠️ that task hit the 10-min cap and was stopped — try breaking it into a smaller step.'
-      : `⚠️ brain error: ${String(e.message || e).slice(0, 1800)}`;
+      : `⚠️ brain error: ${errStr.slice(0, 1700)}${localHint}`;
     try { await msg.reply(m); } catch {}  // Discord API failure in error path must not crash the process
   }
 });
