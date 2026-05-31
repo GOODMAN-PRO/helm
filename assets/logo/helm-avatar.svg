@@ -16,14 +16,13 @@
 
   <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
 
-  <!-- shoulders: two strokes splaying out from under the wheel, with a small hook (per sketch) -->
-  <g fill="none" stroke="#eef2f6" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M198 250 L120 372 L126 420"/>
-    <path d="M314 250 L392 372 L386 420"/>
-  </g>
+  <!-- shoulders: white triangle torso (apex at the neck, wide at the base) -->
+  <path d="M256 250 L120 474 L392 474 Z" fill="#eef2f6"/>
+  <!-- blue tie down the middle -->
+  <path d="M256 252 L242 272 L250 446 L256 460 L262 446 L270 272 Z" fill="#38bdf8"/>
 
   <!-- wheel as the head -->
-  <g transform="translate(256,190)" filter="url(#glow)" fill="none"
+  <g transform="translate(256,186)" filter="url(#glow)" fill="none"
      stroke="url(#wheel)" stroke-linecap="round" stroke-linejoin="round">
     <g stroke-width="14">
       <line y2="-104"/>
@@ -37,7 +36,7 @@
     </g>
     <circle r="80" stroke-width="17"/>
   </g>
-  <circle cx="256" cy="190" r="31" fill="#070a10"/>
-  <circle cx="256" cy="190" r="31" fill="none" stroke="url(#wheel)" stroke-width="5"/>
-  <circle cx="256" cy="190" r="12" fill="url(#core)" filter="url(#glow)"/>
+  <circle cx="256" cy="186" r="31" fill="#070a10"/>
+  <circle cx="256" cy="186" r="31" fill="none" stroke="url(#wheel)" stroke-width="5"/>
+  <circle cx="256" cy="186" r="12" fill="url(#core)" filter="url(#glow)"/>
 </svg>
