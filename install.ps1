@@ -21,7 +21,7 @@ Write-Host "== Helm installer (Windows) ==" -ForegroundColor Cyan
 # 1) prerequisites
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   if (Get-Command winget -ErrorAction SilentlyContinue) {
-    Write-Host "Node not found — installing it via winget..." -ForegroundColor Cyan
+    Write-Host "Node not found - installing it via winget..." -ForegroundColor Cyan
     winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
     # refresh PATH for this session so node/npm are found right away
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
@@ -33,9 +33,9 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 Need git "git not found. Install Git for Windows (https://git-scm.com) then re-run."
 $nodeMajor = [int](node -p "process.versions.node.split('.')[0]")
 if ($nodeMajor -lt 18) { Write-Host "xx  Node too old; need 18+." -ForegroundColor Red; exit 1 }
-# Claude Code is the engine Helm runs on — auto-install it if missing.
+# Claude Code is the engine Helm runs on - auto-install it if missing.
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-  Write-Host "Claude Code (Helm's engine) not found — installing it with npm..." -ForegroundColor Cyan
+  Write-Host "Claude Code (Helm's engine) not found - installing it with npm..." -ForegroundColor Cyan
   npm.cmd install -g @anthropic-ai/claude-code
 }
 $claudeState = if (Get-Command claude -ErrorAction SilentlyContinue) { "claude present" } else { "claude installed (restart shell if not found)" }
@@ -68,7 +68,7 @@ if ($Src) {
   $cloned = $false
   try { git clone --depth 1 $Repo $Dir 2>$null; if (Test-Path (Join-Path $Dir ".git")) { $cloned = $true } } catch {}
   if (-not $cloned) {
-    Write-Host "git clone failed (proxy/firewall?) — using the zip download instead." -ForegroundColor Yellow
+    Write-Host "git clone failed (proxy/firewall?) - using the zip download instead." -ForegroundColor Yellow
     if (Test-Path $Dir) { Remove-Item $Dir -Recurse -Force -ErrorAction SilentlyContinue }
     Get-HelmZip $Dir
   }
@@ -79,7 +79,7 @@ Set-Location $Dir
 # 3) dependencies
 Write-Host "Installing dependencies (npm install)..."
 npm.cmd install --no-audit --no-fund | Out-Null
-if ($LASTEXITCODE -ne 0) { Write-Host "xx  npm install failed — run 'npm install' in $Dir to see why." -ForegroundColor Red; exit 1 }
+if ($LASTEXITCODE -ne 0) { Write-Host "xx  npm install failed - run 'npm install' in $Dir to see why." -ForegroundColor Red; exit 1 }
 Write-Host "ok  dependencies installed" -ForegroundColor Green
 
 # 4) sanity check
@@ -90,7 +90,7 @@ Write-Host "ok  index.js syntax valid" -ForegroundColor Green
 $claudePath = (Get-Command claude -ErrorAction SilentlyContinue).Source
 if (-not $claudePath) { $claudePath = "claude" }
 if (Test-Path ".env") {
-  Write-Host "!!  .env already exists — leaving it. Start with: npm start" -ForegroundColor Yellow
+  Write-Host "!!  .env already exists - leaving it. Start with: npm start" -ForegroundColor Yellow
 } elseif ($env:HELM_NONINTERACTIVE -eq "1") {
   Copy-Item .env.example .env
   (Get-Content .env) -replace '^CLAUDE_BIN=.*', "CLAUDE_BIN=$claudePath" | Set-Content .env
@@ -101,7 +101,7 @@ if (Test-Path ".env") {
   if ($LASTEXITCODE -ne 0 -and -not (Test-Path ".env")) {
     Copy-Item .env.example .env
     (Get-Content .env) -replace '^CLAUDE_BIN=.*', "CLAUDE_BIN=$claudePath" | Set-Content .env
-    Write-Host "!!  Wizard unavailable — wrote .env from template; edit it then run: npm start" -ForegroundColor Yellow
+    Write-Host "!!  Wizard unavailable - wrote .env from template; edit it then run: npm start" -ForegroundColor Yellow
   }
 }
 

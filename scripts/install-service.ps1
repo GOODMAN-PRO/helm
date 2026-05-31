@@ -3,7 +3,7 @@
 $ErrorActionPreference = "Stop"
 $Dir  = Split-Path -Parent $PSScriptRoot
 $Node = (Get-Command node).Source
-if (-not (Test-Path (Join-Path $Dir ".env"))) { Write-Host "No .env in $Dir — run the installer first." -ForegroundColor Red; exit 1 }
+if (-not (Test-Path (Join-Path $Dir ".env"))) { Write-Host "No .env in $Dir - run the installer first." -ForegroundColor Red; exit 1 }
 
 $tr = "`"$Node`" `"$Dir\index.js`""
 # /IT = run only when the user is logged on (so it can reach the GUI/Claude session); /RL LIMITED = normal rights
