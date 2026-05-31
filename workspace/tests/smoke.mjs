@@ -1159,6 +1159,128 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 47. BM25 ranking: higher TF fact ranks above lower TF fact ----
+{
+  const label = 'memory recall: BM25 ranks fact with higher term frequency above lower TF fact';
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    const KIND = 'note';
+    const KEY_HI = '__smoke_bm25_hi';
+    const KEY_LO = '__smoke_bm25_lo';
+    db.prepare(`DELETE FROM facts WHERE kind = ? AND key IN (?, ?) AND expired_at IS NULL`).run(KIND, KEY_HI, KEY_LO);
+    // High TF: 'quasar' appears 3 times
+    db.prepare(
+      `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, updated)
+       VALUES (?, ?, 'bm25probe quasar quasar quasar', 'smoke', 0.9, 3, unixepoch(), unixepoch())`
+    ).run(KIND, KEY_HI);
+    // Low TF: 'quasar' appears once
+    db.prepare(
+      `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, updated)
+       VALUES (?, ?, 'bm25probe quasar minimal', 'smoke', 0.9, 1, unixepoch(), unixepoch())`
+    ).run(KIND, KEY_LO);
+    db.close();
+
+    const r = spawnSync('node',
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'bm25probe quasar', '--keyword-only'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`recall failed: ${r.stderr}`);
+    const arr = JSON.parse(r.stdout);
+
+    const db2 = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db2.prepare(`DELETE FROM facts WHERE kind = ? AND key IN (?, ?)`).run(KIND, KEY_HI, KEY_LO);
+    db2.close();
+
+    const hiIdx = arr.findIndex(f => f.key === KEY_HI);
+    const loIdx = arr.findIndex(f => f.key === KEY_LO);
+    if (hiIdx === -1 || loIdx === -1) throw new Error(`BM25 test facts not in results (hi=${hiIdx}, lo=${loIdx})`);
+    if (hiIdx >= loIdx) throw new Error(`high-TF fact (idx ${hiIdx}) did not rank above low-TF (idx ${loIdx})`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 48. temporal supersede: new value creates new row, old gets expired_at; history returns both ----
+{
+  const label = 'memory.mjs temporal supersede: new value expires old row; recall returns new; history returns both';
+  const mem = path.join(WORKSPACE, 'memory/memory.mjs');
+  const KEY = '__smoke_supersede';
+  try {
+    // Clean up any leftover rows from previous test runs
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
+    db.close();
+
+    const r1 = JSON.parse(spawnSync('node', [mem, 'remember', 'note', KEY, 'first value'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (!['inserted', 'updated'].includes(r1.action)) throw new Error(`unexpected action: ${r1.action}`);
+
+    const r2 = JSON.parse(spawnSync('node', [mem, 'remember', 'note', KEY, 'second value'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (r2.action !== 'superseded') throw new Error(`expected action 'superseded', got '${r2.action}'`);
+    if (r2.value !== 'second value') throw new Error(`new value not in output: ${r2.value}`);
+    if (!r2.old_id) throw new Error('old_id missing from superseded output');
+
+    // recall must return only the new value
+    const recall = JSON.parse(spawnSync('node', [mem, 'recall', KEY, '--keyword-only'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    const active = recall.filter(f => f.key === KEY);
+    if (active.length !== 1) throw new Error(`expected 1 active fact, got ${active.length}`);
+    if (active[0].value !== 'second value') throw new Error(`recall returned old value: ${active[0].value}`);
+
+    // history must return at least 2 rows (old expired + new active)
+    const hist = JSON.parse(spawnSync('node', [mem, 'history', KEY],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (hist.length < 2) throw new Error(`expected >= 2 history rows, got ${hist.length}`);
+    const hasExpired = hist.some(f => f.expired_at !== null);
+    if (!hasExpired) throw new Error('no expired row found in history — supersede did not set expired_at');
+    const hasActive = hist.some(f => f.expired_at === null);
+    if (!hasActive) throw new Error('no active row found in history');
+
+    // Cleanup
+    const db2 = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db2.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
+    db2.close();
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 49. access_count incremented on recall hit ----
+{
+  const label = 'memory.mjs recall: access_count bumped for returned facts';
+  const mem = path.join(WORKSPACE, 'memory/memory.mjs');
+  const KEY = '__smoke_access_count';
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
+    db.close();
+
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'accesscount probe unique'],
+      { encoding: 'utf8', timeout: 10_000 });
+
+    // Recall to trigger access_count bump
+    const r = spawnSync('node', [mem, 'recall', 'accesscount probe', '--keyword-only'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`recall failed: ${r.stderr}`);
+    const arr = JSON.parse(r.stdout);
+    if (!arr.some(f => f.key === KEY)) throw new Error('probe fact not in recall results');
+
+    // Dump and check access_count
+    const dump = JSON.parse(spawnSync('node', [mem, 'dump'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    const fact = dump.find(f => f.key === KEY);
+    if (!fact) throw new Error('probe fact not found in dump');
+    if (!(fact.access_count >= 1)) throw new Error(`access_count not bumped: ${fact.access_count}`);
+
+    // Cleanup
+    const db2 = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db2.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
+    db2.close();
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

@@ -71,14 +71,19 @@ const WEEKLY_PROMPT = [
   'Then, do exactly these things:',
   '1. Write 1–3 episodes summarising the week\'s recurring themes:',
   '   node workspace/memory/memory.mjs episode add "<one line>" --channel weekly-review',
-  '2. For each LOW-CONFIDENCE preference you saw evidence for this week, re-assert it so',
+  '2. LLM-CONSOLIDATE the last 7 days of episodes into durable facts. Read the episodes output',
+  '   and for each distinct theme, entity, or pattern that appears in 2+ recent episodes, write it',
+  '   as a learned fact so it survives beyond the rolling episode window:',
+  '   node workspace/memory/memory.mjs remember learned <kebab-key> "<concise value summarising the pattern>"',
+  '   Only write facts that are genuinely recurring — skip one-offs.',
+  '3. For each LOW-CONFIDENCE preference you saw evidence for this week, re-assert it so',
   '   its evidence_count and confidence advance:',
   '   node workspace/memory/memory.mjs remember preference <key> "<value>" --source observed --confidence 0.75',
   '   For ones you have NO new evidence on, leave them — consolidation will decay them.',
-  '3. If a recurring pattern would benefit from a scheduled job, propose it DISABLED only:',
+  '4. If a recurring pattern would benefit from a scheduled job, propose it DISABLED only:',
   '   node workspace/tools/tools.mjs call scheduler.add --json \'{"name":"...","cron":"...","payload":"...","enabled":false}\'',
   '   Add at most ONE per week. Do not enable it — the owner reviews.',
-  '4. Do NOT edit source code, do NOT spend money, NEVER touch ~/helm.',
+  '5. Do NOT edit source code, do NOT spend money, NEVER touch ~/helm.',
   '',
   'Output 2-4 sentences: what you found, what you persisted, any job proposal. No emojis, no preamble.',
 ].join('\n');
@@ -133,7 +138,7 @@ function tick() {
       // Run consolidation immediately after the weekly review so any decay/dedupe
       // reflects the freshly-written episodes and preferences.
       try {
-        const c = spawnSync('/usr/bin/env', ['node', CONSOLIDATE], { encoding: 'utf8', timeout: 60_000 });
+        const c = spawnSync('/usr/bin/env', ['node', CONSOLIDATE, '--since-days', '7'], { encoding: 'utf8', timeout: 60_000 });
         log('consolidate: ' + ((c.stdout || '').trim().slice(0, 200).replace(/\s+/g, ' ')));
       } catch (e) { log('consolidate error ' + (e.message || e)); }
       // Only stamp the weekly mark when claude actually completed successfully.

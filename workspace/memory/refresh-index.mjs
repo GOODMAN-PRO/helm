@@ -22,7 +22,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS episodes (
 )`);
 
 const facts = db.prepare(
-  `SELECT kind, key, value, confidence, updated FROM facts ORDER BY kind, confidence DESC, updated DESC`
+  `SELECT kind, key, value, confidence, updated FROM facts WHERE expired_at IS NULL ORDER BY kind, confidence DESC, updated DESC`
 ).all();
 const prefs = facts.filter(f => f.kind === 'preference');
 const others = facts.filter(f => f.kind !== 'preference');

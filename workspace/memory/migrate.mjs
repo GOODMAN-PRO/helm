@@ -26,19 +26,20 @@ db.exec(`
   );
 `);
 
-// Deduplicate any rows from prior buggy runs — keep lowest id per (kind, key).
+// Deduplicate active rows only — keep lowest id per (kind, key) among non-expired rows.
+// Expired rows are historical records and must not be touched.
 db.exec(`
-  DELETE FROM facts WHERE id NOT IN (
-    SELECT MIN(id) FROM facts GROUP BY kind, key
+  DELETE FROM facts WHERE expired_at IS NULL AND id NOT IN (
+    SELECT MIN(id) FROM facts WHERE expired_at IS NULL GROUP BY kind, key
   )
 `);
 
-// Long-term guard against re-introducing duplicates: enforce uniqueness at the DB
-// level. Only create the index once dedup above has cleared any existing dupes;
-// CREATE UNIQUE INDEX would otherwise fail with "UNIQUE constraint failed".
-db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS facts_kind_key_uniq ON facts(kind, key)`);
+// Long-term guard against re-introducing duplicates. Partial index (WHERE expired_at IS NULL)
+// enforces uniqueness among active rows only, allowing multiple expired rows per (kind,key).
+// CREATE INDEX IF NOT EXISTS is a no-op when the index already exists (from memory.mjs init).
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS facts_kind_key_uniq ON facts(kind, key) WHERE expired_at IS NULL`);
 
-const stmtFind   = db.prepare(`SELECT id FROM facts WHERE kind = ? AND key = ?`);
+const stmtFind   = db.prepare(`SELECT id FROM facts WHERE kind = ? AND key = ? AND expired_at IS NULL`);
 const stmtInsert = db.prepare(
   `INSERT INTO facts (kind, key, value, source, confidence) VALUES (?, ?, ?, 'CLAUDE.md', 1.0)`
 );

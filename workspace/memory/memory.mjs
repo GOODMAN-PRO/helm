@@ -2,9 +2,12 @@
 // Helm structured memory CLI.
 // Usage:
 //   memory.mjs remember <kind> <key> <value> [--source <s>] [--confidence <0-1>]
-//   memory.mjs recall <query> [--limit N]
+//   memory.mjs recall <query> [--limit N] [--keyword-only]
 //   memory.mjs forget <id>
-//   memory.mjs dump [--kind <kind>]
+//   memory.mjs dump [--kind <kind>] [--all]
+//   memory.mjs history <key>
+//   memory.mjs episode [add <summary>]
+//   memory.mjs unsure [--threshold <0-1>]
 //
 // Exits 0 on success, 1 on error. Output is JSON on stdout.
 
@@ -46,12 +49,28 @@ db.exec(`
 // Active-learning columns. Idempotent: ignore "duplicate column" errors on re-run.
 try { db.exec(`ALTER TABLE facts ADD COLUMN evidence_count INTEGER NOT NULL DEFAULT 1`); } catch {}
 try { db.exec(`ALTER TABLE facts ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0`); } catch {}
-// Backfill last_seen on rows that pre-date the column. WHERE guard avoids a
-// full-table write on every startup once all rows are already set.
 db.exec(`UPDATE facts SET last_seen = updated WHERE last_seen = 0`);
-// Long-term guard against (kind, key) duplicates. Skip if existing rows already
-// violate uniqueness — migrate.mjs handles the dedup-then-create path.
-try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS facts_kind_key_uniq ON facts(kind, key)`); } catch {}
+
+// Temporal validity columns.
+try { db.exec(`ALTER TABLE facts ADD COLUMN valid_from INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE facts ADD COLUMN expired_at INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE facts ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0`); } catch {}
+db.exec(`UPDATE facts SET valid_from = created WHERE valid_from = 0`);
+
+// Partial unique index: uniqueness enforced only among active (non-expired) rows.
+// Allows multiple expired rows per (kind, key) while keeping one active row unique.
+// Migration: if a full index already exists, rebuild it as partial.
+try {
+  const idxRow = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE type='index' AND name='facts_kind_key_uniq'`
+  ).get();
+  if (!idxRow || !(idxRow.sql || '').includes('WHERE')) {
+    db.exec(`DROP INDEX IF EXISTS facts_kind_key_uniq`);
+    db.exec(`CREATE UNIQUE INDEX facts_kind_key_uniq ON facts(kind, key) WHERE expired_at IS NULL`);
+  }
+} catch {
+  try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS facts_kind_key_uniq ON facts(kind, key) WHERE expired_at IS NULL`); } catch {}
+}
 
 const [,, verb, ...rest] = process.argv;
 
@@ -83,13 +102,11 @@ switch (verb) {
     const source = flags.source ?? null;
     const reqConf = parseFloat(flags.confidence ?? 1);
     const force = flags.force === true || flags.force === 'true';
-    // Active learning: a single observation is provisional. Confidence only rises with
-    // independent repeats. `--force` (or non-observed sources) bypass the cap.
     const isObserved = source === 'observed' && !force;
     const PROVISIONAL_CAP = 0.7;
 
     const existing = db.prepare(
-      `SELECT id, value, confidence, evidence_count FROM facts WHERE kind = ? AND key = ?`
+      `SELECT id, value, confidence, evidence_count FROM facts WHERE kind = ? AND key = ? AND expired_at IS NULL`
     ).get(kind, key);
 
     if (existing) {
@@ -99,27 +116,35 @@ switch (verb) {
       if (sameValue) {
         evidence += 1;
         if (isObserved) {
-          // Independent repeat — let confidence rise toward requested, ratchet only upward.
           newConf = Math.max(existing.confidence, Math.min(reqConf, PROVISIONAL_CAP + 0.05 * (evidence - 1)));
         } else {
           newConf = Math.max(existing.confidence, reqConf);
         }
+        db.prepare(
+          `UPDATE facts SET value = ?, source = ?, confidence = ?, evidence_count = ?,
+                            last_seen = unixepoch(), updated = unixepoch()
+           WHERE id = ?`
+        ).run(value, source, newConf, evidence, existing.id);
+        out({ action: 'updated', id: existing.id, kind, key, value, confidence: newConf, evidence_count: evidence });
       } else {
-        // Value changed — treat as a new observation; reset evidence and cap if observed.
+        // Value changed: expire old row and insert a new active row.
         evidence = 1;
         newConf = isObserved ? Math.min(reqConf, PROVISIONAL_CAP) : reqConf;
+        db.prepare(`UPDATE facts SET expired_at = unixepoch() WHERE id = ?`).run(existing.id);
+        const r = db.prepare(
+          `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, valid_from)
+           VALUES (?, ?, ?, ?, ?, 1, unixepoch(), unixepoch())`
+        ).run(kind, key, value, source, newConf);
+        db.prepare(`INSERT INTO episodes (summary, channel) VALUES (?, 'memory')`).run(
+          `fact superseded: ${kind}/${key}`
+        );
+        out({ action: 'superseded', id: r.lastInsertRowid, old_id: existing.id, kind, key, value, confidence: newConf, evidence_count: 1 });
       }
-      db.prepare(
-        `UPDATE facts SET value = ?, source = ?, confidence = ?, evidence_count = ?,
-                          last_seen = unixepoch(), updated = unixepoch()
-         WHERE id = ?`
-      ).run(value, source, newConf, evidence, existing.id);
-      out({ action: 'updated', id: existing.id, kind, key, value, confidence: newConf, evidence_count: evidence });
     } else {
       const conf = isObserved ? Math.min(reqConf, PROVISIONAL_CAP) : reqConf;
       const r = db.prepare(
-        `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen)
-         VALUES (?, ?, ?, ?, ?, 1, unixepoch())`
+        `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, valid_from)
+         VALUES (?, ?, ?, ?, ?, 1, unixepoch(), unixepoch())`
       ).run(kind, key, value, source, conf);
       out({ action: 'inserted', id: r.lastInsertRowid, kind, key, value, confidence: conf, evidence_count: 1 });
     }
@@ -132,8 +157,9 @@ switch (verb) {
     const limit = parseInt(flags.limit ?? 20, 10);
     const keywordOnly = flags['keyword-only'] === true || flags['keyword-only'] === 'true';
 
+    // Only active (non-expired) facts.
     const allFacts = db.prepare(
-      `SELECT * FROM facts ORDER BY updated DESC, confidence DESC LIMIT 500`
+      `SELECT * FROM facts WHERE expired_at IS NULL ORDER BY updated DESC, confidence DESC LIMIT 500`
     ).all();
 
     const STOP = new Set(['the','a','an','of','to','in','on','for','and','or','is','are','be',
@@ -144,56 +170,75 @@ switch (verb) {
     const qTokens = tokenize(query);
     const qStems  = qTokens.map(stem);
 
-    // Keyword score: fraction of query words that appear (substring or stem) in the fact.
-    const keywordScore = f => {
-      if (!qTokens.length) return 1;
-      const haystack = `${f.kind} ${f.key} ${f.value}`.toLowerCase();
-      let hits = 0;
-      for (let i = 0; i < qTokens.length; i++) {
-        if (haystack.includes(qTokens[i]) || haystack.includes(qStems[i])) hits++;
-      }
-      return hits / qTokens.length;
-    };
-
-    // TF-IDF semantic score — fallback when the embedding model is not yet downloaded.
-    let semScore = () => 0;
-    if (!keywordOnly && qStems.length && allFacts.length >= 3) {
-      const docs = allFacts.map(f => tokenize(`${f.kind} ${f.key} ${f.value}`).map(stem));
-      const df = new Map();
-      for (const doc of docs) for (const w of new Set(doc)) df.set(w, (df.get(w) || 0) + 1);
-      const N = docs.length;
-      const idf = w => Math.log(1 + N / (1 + (df.get(w) || 0)));
-      const vec = toks => {
-        const tf = new Map();
-        for (const w of toks) tf.set(w, (tf.get(w) || 0) + 1);
-        const v = new Map();
-        for (const [w, c] of tf) v.set(w, c * idf(w));
-        return v;
-      };
-      const cosine = (a, b) => {
-        if (!a.size || !b.size) return 0;
-        let dot = 0, na = 0, nb = 0;
-        for (const [, x] of a) na += x * x;
-        for (const [, x] of b) nb += x * x;
-        const [small, big] = a.size <= b.size ? [a, b] : [b, a];
-        for (const [w, x] of small) { const y = big.get(w); if (y) dot += x * y; }
-        return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
-      };
-      const qVec = vec(qStems);
-      const docVecs = docs.map(vec);
-      semScore = (_, i) => cosine(qVec, docVecs[i]);
+    if (!qTokens.length) {
+      out(allFacts.slice(0, limit));
+      break;
     }
 
-    // Real embedding similarity (all-MiniLM-L6-v2 via @xenova/transformers).
-    // Only used when the model is already in the local cache; falls back to TF-IDF silently.
-    let embedScores = null;
+    // Tokenize all facts.
+    const docs = allFacts.map(f => tokenize(`${f.kind} ${f.key} ${f.value}`).map(stem));
+
+    // Document frequency map (shared by BM25 and TF-IDF).
+    const df = new Map();
+    for (const doc of docs) for (const w of new Set(doc)) df.set(w, (df.get(w) || 0) + 1);
+    const N = docs.length || 1;
+    const avgdl = docs.reduce((s, d) => s + d.length, 0) / N || 1;
+
+    // BM25 scorer (k1=1.5, b=0.75).
+    const BM25_K1 = 1.5, BM25_B = 0.75;
+    const bm25Score = docToks => {
+      const dl = docToks.length;
+      const tf = new Map();
+      for (const w of docToks) tf.set(w, (tf.get(w) || 0) + 1);
+      let score = 0;
+      for (const qt of qStems) {
+        const f = tf.get(qt) || 0;
+        if (!f) continue;
+        const ni = df.get(qt) || 0;
+        const idf = Math.log((N - ni + 0.5) / (ni + 0.5) + 1);
+        score += idf * (f * (BM25_K1 + 1)) / (f + BM25_K1 * (1 - BM25_B + BM25_B * dl / avgdl));
+      }
+      return score;
+    };
+    const bm25Scores = docs.map(bm25Score);
+
+    // TF-IDF cosine (fallback when embeddings unavailable).
+    const idfFn = w => Math.log(1 + N / (1 + (df.get(w) || 0)));
+    const tfidfVec = toks => {
+      const tf = new Map();
+      for (const w of toks) tf.set(w, (tf.get(w) || 0) + 1);
+      const v = new Map();
+      for (const [w, c] of tf) v.set(w, c * idfFn(w));
+      return v;
+    };
+    const cosineMapsFn = (a, b) => {
+      if (!a.size || !b.size) return 0;
+      let dot = 0, na = 0, nb = 0;
+      for (const [, x] of a) na += x * x;
+      for (const [, x] of b) nb += x * x;
+      const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+      for (const [w, x] of small) { const y = big.get(w); if (y) dot += x * y; }
+      return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+    };
+
+    // Cosine scores: try real embeddings first, fall back to TF-IDF.
+    let cosScores = null;
     if (!keywordOnly) {
+      if (qStems.length && allFacts.length >= 3) {
+        const qVec = tfidfVec(qStems);
+        const docVecs = docs.map(tfidfVec);
+        cosScores = docVecs.map(dv => cosineMapsFn(qVec, dv));
+      } else {
+        cosScores = allFacts.map(() => 0);
+      }
+      // Try real embedding similarity (all-MiniLM-L6-v2 via @xenova/transformers).
+      // Only used when the model is already in the local cache; falls back to TF-IDF silently.
       try {
         const { ensurePipelineLoaded, embedText, cosineSimilarity, getOrComputeVector } =
           await import('./embed.mjs');
         if (await ensurePipelineLoaded()) {
           const qVec = await embedText(query || ' ');
-          embedScores = await Promise.all(
+          cosScores = await Promise.all(
             allFacts.map(f =>
               getOrComputeVector(db, f.id, `${f.kind} ${f.key} ${f.value}`)
                 .then(fv => cosineSimilarity(qVec, fv))
@@ -201,41 +246,77 @@ switch (verb) {
           );
         }
       } catch {
-        // package missing or model not downloaded — embedScores stays null
+        // no model — keep TF-IDF cosScores
       }
     }
 
-    const scored = allFacts.map((f, i) => {
-      const k = keywordScore(f);
-      const s = semScore(f, i);
-      const e = embedScores ? embedScores[i] : null;
-      // Blend: take the better of keyword score and semantic score, then
-      // weight by confidence so well-confirmed facts outrank provisional ones
-      // with the same relevance. confidence=1.0 → weight 1.0; confidence=0.7
-      // → weight 0.91; confidence=0.3 → weight 0.79.
-      const score = (e !== null ? Math.max(k, e) : Math.max(k, s)) * (0.7 + 0.3 * f.confidence);
-      return { ...f, _score: score, _k: k, _s: s };
+    // 1.3x boost when any query stem appears in the fact key.
+    const keyMatchBoost = f => {
+      const keyStems = tokenize(f.key).map(stem);
+      return qStems.some(qt => keyStems.includes(qt)) ? 1.3 : 1.0;
+    };
+    const confWeight = f => 0.7 + 0.3 * f.confidence;
+
+    let scored;
+    if (keywordOnly || !cosScores) {
+      // BM25-only path: score = bm25 * confWeight * keyBoost
+      scored = allFacts.map((f, i) => ({
+        ...f,
+        _score: bm25Scores[i] * confWeight(f) * keyMatchBoost(f),
+      }));
+      const results = scored
+        .filter(f => f._score > 0)
+        .sort((a, b) => b._score - a._score || b.confidence - a.confidence || b.updated - a.updated)
+        .slice(0, limit)
+        .map(({ _score, ...f }) => f);
+      for (const f of results) {
+        db.prepare(`UPDATE facts SET access_count = access_count + 1 WHERE id = ?`).run(f.id);
+      }
+      out(results);
+      break;
+    }
+
+    // RRF fusion: rank BM25 and cosine independently, combine via Reciprocal Rank Fusion.
+    // score = (1/(60+bm25_rank) + 1/(60+cos_rank)) * confWeight * keyBoost
+    const bm25Idx = allFacts.map((_, i) => i).sort((a, b) => bm25Scores[b] - bm25Scores[a]);
+    const bm25Rank = new Array(allFacts.length);
+    bm25Idx.forEach((idx, rank) => { bm25Rank[idx] = rank; });
+
+    const cosIdx = allFacts.map((_, i) => i).sort((a, b) => cosScores[b] - cosScores[a]);
+    const cosRank = new Array(allFacts.length);
+    cosIdx.forEach((idx, rank) => { cosRank[idx] = rank; });
+
+    scored = allFacts.map((f, i) => {
+      const rrf = 1 / (60 + bm25Rank[i]) + 1 / (60 + cosRank[i]);
+      return {
+        ...f,
+        _score: rrf * confWeight(f) * keyMatchBoost(f),
+        _bm25: bm25Scores[i],
+        _cos: cosScores[i],
+      };
     });
 
     const results = scored
-      .filter(f => !qTokens.length || f._score > 0.01)
-      .sort((a, b) => b._score - a._score || (b._s - a._s) || (b.confidence - a.confidence) || (b.updated - a.updated))
+      .filter(f => f._bm25 > 0 || f._cos > 0.01)
+      .sort((a, b) => b._score - a._score || b.confidence - a.confidence || b.updated - a.updated)
       .slice(0, limit)
-      .map(({ _score, _k, _s, ...f }) => f);
+      .map(({ _score, _bm25, _cos, ...f }) => f);
+
+    for (const f of results) {
+      db.prepare(`UPDATE facts SET access_count = access_count + 1 WHERE id = ?`).run(f.id);
+    }
 
     out(results);
     break;
   }
 
   case 'unsure': {
-    // List preferences whose confidence is below the threshold — the ones Helm should
-    // confirm with the owner before relying on them.
     const { flags } = parseFlags(rest);
     const threshold = parseFloat(flags.threshold ?? 0.7);
     const rows = db.prepare(
       `SELECT id, kind, key, value, confidence, evidence_count, last_seen, source
          FROM facts
-        WHERE kind = 'preference' AND confidence < ?
+        WHERE kind = 'preference' AND confidence < ? AND expired_at IS NULL
         ORDER BY confidence ASC, last_seen ASC`
     ).all(threshold);
     out(rows);
@@ -247,7 +328,6 @@ switch (verb) {
     const id = parseInt(pos[0], 10);
     if (!id) die('usage: forget <id>');
     const r = db.prepare(`DELETE FROM facts WHERE id = ?`).run(id);
-    // Remove any cached embedding vector (table may not exist yet; ignore error).
     try { db.prepare(`DELETE FROM vectors WHERE fact_id = ?`).run(id); } catch {}
     out({ deleted: r.changes, id });
     break;
@@ -255,18 +335,35 @@ switch (verb) {
 
   case 'dump': {
     const { flags } = parseFlags(rest);
+    const showAll = flags.all === true || flags.all === 'true';
+    const activeFilter = showAll ? '' : 'AND expired_at IS NULL';
     let rows;
     if (flags.kind) {
-      rows = db.prepare(`SELECT * FROM facts WHERE kind = ? ORDER BY updated DESC`).all(flags.kind);
+      rows = db.prepare(
+        `SELECT * FROM facts WHERE kind = ? ${activeFilter} ORDER BY updated DESC`
+      ).all(flags.kind);
     } else {
-      rows = db.prepare(`SELECT * FROM facts ORDER BY kind, updated DESC`).all();
+      rows = db.prepare(
+        `SELECT * FROM facts WHERE 1=1 ${activeFilter} ORDER BY kind, updated DESC`
+      ).all();
     }
     out(rows);
     break;
   }
 
+  case 'history': {
+    // Return all versions of facts with the given key (active + expired), newest first.
+    const { pos } = parseFlags(rest);
+    const key = pos[0];
+    if (!key) die('usage: history <key>');
+    const rows = db.prepare(
+      `SELECT * FROM facts WHERE key = ? ORDER BY valid_from DESC, id DESC`
+    ).all(key);
+    out(rows);
+    break;
+  }
+
   case 'episode': {
-    // memory.mjs episode add <summary> [--channel c] [--raw_ref r]
     const { flags, pos } = parseFlags(rest);
     const subverb = pos[0];
     if (subverb === 'add') {
@@ -284,6 +381,6 @@ switch (verb) {
   }
 
   default:
-    die('verbs: remember | recall | forget | dump | episode | unsure');
+    die('verbs: remember | recall | forget | dump | episode | unsure | history');
 }
 })(); } finally { db.close(); }

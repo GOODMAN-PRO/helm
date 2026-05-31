@@ -41,10 +41,14 @@ const DECAY_DAYS = parseInt(flags['decay-days'] ?? 30, 10);
 const FLOOR      = parseFloat(flags.floor ?? 0.05);
 
 const db = new DatabaseSync(DB_PATH);
-// Ensure the active-learning columns exist (consolidate may run before memory.mjs ever did).
+// Ensure columns exist (consolidate may run before memory.mjs ever did).
 try { db.exec(`ALTER TABLE facts ADD COLUMN evidence_count INTEGER NOT NULL DEFAULT 1`); } catch {}
 try { db.exec(`ALTER TABLE facts ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0`); } catch {}
 db.exec(`UPDATE facts SET last_seen = COALESCE(NULLIF(last_seen, 0), updated)`);
+try { db.exec(`ALTER TABLE facts ADD COLUMN valid_from INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE facts ADD COLUMN expired_at INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE facts ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0`); } catch {}
+db.exec(`UPDATE facts SET valid_from = COALESCE(NULLIF(valid_from, 0), created)`);
 
 const stats = { distilled: 0, decayed: 0, pruned: 0, deduped: 0 };
 
@@ -98,8 +102,9 @@ for (const [stem, ids] of stemCount) {
 const now = Math.floor(Date.now() / 1000);
 const decayStartTs = now - DECAY_DAYS * 86400;
 const decayCandidates = db.prepare(
-  `SELECT id, confidence, last_seen, evidence_count, source FROM facts
+  `SELECT id, confidence, last_seen, evidence_count, source, access_count FROM facts
     WHERE evidence_count < 2 AND last_seen < ? AND confidence > ?
+      AND expired_at IS NULL
       AND (source IS NULL OR source != 'CLAUDE.md')`
 ).all(decayStartTs, FLOOR);
 // Also advance last_seen by the number of stale weeks consumed so the same decay
@@ -110,16 +115,21 @@ const stmtSetConf = db.prepare(
 for (const f of decayCandidates) {
   const weeksStale = Math.floor((now - f.last_seen - DECAY_DAYS * 86400) / (7 * 86400));
   if (weeksStale <= 0) continue;
-  const newConf = Math.max(FLOOR / 2, f.confidence * Math.pow(0.9, weeksStale + 1));
+  // High-access facts decay slower: each log1p(access_count) unit reduces effective stale weeks.
+  const accessBoost = Math.log1p(f.access_count || 0);
+  const effectiveWeeks = Math.max(0, (weeksStale + 1) - accessBoost);
+  if (effectiveWeeks <= 0) continue;
+  const newConf = Math.max(FLOOR / 2, f.confidence * Math.pow(0.9, effectiveWeeks));
   if (newConf < f.confidence - 0.01) {
     if (!DRY) stmtSetConf.run(newConf, weeksStale * 7 * 86400, f.id);
     stats.decayed++;
   }
 }
 
-// Prune anything below floor that was never reinforced.
+// Prune active facts below floor that were never reinforced.
 const pruneIds = db.prepare(
   `SELECT id FROM facts WHERE confidence < ? AND evidence_count < 2
+    AND expired_at IS NULL
     AND (source IS NULL OR source != 'CLAUDE.md')`
 ).all(FLOOR).map(r => r.id);
 if (!DRY && pruneIds.length) {
@@ -132,8 +142,9 @@ stats.pruned = pruneIds.length;
 // (kind, key) should be unique by application convention. If multiple rows exist
 // for the same pair, merge: keep the row with the highest confidence and most
 // recent last_seen; sum evidence counts onto it; delete the rest.
+// Only dedup among active rows; expired rows are historical records.
 const dupGroups = db.prepare(
-  `SELECT kind, key, COUNT(*) c FROM facts GROUP BY kind, key HAVING c > 1`
+  `SELECT kind, key, COUNT(*) c FROM facts WHERE expired_at IS NULL GROUP BY kind, key HAVING c > 1`
 ).all();
 const stmtGroupRows = db.prepare(
   `SELECT id, confidence, evidence_count, last_seen FROM facts
