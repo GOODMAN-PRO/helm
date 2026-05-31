@@ -1806,6 +1806,31 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 65. reverse: tools registered; module imports without heavy side effects ----
+{
+  const label = 'reverse: reverse.web/app/file in registry; module imports cleanly without running anything';
+  try {
+    const r = spawnSync('node', [path.join(WORKSPACE, 'tools/tools.mjs'), 'list'],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`tools list failed: ${r.stderr}`);
+    const tools = JSON.parse(r.stdout);
+    const names = tools.map(t => t.name);
+    for (const n of ['reverse.web', 'reverse.app', 'reverse.file']) {
+      if (!names.includes(n)) throw new Error(`missing from registry: ${n}`);
+    }
+
+    // node --check: syntax must be valid
+    const chk = spawnSync('node', ['--check', path.join(WORKSPACE, 'tools/impl/reverse.mjs')],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (chk.status !== 0) throw new Error(`syntax check failed: ${chk.stderr}`);
+
+    // Dynamic import must succeed without launching playwright or running any subcommand
+    await import(path.join(WORKSPACE, 'tools/impl/reverse.mjs'));
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
