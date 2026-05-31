@@ -13,10 +13,11 @@
 //        [--build-model sonnet] [--review-model sonnet] [--tasks <file>] [--dry]
 
 import { spawn, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
+import { HANDOFF_SCHEMA, pruneFileReads } from '../sessions/compact.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/swarm
 const WORKSPACE = path.resolve(__dirname, '..');
@@ -104,17 +105,26 @@ const buildPrompt = t => [
   `- If you need npm packages, \`npm install <pkg>\` here so package.json updates. Keep big downloads lazy where possible.`,
   ``,
   `Build it, run the smoke test yourself, fix anything you broke. Then output a concise summary (<300 words) of what you added and how to use it. No emojis.`,
+  ``,
+  `REQUIRED: Before finishing, write handoff.json at the ROOT of your worktree (git add it).`,
+  `Use EXACTLY this schema (fill every field — leave nothing blank):`,
+  JSON.stringify({ ...HANDOFF_SCHEMA, worker_id: t.id, task: t.title }, null, 2),
+  `artifacts: list relative paths of every file you created or modified.`,
+  `confidence: 0.0–1.0 reflecting how certain you are the feature is correct and complete.`,
 ].join('\n');
 
-const reviewPrompt = (t, builderSummary) => [
+const reviewPrompt = (t, builderSummary, handoff) => [
   `You are a Helm REVIEW agent. Independently review another agent's implementation in this git worktree.`,
   ``,
   `FEATURE: ${t.title}`,
   `SPEC:`,
   t.spec,
   ``,
-  `Builder summary:`,
-  builderSummary || '(none)',
+  `Builder handoff (structured — check artifacts exist and confidence is reasonable):`,
+  handoff ? JSON.stringify(handoff, null, 2) : '(none — agent did not write handoff.json)',
+  ``,
+  `Builder summary (file-read blocks pruned to save context):`,
+  pruneFileReads(builderSummary || '(none)'),
   ``,
   `Do this:`,
   `- Read the diff vs main: \`git diff main\``,
@@ -165,21 +175,33 @@ const reviewPrompt = (t, builderSummary) => [
   log('=== BUILD ===');
   await pool(todo, WORKERS, async t => {
     if (DRY) writeFileSync(path.join(t._wt, `SWARM_DRY_${t.id}.md`), `dry ${t.id} ${ts()}\n`);
-    else { const r = await runClaude(t._wt, BUILD_MODEL, buildPrompt(t)); t._build = r.result; log(`built ${t.id} (code ${r.code})`); }
+    else {
+      const r = await runClaude(t._wt, BUILD_MODEL, buildPrompt(t));
+      t._build = r.result;
+      // Read structured handoff written by the build agent (preferred over raw stdout).
+      const handoffPath = path.join(t._wt, 'handoff.json');
+      if (existsSync(handoffPath)) {
+        try {
+          t._handoff = JSON.parse(readFileSync(handoffPath, 'utf8'));
+          log(`handoff ${t.id}: confidence=${t._handoff.confidence} artifacts=${(t._handoff.artifacts || []).length}`);
+        } catch (e) { log(`WARN: handoff.json parse failed for ${t.id}: ${e.message}`); }
+      }
+      log(`built ${t.id} (code ${r.code})`);
+    }
     git(t._wt, 'add', '-A'); git(t._wt, 'commit', '-q', '-m', `swarm build: ${t.id}`);
   });
 
   log('=== REVIEW ===');
   await pool(todo, REVIEWERS, async t => {
     if (DRY) { t._verdict = 'APPROVE'; return; }
-    let r = await runClaude(t._wt, REVIEW_MODEL, reviewPrompt(t, t._build));
+    let r = await runClaude(t._wt, REVIEW_MODEL, reviewPrompt(t, t._build, t._handoff));
     git(t._wt, 'add', '-A'); git(t._wt, 'commit', '-q', '-m', `swarm review: ${t.id}`);
     let v = lastVerdict(r.result);
     if (/REJECT/i.test(v)) {
       log(`reject ${t.id}: ${v}`);
       const rev = await runClaude(t._wt, BUILD_MODEL, `Revise your "${t.title}" implementation. A reviewer REJECTED it:\n${v}\nFix it, keep \`node workspace/tests/smoke.mjs\` green, then summarize.`);
       git(t._wt, 'add', '-A'); git(t._wt, 'commit', '-q', '-m', `swarm revise: ${t.id}`);
-      r = await runClaude(t._wt, REVIEW_MODEL, reviewPrompt(t, rev.result));
+      r = await runClaude(t._wt, REVIEW_MODEL, reviewPrompt(t, rev.result, t._handoff));
       git(t._wt, 'add', '-A'); git(t._wt, 'commit', '-q', '-m', `swarm review2: ${t.id}`);
       v = lastVerdict(r.result);
     }

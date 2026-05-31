@@ -1502,6 +1502,52 @@ function fail(label, reason) {
       throw new Error('could not locate critic gate or merge call in swarm.mjs');
     if (criticIdx >= mergeIdx)
       throw new Error('critic gate must appear before the git merge call');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 59. compact.mjs: syntax valid; HANDOFF_SCHEMA shape; pruneFileReads strips old blocks ----
+{
+  const label = 'compact.mjs: syntax valid; HANDOFF_SCHEMA has correct keys; pruneFileReads strips old file blocks; swarm.mjs wired';
+  try {
+    // Syntax check
+    const rc = spawnSync('node', ['--check', path.join(WORKSPACE, 'sessions/compact.mjs')],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rc.status !== 0) throw new Error(`syntax check failed: ${rc.stderr}`);
+
+    const { HANDOFF_SCHEMA, pruneFileReads } = await import(
+      path.join(WORKSPACE, 'sessions/compact.mjs')
+    );
+
+    // Schema shape
+    const required = ['worker_id', 'task', 'artifacts', 'key_findings', 'decisions', 'open_questions', 'confidence'];
+    for (const k of required) {
+      if (!(k in HANDOFF_SCHEMA)) throw new Error(`HANDOFF_SCHEMA missing key: ${k}`);
+    }
+    if (!Array.isArray(HANDOFF_SCHEMA.artifacts))    throw new Error('HANDOFF_SCHEMA.artifacts must be an array');
+    if (typeof HANDOFF_SCHEMA.confidence !== 'number') throw new Error('HANDOFF_SCHEMA.confidence must be a number');
+
+    // pruneFileReads: text shorter than threshold is unchanged
+    const shortText = 'hello world\nfoo bar\nbaz';
+    if (pruneFileReads(shortText) !== shortText) throw new Error('short text should pass through unchanged');
+
+    // pruneFileReads: null/undefined safe
+    if (pruneFileReads(null) !== null) throw new Error('null should be returned as-is');
+
+    // pruneFileReads: 20-line numbered block in old region gets dropped
+    const numBlock = Array.from({ length: 20 }, (_, i) => `${i + 1}\tcode_line_${i};`).join('\n');
+    const recent   = Array.from({ length: 500 }, (_, i) => `recent_line_${i}`).join('\n');
+    const combined = numBlock + '\n' + recent;
+    const pruned   = pruneFileReads(combined, 3);
+    // First numbered line must be gone (replaced by the [file read: ...] note)
+    if (pruned.includes('1\tcode_line_0;')) throw new Error('pruneFileReads did not drop numbered block from old region');
+    if (!pruned.includes('dropped'))         throw new Error('pruneFileReads missing "dropped" note');
+
+    // swarm.mjs must reference the new features
+    const swarmSrc = readFileSync(path.join(WORKSPACE, 'swarm/swarm.mjs'), 'utf8');
+    if (!swarmSrc.includes('HANDOFF_SCHEMA'))  throw new Error('swarm.mjs does not import HANDOFF_SCHEMA');
+    if (!swarmSrc.includes('pruneFileReads'))  throw new Error('swarm.mjs does not import pruneFileReads');
+    if (!swarmSrc.includes('handoff.json'))    throw new Error('swarm.mjs does not reference handoff.json');
 
     ok(label);
   } catch (e) { fail(label, e.message); }
