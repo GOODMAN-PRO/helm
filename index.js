@@ -40,9 +40,9 @@ function claudeEnv() {
   if (AUTH_MODE === 'apikey') {
     delete e.ANTHROPIC_BASE_URL;                 // hosted Anthropic API — just the key
   } else if (AUTH_MODE === 'custom') {
-    // free / local / custom endpoint: keep ANTHROPIC_BASE_URL + token + model as-is.
-    // Many gateways expect ANTHROPIC_AUTH_TOKEN; mirror the API key into it if unset.
-    if (e.ANTHROPIC_API_KEY && !e.ANTHROPIC_AUTH_TOKEN) e.ANTHROPIC_AUTH_TOKEN = e.ANTHROPIC_API_KEY;
+    // free / local / custom endpoint: Claude Code needs an auth token even for a local server
+    // (e.g. Ollama requires ANTHROPIC_AUTH_TOKEN set). Use the provided key, else a local placeholder.
+    if (!e.ANTHROPIC_AUTH_TOKEN) e.ANTHROPIC_AUTH_TOKEN = e.ANTHROPIC_API_KEY || 'ollama';
   } else {
     // subscription (OAuth) — strip anything that would override the login
     delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
