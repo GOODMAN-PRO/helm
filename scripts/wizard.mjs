@@ -42,6 +42,8 @@ const BANNER = [
   `  ${C.sky}${C.b} ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝${C.reset}`,
   `       ${C.gray}personal AI agent · setup${C.reset}`,
   `  ${C.dim}────────────────────────────────────────${C.reset}`,
+  `  ${C.gray}Discord bot:${C.reset} ${C.cyan}https://discord.com/developers/applications${C.reset}`,
+  `  ${C.gray}API keys:   ${C.reset} ${C.cyan}https://console.anthropic.com/settings/keys${C.reset}   ${C.gray}Local models:${C.reset} ${C.cyan}https://ollama.com${C.reset}`,
   '',
 ].join('\n');
 
@@ -207,15 +209,17 @@ async function runPlain() {
   const rl = (await import('node:readline/promises')).createInterface({ input: process.stdin, output: process.stdout });
   const ask = async (q, d = '') => { const a = (await rl.question(d ? `${q} [${d}]: ` : `${q}: `)).trim(); return a || d; };
   console.log('\n== Helm setup ==');
+  console.log('  Discord bot: https://discord.com/developers/applications');
+  console.log('  API keys:    https://console.anthropic.com/settings/keys   Local models: https://ollama.com\n');
   const gw = (await ask('Gateways — discord, imessage, or both', 'discord')).toLowerCase();
   const gateways = gw.includes('both') ? ['discord', 'imessage'] : gw.includes('imessage') ? (gw.includes('discord') ? ['discord', 'imessage'] : ['imessage']) : ['discord'];
-  let token = ''; if (gateways.includes('discord')) token = await ask('Discord bot token');
-  const ownerId = await ask('Your Discord user ID');
+  let token = ''; if (gateways.includes('discord')) token = await ask('Discord bot token (https://discord.com/developers/applications -> Bot -> Reset Token)');
+  const ownerId = await ask('Your Discord user ID (enable Developer Mode, right-click your name -> Copy User ID)');
   const b = await ask('Power Helm with — 1) Claude subscription  2) Anthropic API key  3) Any other model (local/hosted)', '1');
   const authMode = b === '2' ? 'apikey' : b === '3' ? 'custom' : 'subscription';
   let apiKey = '', baseUrl = '', modelId = '';
-  if (authMode === 'apikey') apiKey = await ask('Anthropic API key');
-  else if (authMode === 'custom') { baseUrl = await ask('Model endpoint URL', 'http://localhost:11434'); modelId = await ask('Model name', 'llama3.1'); apiKey = await ask('API key for that endpoint (blank if none)', ''); }
+  if (authMode === 'apikey') apiKey = await ask('Anthropic API key (https://console.anthropic.com/settings/keys)');
+  else if (authMode === 'custom') { baseUrl = await ask('Model endpoint URL — Ollama is https://ollama.com', 'http://localhost:11434'); modelId = await ask('Model name', 'llama3.1'); apiKey = await ask('API key for that endpoint (blank if none)', ''); }
   const model = (await ask('Model — 1) opus  2) sonnet', '1')) === '2' ? 'sonnet' : 'opus';
   const perm = (await ask('Tool permissions — 1) bypassPermissions  2) default', '1')) === '2' ? 'default' : 'bypassPermissions';
   const svc = (await ask('Run 24/7 in the background? (y/n)', 'y')).toLowerCase().startsWith('y');
@@ -242,9 +246,9 @@ async function main() {
   const owner = '';
   let ownerId = '';
   if (gateways.includes('discord')) {
-    token = await text('Discord bot token', { mask: true, hint: 'Developer Portal -> your app -> Bot -> Reset Token' });
+    token = await text('Discord bot token', { mask: true, hint: 'https://discord.com/developers/applications -> your app -> Bot -> Reset Token' });
   }
-  ownerId = await text('Your Discord user ID (owner lock)', { hint: 'Discord -> right-click your name -> Copy User ID' });
+  ownerId = await text('Your Discord user ID (owner lock)', { hint: 'Discord -> Settings -> Advanced -> Developer Mode on, then right-click your name -> Copy User ID' });
 
   // 2.5) backend — how Helm is powered
   const backendItems = [
@@ -256,9 +260,9 @@ async function main() {
   const authMode = backendIdx === 1 ? 'apikey' : backendIdx === 2 ? 'custom' : 'subscription';
   let apiKey = '', baseUrl = '', modelId = '';
   if (authMode === 'apikey') {
-    apiKey = await text('Anthropic API key', { mask: true, hint: 'console.anthropic.com -> API Keys (starts with sk-ant-)' });
+    apiKey = await text('Anthropic API key', { mask: true, hint: 'https://console.anthropic.com/settings/keys (starts with sk-ant-)' });
   } else if (authMode === 'custom') {
-    baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Ollama (local) -> http://localhost:11434. OpenAI/Gemini/Groq/OpenRouter -> a router URL (LiteLLM / claude-code-router)' });
+    baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Ollama (free, local — install from https://ollama.com) -> http://localhost:11434. OpenAI/Gemini/Groq/OpenRouter -> a router URL (LiteLLM / claude-code-router)' });
     modelId = await text('Model name', { def: 'llama3.1', hint: 'e.g. llama3.1, qwen3-coder (Ollama) · gpt-4o, gemini-2.0, llama-3.1-70b (via router)' });
     apiKey = await text('API key for that endpoint', { mask: true, hint: 'leave blank for a local model that needs none (e.g. Ollama)' });
   }
