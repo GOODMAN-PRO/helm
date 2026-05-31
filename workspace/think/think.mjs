@@ -197,7 +197,7 @@ function tick() {
         log(`interrupt score: ${score.toFixed(3)}`);
         if (score > 0.65) {
           const summary = thought.length > 280 ? thought.slice(0, 277) + '...' : thought;
-          const pr = spawnSync('/usr/bin/env', ['node', PUSH_BIN, `[Helm] ${summary}`],
+          const pr = spawnSync(process.execPath, [PUSH_BIN, `[Helm] ${summary}`],
             { encoding: 'utf8', timeout: 15_000 });
           if (pr.status === 0) log('pushed interrupt DM to owner');
           else log('push failed: ' + (pr.stderr || '').trim().slice(0, 100));
@@ -209,7 +209,7 @@ function tick() {
       // Run consolidation immediately after the weekly review so any decay/dedupe
       // reflects the freshly-written episodes and preferences.
       try {
-        const c = spawnSync('/usr/bin/env', ['node', CONSOLIDATE, '--since-days', '7'], { encoding: 'utf8', timeout: 60_000 });
+        const c = spawnSync(process.execPath, [CONSOLIDATE, '--since-days', '7'], { encoding: 'utf8', timeout: 60_000 });
         log('consolidate: ' + ((c.stdout || '').trim().slice(0, 200).replace(/\s+/g, ' ')));
       } catch (e) { log('consolidate error ' + (e.message || e)); }
       // Only stamp the weekly mark when claude actually completed successfully.
@@ -222,7 +222,7 @@ function tick() {
       }
     }
 
-    spawnSync('/usr/bin/env', ['node', REFRESH], { cwd: ROOT, encoding: 'utf8' });
+    spawnSync(process.execPath, [REFRESH], { cwd: ROOT, encoding: 'utf8' });
     log('thought logged + index refreshed');
   } catch (e) {
     log('error ' + (e.message || e));
