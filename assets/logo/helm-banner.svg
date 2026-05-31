@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" width="880" height="300" role="img" aria-label="Helm">
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="40" y1="40" x2="840" y2="260">
+      <stop offset="0%" stop-color="#7df0dc"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#eafffb"/>
+      <stop offset="100%" stop-color="#5eead4"/>
+    </radialGradient>
+  </defs>
+
+  <!-- wheel mark (transparent background — no box, no white edges) -->
+  <g transform="translate(160,150)" fill="none" stroke="url(#g)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="13">
+      <line y2="-104"/>
+      <line y2="-104" transform="rotate(45)"/>
+      <line y2="-104" transform="rotate(90)"/>
+      <line y2="-104" transform="rotate(135)"/>
+      <line y2="-104" transform="rotate(180)"/>
+      <line y2="-104" transform="rotate(225)"/>
+      <line y2="-104" transform="rotate(270)"/>
+      <line y2="-104" transform="rotate(315)"/>
+    </g>
+    <circle r="82" stroke-width="16"/>
+  </g>
+  <!-- hub covers the spoke convergence -->
+  <circle cx="160" cy="150" r="30" fill="url(#g)"/>
+  <circle cx="160" cy="150" r="12" fill="url(#core)"/>
+
+  <!-- HELM wordmark in the brand gradient -->
+  <text x="315" y="204" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="160" font-weight="800" letter-spacing="6" fill="url(#g)">HELM</text>
+</svg>

@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/assets/logo/helm-logo-cool.png" alt="Helm" width="150">
+  <img src="https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/assets/logo/helm-banner.png" alt="Helm" width="440">
 </p>
-
-<h1 align="center">Helm</h1>
 
 <p align="center"><strong>Your own AI agent, on your own machine.</strong></p>
 
