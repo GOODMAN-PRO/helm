@@ -2,11 +2,33 @@
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/owner/secondme"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/owner/secondme"],
+      "healthCheck": false,
+      "enabled": true
     },
     "fetch": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+      "args": ["-y", "@modelcontextprotocol/server-fetch"],
+      "healthCheck": "initialize",
+      "enabled": true
+    },
+    "github": {
+      "command": "node",
+      "args": ["/Users/owner/secondme/workspace/mcp/wrap-github.mjs"],
+      "healthCheck": "initialize",
+      "enabled": true
+    },
+    "google-workspace": {
+      "command": "node",
+      "args": ["/Users/owner/secondme/workspace/mcp/wrap-google-workspace.mjs"],
+      "healthCheck": "initialize",
+      "enabled": true
+    },
+    "brave-search": {
+      "command": "node",
+      "args": ["/Users/owner/secondme/workspace/mcp/wrap-brave-search.mjs"],
+      "healthCheck": "initialize",
+      "enabled": true
     }
   }
 }
