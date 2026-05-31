@@ -584,6 +584,28 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 25. BUG-imessage-A: readAt bounds guards prevent RangeError on truncated blobs ----
+{
+  const label = 'BUG-imessage-A: readAt has bounds guards for 0x81/0x82 length prefixes';
+  try {
+    const src = readFileSync(path.join(ROOT, 'imessage.js'), 'utf8');
+    if (!src.includes('i + 3 > buf.length')) throw new Error('missing bounds guard for 0x81 (readUInt16LE)');
+    if (!src.includes('i + 5 > buf.length')) throw new Error('missing bounds guard for 0x82 (readUInt32LE)');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 26. BUG-imessage-B: timeout flag prevents spurious retry after 30-min cap ----
+{
+  const label = 'BUG-imessage-B: runClaude sets _timedOut; ask() skips retry on timeout';
+  try {
+    const src = readFileSync(path.join(ROOT, 'imessage.js'), 'utf8');
+    if (!src.includes('_timedOut')) throw new Error('_timedOut flag not set in runClaude');
+    if (!src.includes('e.timedOut')) throw new Error('e.timedOut check missing from ask() catch block');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

@@ -74,12 +74,13 @@ function runClaude(args, prompt) {
   return new Promise((resolve, reject) => {
     const child = spawn(CLAUDE_BIN, args, { cwd: WORKSPACE });
     let out = '', err = '';
-    const kill = setTimeout(() => child.kill(), 30 * 60_000); // 30-min cap for chat
+    const kill = setTimeout(() => { child._timedOut = true; child.kill(); }, 30 * 60_000); // 30-min cap for chat
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
     child.on('error', e => { clearTimeout(kill); reject(e); });
     child.on('close', code => {
       clearTimeout(kill);
+      if (child._timedOut) return reject(Object.assign(new Error('hit 30-min cap'), { timedOut: true }));
       if (code === 0) resolve(out);
       else reject(new Error(err.trim() || `claude exited ${code}`));
     });
@@ -118,7 +119,7 @@ async function ask(handle, prompt) {
   } catch (e) {
     clearTimeout(hbStart);
     clearInterval(hbInterval);
-    if (!sid) throw e;
+    if (e.timedOut || !sid) throw e;
     deleteSession('owner');
     out = await runClaude(base, prompt);
   }
@@ -144,8 +145,8 @@ function decodeAttributedBody(hex) {
   const readAt = i => {
     if (i >= buf.length) return null;
     const b = buf[i];
-    if (b === 0x81) return { len: buf.readUInt16LE(i + 1), start: i + 3 };
-    if (b === 0x82) return { len: buf.readUInt32LE(i + 1), start: i + 5 };
+    if (b === 0x81) { if (i + 3 > buf.length) return null; return { len: buf.readUInt16LE(i + 1), start: i + 3 }; }
+    if (b === 0x82) { if (i + 5 > buf.length) return null; return { len: buf.readUInt32LE(i + 1), start: i + 5 }; }
     return { len: b, start: i + 1 };
   };
   // The framing is normally 5 bytes; try nearby skips and trust the one whose
