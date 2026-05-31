@@ -469,6 +469,28 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
+  // ---- file transfer between Mac and Windows (both directions) ----
+  const pullM = text.match(/^\/?pull\s+(.+)$/i);
+  if (pullM) {
+    if (!HELM_WIN_HOST) { await msg.reply('Windows node not configured (set HELM_WIN_HOST in .env).'); return; }
+    const wp = pullM[1].trim();
+    const lf = scpFromWin(wp);
+    if (!lf) { await msg.reply(`Couldn't pull \`${wp}\` from Windows — check the path and that the PC is reachable.`); return; }
+    await msg.reply(`Pulled from Windows → \`${lf}\``);
+    try { await msg.reply({ files: [lf] }); } catch {}
+    return;
+  }
+  const pushM = text.match(/^\/?push\s+(.+)$/i);
+  if (pushM) {
+    if (!HELM_WIN_HOST) { await msg.reply('Windows node not configured (set HELM_WIN_HOST in .env).'); return; }
+    let lp = pushM[1].trim().replace(/^~(?=[/\\])/, process.env.HOME || '');
+    if (!existsSync(lp)) { await msg.reply(`No such file on the Mac: \`${lp}\``); return; }
+    const wp = scpToWin(lp);
+    if (!wp) { await msg.reply(`Couldn't push \`${lp}\` to Windows.`); return; }
+    await msg.reply(`Pushed to Windows → \`C:\\Users\\User\\${wp.replace(/\//g, '\\')}\``);
+    return;
+  }
+
   // ---- /cost: today's usage summary (notional tokens, Max subscription) ----
   if (/^\/cost\b/.test(low)) {
     try {
