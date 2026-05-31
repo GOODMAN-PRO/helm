@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# Helm installer — set up the Helm AI agent (Discord DM -> Claude on your subscription -> action).
+#!/bin/sh
+# Helm installer (POSIX sh — runs under sh, bash, zsh, dash). Sets up the Helm AI agent.
 #
 # Remote (after publish):
 #   curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash
@@ -12,7 +12,7 @@
 #   HELM_DIR   install target                  (default: $HOME/helm)
 #   HELM_SRC   install from this local dir instead of cloning (for testing)
 #   HELM_NONINTERACTIVE=1  skip prompts; write .env from template for manual editing
-set -euo pipefail
+set -eu
 
 REPO_URL="${HELM_REPO:-https://github.com/GOODMAN-PRO/helm.git}"
 TARGET="${HELM_DIR:-$HOME/helm}"

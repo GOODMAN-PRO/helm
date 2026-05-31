@@ -29,17 +29,17 @@ a **free / local model**.
 
 One command — checks prerequisites, fetches the code, installs deps, and walks you through setup.
 
-**macOS / Linux**
+**Recommended — any OS, no shell script** (just Node, which Helm needs anyway):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash
+npx github:GOODMAN-PRO/helm
+```
+**macOS / Linux** (works with `bash` *or* `sh` — the script is POSIX):
+```bash
+curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh
 ```
 **Windows (PowerShell)**
 ```powershell
 irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex
-```
-**Any OS (Node / npx)** — no clone, no shell script:
-```bash
-npx github:GOODMAN-PRO/helm
 ```
 
 Prerequisites: **Node 18+** and **Claude Code** (`claude`); **git** is used if present, otherwise the

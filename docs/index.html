@@ -190,19 +190,19 @@
     <p class="eyebrow">Get Helm</p>
     <h2>One command. <span class="grad">Then it's yours.</span></h2>
     <div class="install">
-      <p class="oslab">macOS / Linux</p>
+      <p class="oslab">Recommended — any OS, no shell script (just Node)</p>
       <div class="code">
-        <span>curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash</span>
+        <span>npx github:GOODMAN-PRO/helm</span>
+        <button onclick="copyCmd(this)">Copy</button>
+      </div>
+      <p class="oslab">macOS / Linux (bash or sh)</p>
+      <div class="code">
+        <span>curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh</span>
         <button onclick="copyCmd(this)">Copy</button>
       </div>
       <p class="oslab">Windows (PowerShell)</p>
       <div class="code">
         <span>irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex</span>
-        <button onclick="copyCmd(this)">Copy</button>
-      </div>
-      <p class="oslab">Any OS — Node / npx (no clone)</p>
-      <div class="code">
-        <span>npx github:GOODMAN-PRO/helm</span>
         <button onclick="copyCmd(this)">Copy</button>
       </div>
       <div class="opts">
