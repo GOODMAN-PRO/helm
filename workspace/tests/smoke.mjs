@@ -790,6 +790,35 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 36. bin/helm-push.mjs: syntax valid + env value trimming + sendFile empty body guard ----
+{
+  const label = 'bin/helm-push.mjs: syntax valid; env values trimmed; sendFile guards empty body';
+  try {
+    const r = spawnSync('node', ['--check', path.join(ROOT, 'bin/helm-push.mjs')],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r.status !== 0) throw new Error(`syntax check failed: ${r.stderr}`);
+
+    const src = readFileSync(path.join(ROOT, 'bin/helm-push.mjs'), 'utf8');
+
+    // Bug 1 fix: env value must be trimmed to strip trailing whitespace from .env lines
+    if (!src.includes(".trim()"))
+      throw new Error('env value .trim() missing — trailing-whitespace bug not fixed');
+
+    // Bug 2 fix: sendFile must guard against empty response body (consistent with api())
+    if (!src.includes("body ? JSON.parse(body)"))
+      throw new Error('sendFile empty-body guard missing — JSON.parse(body) without guard');
+
+    // Bug 3 fix: sendFile error must include statusText (consistent with api())
+    const sendFileIdx = src.indexOf('async function sendFile');
+    if (sendFileIdx === -1) throw new Error('sendFile function not found');
+    const sendFileBody = src.slice(sendFileIdx);
+    if (!sendFileBody.includes('res.statusText'))
+      throw new Error('sendFile error missing res.statusText — error messages inconsistent with api()');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
