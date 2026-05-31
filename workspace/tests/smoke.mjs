@@ -1553,6 +1553,72 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 60. think.mjs: computeInterruptScore function + 0.65 threshold gate present ----
+{
+  const label = 'think.mjs: computeInterruptScore named function + 0.65 threshold gate present';
+  try {
+    const src = readFileSync(path.join(WORKSPACE, 'think/think.mjs'), 'utf8');
+    if (!src.includes('function computeInterruptScore'))
+      throw new Error('computeInterruptScore function not found in think.mjs');
+    if (!src.includes('0.65'))
+      throw new Error('threshold 0.65 not found in think.mjs');
+    if (!src.includes('score > 0.65'))
+      throw new Error('score > 0.65 gate not found in think.mjs');
+    if (!src.includes('PUSH_BIN'))
+      throw new Error('PUSH_BIN constant not found in think.mjs — helm-push not wired');
+    // Syntax check
+    const rc = spawnSync('node', ['--check', path.join(WORKSPACE, 'think/think.mjs')],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rc.status !== 0) throw new Error(`syntax check failed: ${rc.stderr}`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 61. computeInterruptScore: urgency keywords present; relevance via memory recall ----
+{
+  const label = 'computeInterruptScore: required urgency keywords present; recall wired; score capped at 1';
+  try {
+    const src = readFileSync(path.join(WORKSPACE, 'think/think.mjs'), 'utf8');
+    for (const kw of ['deadline', 'urgent', 'exam', 'critical', 'emergency']) {
+      if (!src.includes(`'${kw}'`))
+        throw new Error(`urgency keyword '${kw}' missing from URGENCY_KEYWORDS`);
+    }
+    // Must call memory.mjs recall for relevance scoring
+    if (!src.includes("'recall'"))
+      throw new Error('memory recall call not found in computeInterruptScore');
+    // Score formula must weight urgency higher (0.7) and cap at 1
+    if (!src.includes('0.7 * urgency'))
+      throw new Error('urgency weight 0.7 missing from score formula');
+    if (!src.includes('Math.min(0.7 * urgency'))
+      throw new Error('Math.min cap missing from score formula');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 62. bin/helm-notify.mjs: syntax valid; task/duration/files/summary fields present ----
+{
+  const label = 'bin/helm-notify.mjs: syntax valid; all required fields wired; exits 0 on push failure';
+  try {
+    const notifyPath = path.join(ROOT, 'bin/helm-notify.mjs');
+    if (!existsSync(notifyPath)) throw new Error('bin/helm-notify.mjs not found');
+
+    const rc = spawnSync('node', ['--check', notifyPath], { encoding: 'utf8', timeout: 10_000 });
+    if (rc.status !== 0) throw new Error(`syntax check failed: ${rc.stderr}`);
+
+    const src = readFileSync(notifyPath, 'utf8');
+    if (!src.includes('helm-push'))
+      throw new Error('helm-notify does not reference helm-push');
+    for (const field of ['task', 'duration', 'files', 'summary']) {
+      if (!src.includes(`'${field}'`) && !src.includes(`"${field}"`))
+        throw new Error(`${field} field missing from helm-notify`);
+    }
+    // Must always exit 0 so a failed DM never breaks a calling job
+    if (!src.includes('process.exit(0)'))
+      throw new Error('process.exit(0) not found — helm-notify might propagate push failures');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

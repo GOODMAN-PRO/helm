@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Helm">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="34%" r="80%">
+      <stop offset="0%" stop-color="#1d2738"/>
+      <stop offset="55%" stop-color="#111722"/>
+      <stop offset="100%" stop-color="#080b11"/>
+    </radialGradient>
+    <linearGradient id="wheel" gradientUnits="userSpaceOnUse" x1="110" y1="90" x2="402" y2="422">
+      <stop offset="0%" stop-color="#7df0dc"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d6fff7"/>
+      <stop offset="60%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <!-- faint outer guide ring for depth -->
+  <circle cx="256" cy="256" r="158" fill="none" stroke="#2b3a52" stroke-width="2" opacity="0.45"/>
+
+  <g transform="translate(256,256)" filter="url(#glow)" fill="none"
+     stroke="url(#wheel)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 8 spokes + handle pegs radiating past the ring -->
+    <g stroke-width="15">
+      <line x1="0" y1="0" x2="0" y2="-184"/>
+      <line x1="0" y1="0" x2="0" y2="-184" transform="rotate(45)"/>
+      <line x1="0" y1="0" x2="0" y2="-184" transform="rotate(90)"/>
+      <line x1="0" y1="0" x2="0" y2="-184" transform="rotate(135)"/>
+      <line x1="0" y1="0" x2="0" y2="-184" transform="rotate(180)"/>
+      <line x1="0" y1="0" x2="0" y2="-184" transform="rotate(225)"/>
+      <line x1="0" y1="0" x2="0" y2="-184" transform="rotate(270)"/>
+      <line x1="0" y1="0" x2="0" y2="-184" transform="rotate(315)"/>
+    </g>
+    <!-- outer wheel ring -->
+    <circle r="126" stroke-width="20"/>
+    <!-- inner accent ring -->
+    <circle r="96" stroke-width="3" opacity="0.5"/>
+  </g>
+
+  <!-- hub: dark disc punched over the spokes, glowing core -->
+  <circle cx="256" cy="256" r="46" fill="#080b11"/>
+  <circle cx="256" cy="256" r="46" fill="none" stroke="url(#wheel)" stroke-width="6"/>
+  <circle cx="256" cy="256" r="16" fill="url(#core)" filter="url(#glow)"/>
+</svg>
