@@ -44,7 +44,7 @@ try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); 
 
 function pushOwner(text) {
   try {
-    const r = spawnSync('/usr/bin/env', ['node', PUSH_BIN, text], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [PUSH_BIN, text], { encoding: 'utf8' });
     if (r.status !== 0) log(`push failed: ${(r.stderr || '').trim()}`);
   } catch (e) {
     log(`push error: ${e.message}`);

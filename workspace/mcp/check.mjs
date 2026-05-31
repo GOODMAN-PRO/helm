@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, 'servers.json');
+const HELM_ROOT = path.resolve(__dirname, '../..'); // install root, for __HELM_ROOT__ expansion
 
 // JSON-RPC initialize request per MCP spec (2024-11-05)
 const INIT_REQUEST =
@@ -114,7 +115,11 @@ export async function runHealthChecks({ silent = false } = {}) {
     if (entry.enabled === false || !entry.healthCheck) {
       return Promise.resolve({ name, status: 'SKIP' });
     }
-    return probeServer(name, entry);
+    // Expand the install-root token so server paths are correct on any machine (Mac/Windows).
+    const expanded = Array.isArray(entry.args)
+      ? { ...entry, args: entry.args.map(a => typeof a === 'string' ? a.split('__HELM_ROOT__').join(HELM_ROOT) : a) }
+      : entry;
+    return probeServer(name, expanded);
   });
 
   const results = await Promise.all(tasks);

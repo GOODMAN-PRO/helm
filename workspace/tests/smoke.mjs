@@ -3,13 +3,16 @@
 // Run: node workspace/tests/smoke.mjs
 
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE  = path.resolve(__dirname, '..');
 const ROOT       = path.resolve(__dirname, '../..');
+
+// Cross-platform dynamic import: Node rejects import("C:\..") on Windows ("protocol 'c:'").
+const imp = s => import(path.isAbsolute(s) ? pathToFileURL(s).href : s);
 
 let passed = 0, failed = 0;
 
@@ -120,7 +123,7 @@ function fail(label, reason) {
 {
   const label = 'sessions.mjs: get/set/delete round-trip';
   try {
-    const { getSession, setSession, deleteSession } = await import(
+    const { getSession, setSession, deleteSession } = await imp(
       path.join(ROOT, 'workspace/sessions.mjs')
     );
     setSession('smoke-test', 'sess-abc', 'test');
@@ -141,7 +144,7 @@ function fail(label, reason) {
 {
   const label = 'scheduler/cron.mjs: match + nextCronDate (UTC)';
   try {
-    const { cronMatches, nextCronDate } = await import(
+    const { cronMatches, nextCronDate } = await imp(
       path.join(WORKSPACE, 'scheduler/cron.mjs')
     );
     // Use Date.UTC so results are timezone-independent.
@@ -160,11 +163,11 @@ function fail(label, reason) {
 {
   const label = 'runs/runs.mjs: makeRunDir creates directory';
   try {
-    const { makeRunDir, appendLog, finaliseRun } = await import(
+    const { makeRunDir, appendLog, finaliseRun } = await imp(
       path.join(WORKSPACE, 'runs/runs.mjs')
     );
     const dir = makeRunDir('smoke');
-    const { existsSync: exists } = await import('node:fs');
+    const { existsSync: exists } = await imp('node:fs');
     if (!exists(dir)) throw new Error(`dir not created: ${dir}`);
     appendLog(dir, { event: 'test' });
     finaliseRun(dir, 'smoke passed');
@@ -177,7 +180,7 @@ function fail(label, reason) {
 {
   const label = 'BUG-1: cron 0 2 * * * matches UTC 02:00, not local time';
   try {
-    const { cronMatches, nextCronDate } = await import(
+    const { cronMatches, nextCronDate } = await imp(
       path.join(WORKSPACE, 'scheduler/cron.mjs')
     );
     const atUtc2 = new Date(Date.UTC(2026, 4, 30, 2, 0, 0)); // 2026-05-30 02:00 UTC
@@ -366,7 +369,7 @@ function fail(label, reason) {
     // Part 2: each module must import cleanly without launching chromium
     const implDir = path.join(WORKSPACE, 'tools/impl');
     for (const f of ['browser.open', 'browser.read', 'browser.click', 'browser.fill', 'browser.screenshot']) {
-      await import(path.join(implDir, `${f}.mjs`));
+      await imp(path.join(implDir, `${f}.mjs`));
     }
     ok(label);
   } catch (e) { fail(label, e.message); }
@@ -395,7 +398,7 @@ function fail(label, reason) {
   const label = 'embed.mjs: API exports correct, cosineSimilarity works, isModelAvailable safe without model';
   try {
     const { isModelAvailable, cosineSimilarity, embedText, getOrComputeVector, ensureVectorsTable } =
-      await import(path.join(WORKSPACE, 'memory/embed.mjs'));
+      await imp(path.join(WORKSPACE, 'memory/embed.mjs'));
 
     if (typeof isModelAvailable   !== 'function') throw new Error('isModelAvailable not exported');
     if (typeof cosineSimilarity   !== 'function') throw new Error('cosineSimilarity not exported');
@@ -442,7 +445,7 @@ function fail(label, reason) {
       if (!names.includes(n)) throw new Error(`vision tool missing from registry: ${n}`);
     }
     // Module must import cleanly without taking a real screenshot (main() is gated behind argv check)
-    await import(path.join(WORKSPACE, 'tools/impl/vision.mjs'));
+    await imp(path.join(WORKSPACE, 'tools/impl/vision.mjs'));
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
@@ -452,7 +455,7 @@ function fail(label, reason) {
   const label = 'dashboard/server.mjs: imports cleanly; GET / returns 200; GET /api/state returns valid JSON';
   let server;
   try {
-    const { start } = await import(path.join(WORKSPACE, 'dashboard/server.mjs'));
+    const { start } = await imp(path.join(WORKSPACE, 'dashboard/server.mjs'));
     // port 0 → OS assigns an ephemeral port; avoids conflicts
     const { server: s, url } = await start(0);
     server = s;
@@ -518,7 +521,7 @@ function fail(label, reason) {
     if (readded.notify !== true) throw new Error(`re-add returned notify=${readded.notify}, expected true (default)`);
 
     // Cleanup: delete the row directly
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const db = new DatabaseSync(path.join(WORKSPACE, 'scheduler/jobs.db'));
     db.prepare(`DELETE FROM jobs WHERE name = ?`).run(NAME);
     db.close();
@@ -530,7 +533,7 @@ function fail(label, reason) {
 {
   const label = 'memory: UNIQUE index on facts(kind, key) exists and blocks direct duplicate inserts';
   try {
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
     // Index is created by memory.mjs init on import (we triggered it via earlier tests).
     const idx = db.prepare(
@@ -644,7 +647,7 @@ function fail(label, reason) {
 {
   const label = 'cron.mjs: N/step (e.g. 5/15) expands to full range, not just start value';
   try {
-    const { cronMatches, nextCronDate } = await import(
+    const { cronMatches, nextCronDate } = await imp(
       path.join(WORKSPACE, 'scheduler/cron.mjs')
     );
     // 5/15 on minutes should match {5, 20, 35, 50}
@@ -887,7 +890,7 @@ function fail(label, reason) {
 {
   const label = 'memory recall: confidence weighting ranks high-confidence fact above low-confidence match';
   try {
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
     const KIND = 'preference';
     const KEY_HI = '__smoke_conf_hi';
@@ -934,7 +937,7 @@ function fail(label, reason) {
     if (rc.status !== 0) throw new Error(`syntax check failed: ${rc.stderr}`);
 
     // Import without executing main (guarded by argv check)
-    const { parseExamDate, daysUntil } = await import(
+    const { parseExamDate, daysUntil } = await imp(
       path.join(WORKSPACE, 'scheduler/exam-countdown.mjs')
     );
 
@@ -994,7 +997,7 @@ function fail(label, reason) {
   try {
     // Re-import using a cache-busting search (module is already cached from check 21 — use the
     // same cached import, which is fine: we just need the already-started module shape).
-    const { start } = await import(path.join(WORKSPACE, 'dashboard/server.mjs'));
+    const { start } = await imp(path.join(WORKSPACE, 'dashboard/server.mjs'));
     const { server: s, url } = await start(0);
     server = s;
 
@@ -1018,7 +1021,7 @@ function fail(label, reason) {
 {
   const label = 'circuit-breaker.mjs: CircuitBreaker exports and state transitions (closed->open->half-open->closed)';
   try {
-    const { CircuitBreaker, DB_PATH } = await import(path.join(WORKSPACE, 'tools/circuit-breaker.mjs'));
+    const { CircuitBreaker, DB_PATH } = await imp(path.join(WORKSPACE, 'tools/circuit-breaker.mjs'));
 
     if (typeof CircuitBreaker !== 'function') throw new Error('CircuitBreaker not exported as a class');
     if (typeof DB_PATH !== 'string') throw new Error('DB_PATH not exported');
@@ -1051,13 +1054,13 @@ function fail(label, reason) {
 // ---- 55. apply-edit.mjs: exports applyEdits; 0-match returns error; no-blocks is no-op ----
 {
   const label = 'swarm/apply-edit.mjs: applyEdits exported; 0-match error; no-blocks no-op';
-  const { writeFileSync: wfs43, unlinkSync: ufs43 } = await import('node:fs');
+  const { writeFileSync: wfs43, unlinkSync: ufs43 } = await imp('node:fs');
   // Use a .txt temp file (not syntax-checked, not git-tracked) with known content.
   const tmpRel = 'workspace/swarm/.smoke43.txt';
   const tmpAbs = path.join(ROOT, tmpRel);
   wfs43(tmpAbs, 'ALPHA=hello\nBETA=world\n');
   try {
-    const { applyEdits } = await import(path.join(WORKSPACE, 'swarm/apply-edit.mjs'));
+    const { applyEdits } = await imp(path.join(WORKSPACE, 'swarm/apply-edit.mjs'));
     if (typeof applyEdits !== 'function') throw new Error('applyEdits not a function');
 
     // No edit blocks -> no-op (must not mutate any file)
@@ -1081,9 +1084,9 @@ function fail(label, reason) {
 {
   const label = 'swarm/tools: view_file (100-line window), search_repo (file list), search_file (capped matches)';
   try {
-    const { view_file } = await import(path.join(WORKSPACE, 'swarm/tools/view_file.mjs'));
-    const { search_repo } = await import(path.join(WORKSPACE, 'swarm/tools/search_repo.mjs'));
-    const { search_file } = await import(path.join(WORKSPACE, 'swarm/tools/search_file.mjs'));
+    const { view_file } = await imp(path.join(WORKSPACE, 'swarm/tools/view_file.mjs'));
+    const { search_repo } = await imp(path.join(WORKSPACE, 'swarm/tools/search_repo.mjs'));
+    const { search_file } = await imp(path.join(WORKSPACE, 'swarm/tools/search_file.mjs'));
 
     if (typeof view_file    !== 'function') throw new Error('view_file not a function');
     if (typeof search_repo  !== 'function') throw new Error('search_repo not a function');
@@ -1116,7 +1119,7 @@ function fail(label, reason) {
 {
   const label = 'model-routing: classifyComplexity returns haiku/sonnet/opus for known inputs';
   try {
-    const { classifyComplexity } = await import(path.join(WORKSPACE, 'model-routing.mjs'));
+    const { classifyComplexity } = await imp(path.join(WORKSPACE, 'model-routing.mjs'));
     const VALID = new Set(['haiku', 'sonnet', 'opus']);
 
     const cases = [
@@ -1155,7 +1158,7 @@ function fail(label, reason) {
 {
   const label = 'swarm/coding-task.mjs: codingTask exported and module loads without side effects';
   try {
-    const { codingTask } = await import(path.join(WORKSPACE, 'swarm/coding-task.mjs'));
+    const { codingTask } = await imp(path.join(WORKSPACE, 'swarm/coding-task.mjs'));
     if (typeof codingTask !== 'function') throw new Error('codingTask is not a function');
     ok(label);
   } catch (e) { fail(label, e.message); }
@@ -1165,7 +1168,7 @@ function fail(label, reason) {
 {
   const label = 'cost-tracker.mjs: appendCost records entry; getCostSummary returns it in since window';
   try {
-    const { appendCost, getCostSummary } = await import(path.join(WORKSPACE, 'costs/cost-tracker.mjs'));
+    const { appendCost, getCostSummary } = await imp(path.join(WORKSPACE, 'costs/cost-tracker.mjs'));
 
     if (typeof appendCost !== 'function') throw new Error('appendCost not exported');
     if (typeof getCostSummary !== 'function') throw new Error('getCostSummary not exported');
@@ -1255,7 +1258,7 @@ function fail(label, reason) {
     spawnSync('node', [mem, 'remember', 'preference', KEY, 'autopilot'],
       { encoding: 'utf8', timeout: 10_000 });
 
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
     const row = db.prepare(`SELECT value FROM facts WHERE kind = 'preference' AND key = ? AND expired_at IS NULL`).get(KEY);
     const stored = row?.value;
@@ -1290,7 +1293,7 @@ function fail(label, reason) {
 {
   const label = 'memory recall: BM25 ranks fact with higher term frequency above lower TF fact';
   try {
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
     const KIND = 'note';
     const KEY_HI = '__smoke_bm25_hi';
@@ -1333,7 +1336,7 @@ function fail(label, reason) {
   const KEY = '__smoke_supersede';
   try {
     // Clean up any leftover rows from previous test runs
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
     db.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
     db.close();
@@ -1378,7 +1381,7 @@ function fail(label, reason) {
   const mem = path.join(WORKSPACE, 'memory/memory.mjs');
   const KEY = '__smoke_access_count';
   try {
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
     db.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
     db.close();
@@ -1420,7 +1423,7 @@ function fail(label, reason) {
 
     // Import as a module and verify detectScale is exported.
     // The CLI argv check prevents main() from running on import.
-    const { detectScale } = await import(guiclickPath);
+    const { detectScale } = await imp(guiclickPath);
     if (typeof detectScale !== 'function') throw new Error('detectScale not exported from bin/guiclick');
 
     // detectScale must return a positive integer without Screen Recording (it reads display metadata).
@@ -1443,7 +1446,7 @@ function fail(label, reason) {
     if (r.status !== 0) throw new Error(`syntax check failed: ${r.stderr}`);
 
     // Import without triggering CLI main() — the argv guard prevents execution on import.
-    const { guiStep } = await import(guiTaskPath);
+    const { guiStep } = await imp(guiTaskPath);
     if (typeof guiStep !== 'function') throw new Error('guiStep not exported from gui_task.mjs');
     // Must be async (returns a Promise)
     const asyncTag = Object.prototype.toString.call(guiStep);
@@ -1538,7 +1541,7 @@ function fail(label, reason) {
       throw new Error(`expected >= 4 steps after retry insert, got ${show1.steps.length}`);
 
     // 8. Checkpoints table must have rows for this plan
-    const { DatabaseSync } = await import('node:sqlite');
+    const { DatabaseSync } = await imp('node:sqlite');
     const planDb = new DatabaseSync(path.join(WORKSPACE, 'plans/plans.db'));
     const cpRows = planDb.prepare(`SELECT * FROM checkpoints WHERE plan_id = ?`).all(pid);
     planDb.close();
@@ -1654,7 +1657,7 @@ function fail(label, reason) {
       { encoding: 'utf8', timeout: 10_000 });
     if (rc.status !== 0) throw new Error(`syntax check failed: ${rc.stderr}`);
 
-    const { HANDOFF_SCHEMA, pruneFileReads } = await import(
+    const { HANDOFF_SCHEMA, pruneFileReads } = await imp(
       path.join(WORKSPACE, 'sessions/compact.mjs')
     );
 
@@ -1721,7 +1724,7 @@ function fail(label, reason) {
     }
 
     // 4. check.mjs imports cleanly and exports runHealthChecks (no network, no keys required)
-    const { runHealthChecks } = await import(path.join(WORKSPACE, 'mcp/check.mjs'));
+    const { runHealthChecks } = await imp(path.join(WORKSPACE, 'mcp/check.mjs'));
     if (typeof runHealthChecks !== 'function')
       throw new Error('runHealthChecks not exported from check.mjs');
 
@@ -1825,7 +1828,7 @@ function fail(label, reason) {
     if (chk.status !== 0) throw new Error(`syntax check failed: ${chk.stderr}`);
 
     // Dynamic import must succeed without launching playwright or running any subcommand
-    await import(path.join(WORKSPACE, 'tools/impl/reverse.mjs'));
+    await imp(path.join(WORKSPACE, 'tools/impl/reverse.mjs'));
 
     ok(label);
   } catch (e) { fail(label, e.message); }
@@ -1839,7 +1842,7 @@ function fail(label, reason) {
     if (!existsSync(stuckPath)) throw new Error('workspace/upgrades/stuck.mjs not found');
     if (spawnSync('node', ['--check', stuckPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
       throw new Error('stuck.mjs syntax check failed');
-    const { recordStuck, listStuck, renderStuckForPrompt, archiveAll, readAll } = await import(stuckPath);
+    const { recordStuck, listStuck, renderStuckForPrompt, archiveAll, readAll } = await imp(stuckPath);
     // record two identical-ish summaries -> dedup to one with count 2
     const before = readAll().length;
     recordStuck('__smoke_stuck test thing', 'detail a', 'test');
@@ -1873,7 +1876,7 @@ function fail(label, reason) {
     if (!existsSync(tplPath)) throw new Error('workspace/templates/templates.mjs not found');
     if (spawnSync('node', ['--check', tplPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
       throw new Error('templates.mjs syntax check failed');
-    const { exportTemplate, importTemplate, listTemplates } = await import(tplPath);
+    const { exportTemplate, importTemplate, listTemplates } = await imp(tplPath);
     const out = exportTemplate('__smoke_tpl', 'smoke template');
     if (!existsSync(out)) throw new Error('export did not write a file');
     const raw = readFileSync(out, 'utf8');
@@ -1888,7 +1891,7 @@ function fail(label, reason) {
     if (!listTemplates().includes('__smoke_tpl')) throw new Error('listTemplates missing the new template');
     // import should not throw and should report what it applied — but must not leave the real
     // servers.json/persona reformatted, so snapshot and restore them around the call.
-    const fsmod = await import('node:fs');
+    const fsmod = await imp('node:fs');
     const serversFile = path.join(WORKSPACE, 'mcp/servers.json');
     const personaFile = path.join(WORKSPACE, 'persona.local.md');
     const serversBak = readFileSync(serversFile, 'utf8');
@@ -1907,7 +1910,7 @@ function fail(label, reason) {
     if (!idx.includes('exportTemplate') || !idx.includes('importTemplate') || !idx.includes('ownerPersonaOverride'))
       throw new Error('index.js does not wire templates');
     // cleanup the smoke artifact
-    try { (await import('node:fs')).unlinkSync(out); } catch {}
+    try { (await imp('node:fs')).unlinkSync(out); } catch {}
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
@@ -1921,7 +1924,7 @@ function fail(label, reason) {
     if (!existsSync(path.join(WORKSPACE, 'mind/MIND.md'))) throw new Error('workspace/mind/MIND.md not found');
     if (spawnSync('node', ['--check', mindPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
       throw new Error('mind.mjs syntax check failed');
-    const { VERBS, vaultPath } = await import(mindPath);
+    const { VERBS, vaultPath } = await imp(mindPath);
     for (const v of ['save', 'capture', 'find', 'synthesize', 'research', 'daily', 'recap', 'health'])
       if (!VERBS[v]) throw new Error(`mind verb missing: ${v}`);
     if (typeof vaultPath() !== 'string' || !vaultPath().includes('HelmBrain')) throw new Error('vaultPath() should point at HelmBrain');
@@ -1947,7 +1950,7 @@ function fail(label, reason) {
     if (!existsSync(loaderPath)) throw new Error('workspace/skills/loader.mjs not found');
     if (spawnSync('node', ['--check', loaderPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
       throw new Error('loader.mjs syntax check failed');
-    const { listSkills, runSkillCommand } = await import(loaderPath);
+    const { listSkills, runSkillCommand } = await imp(loaderPath);
     const skills = await listSkills();
     if (!Array.isArray(skills)) throw new Error('listSkills() did not return an array');
     if (skills.length < 3) throw new Error(`expected >= 3 skills, got ${skills.length}`);

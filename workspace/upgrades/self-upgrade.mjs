@@ -33,10 +33,10 @@ const ts = () => new Date().toISOString();
 const log = m => { const l = `[${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
 const git = (...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', ...a]);
-const notify = msg => { try { sh('/usr/bin/env', ['node', path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
+const notify = msg => { try { sh(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
 
 function restartAndHealth() {
-  const uid = process.getuid();
+  const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
   // Track how much of the log pre-dates this restart so stale "Helm online" text
   // from a previous boot isn't accepted as a successful health check.
   let prevLen = 0;

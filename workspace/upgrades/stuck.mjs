@@ -6,7 +6,7 @@
 // piling up duplicates).
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));   // workspace/upgrades
 const QUEUE = path.join(DIR, 'stuck-queue.jsonl');
@@ -57,7 +57,7 @@ export function archiveAll() {
   writeAll([]); return items.length;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [cmd, ...rest] = process.argv.slice(2);
   if (cmd === 'add') { const e = recordStuck(rest[0], rest[1] || '', 'cli'); console.log(e ? `recorded: ${e.summary} (x${e.count})` : 'nothing recorded'); }
   else if (cmd === 'list') { const o = listStuck(); console.log(o.length ? o.map(i => `- (${i.count}x) [${i.source}] ${i.summary}`).join('\n') : '(stuck queue empty)'); }

@@ -64,6 +64,8 @@ function mcpConfigArg() {
     for (const [name, entry] of Object.entries(raw.mcpServers || {})) {
       if (entry.enabled === false) continue;
       const { healthCheck: _h, enabled: _e, ...mcpEntry } = entry;
+      // Expand the install-root token so server paths are correct on any machine (Mac/Windows).
+      if (Array.isArray(mcpEntry.args)) mcpEntry.args = mcpEntry.args.map(a => typeof a === 'string' ? a.split('__HELM_ROOT__').join(__dirname) : a);
       filtered[name] = mcpEntry;
     }
     return JSON.stringify({ mcpServers: filtered });

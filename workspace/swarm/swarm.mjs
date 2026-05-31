@@ -47,7 +47,7 @@ const log = m => { const l = `[swarm ${ts()}] ${m}`; console.log(l); try { appen
 const flushTasks = tasks => { try { writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2)); } catch (e) { log('WARN: could not flush tasks: ' + e.message); } };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 const git = (cwd, ...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', '-C', cwd, ...a]);
-const notify = msg => { try { sh('/usr/bin/env', ['node', path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
+const notify = msg => { try { sh(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
 // Extract the LAST VERDICT line — reviewers may quote previous verdicts before writing their own.
 const lastVerdict = s => { const ms = (s || '').match(/VERDICT:\s*(?:APPROVE|REJECT)[^\n]*/gi); return ms ? ms[ms.length - 1] : ''; };
 
@@ -296,7 +296,7 @@ const reviewPrompt = (t, builderSummary, handoff) => [
   log('DONE\n' + summary);
   const merged = results.filter(r => r.status === 'merged').length;
   if (!DRY) {
-    if (merged) { const uid = process.getuid(); sh('launchctl', ['kickstart', '-k', `gui/${uid}/com.helm.discord`]); }
+    if (merged && process.platform === 'darwin') { const uid = process.getuid(); sh('launchctl', ['kickstart', '-k', `gui/${uid}/com.helm.discord`]); }
     notify(`Swarm finished: ${merged}/${results.length} features merged.\n${summary}`);
   }
 })();

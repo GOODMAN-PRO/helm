@@ -26,7 +26,7 @@ mkdirSync(REPORTS, { recursive: true });
 
 const ts = () => new Date().toISOString();
 const log = m => { const l = `[research ${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
-const notify = m => { try { spawnSync('/usr/bin/env', ['node', path.join(ROOT, 'bin', 'helm-push.mjs'), m]); } catch {} };
+const notify = m => { try { spawnSync(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), m]); } catch {} };
 
 function runClaude(cwd, prompt, capMin) {
   return new Promise(resolve => {

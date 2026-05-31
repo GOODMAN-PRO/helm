@@ -56,7 +56,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   );
 
   const msg = '[exam-countdown] ' + lines.join('; ');
-  const r = spawnSync('/usr/bin/env', ['node', PUSH_BIN, msg], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [PUSH_BIN, msg], { encoding: 'utf8' });
   if (r.status !== 0) {
     process.stderr.write(`push failed: ${(r.stderr || '').trim()}\n`);
     process.exit(1);

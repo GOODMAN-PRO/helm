@@ -38,7 +38,7 @@ if (summary) parts.push(summary.slice(0, 200));
 const message = parts.join(' | ');
 
 try {
-  const r = spawnSync('/usr/bin/env', ['node', PUSH_BIN, message], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [PUSH_BIN, message], { encoding: 'utf8' });
   if (r.status !== 0) {
     process.stderr.write('helm-notify: push failed: ' + (r.stderr || '').trim() + '\n');
   } else {

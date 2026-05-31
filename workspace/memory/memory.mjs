@@ -19,6 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.join(__dirname, 'memory.db');
 
 const db = new DatabaseSync(DB_PATH);
+// Wait out (don't crash on) concurrent writers — background think/consolidate can
+// touch this DB while an interactive recall runs. Matches sessions.mjs.
+db.exec(`PRAGMA busy_timeout = 5000`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS facts (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
