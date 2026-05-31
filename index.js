@@ -47,6 +47,13 @@ function resolveClaude() {
   if (existsSync(bin + '.cmd')) return { cmd: bin + '.cmd', shell: true };
   return { cmd: bin, shell: true };   // let the shell resolve via PATHEXT
 }
+// A free ONLINE model (Groq/OpenRouter/Together/Cerebras/...) is configured when these are set.
+// We run a tiny local proxy (workspace/proxy/llm-proxy.mjs) that translates Claude Code's
+// Anthropic API to the provider's OpenAI-compatible API, and point Claude Code at the proxy.
+const PROXY_PORT = parseInt(process.env.PROXY_PORT || '8787', 10);
+function proxyConfigured() {
+  return AUTH_MODE === 'custom' && !!process.env.OPENAI_BASE_URL && !!process.env.OPENAI_MODEL;
+}
 function claudeEnv() {
   const e = { ...process.env };
   if (AUTH_MODE === 'apikey') {
@@ -55,6 +62,11 @@ function claudeEnv() {
     // free / local / custom endpoint: Claude Code needs an auth token even for a local server
     // (e.g. Ollama requires ANTHROPIC_AUTH_TOKEN set). Use the provided key, else a local placeholder.
     if (!e.ANTHROPIC_AUTH_TOKEN) e.ANTHROPIC_AUTH_TOKEN = e.ANTHROPIC_API_KEY || 'ollama';
+    // Free online model: route Claude Code through the local translation proxy.
+    if (proxyConfigured()) {
+      e.ANTHROPIC_BASE_URL = `http://127.0.0.1:${PROXY_PORT}`;
+      e.ANTHROPIC_AUTH_TOKEN = 'helm-proxy';     // proxy ignores it; just satisfy Claude Code
+    }
   } else {
     // subscription (OAuth) — strip anything that would override the login
     delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
@@ -95,7 +107,10 @@ const autopilotTimers = new Map();
 
 // Pick --model for this turn: fixed pref overrides the complexity classifier.
 function pickModel(prompt) {
-  // custom/free endpoints expect their own model id (e.g. a Groq/Ollama model name)
+  // free online model behind the proxy: the proxy forces OPENAI_MODEL upstream, so --model is
+  // cosmetic — pass the provider model id so logs/UX read sensibly.
+  if (proxyConfigured()) return process.env.OPENAI_MODEL;
+  // custom/local endpoints expect their own model id (e.g. an Ollama model name)
   if (AUTH_MODE === 'custom' && process.env.ANTHROPIC_MODEL) return process.env.ANTHROPIC_MODEL;
   return getModelPref() ?? classifyComplexity(prompt);
 }
@@ -686,6 +701,30 @@ process.on('unhandledRejection', reason => console.error('Unhandled rejection:',
 
 // Fire-and-forget MCP health check at startup — bot starts regardless of results.
 runHealthChecks().catch(() => {});
+
+// Free online model: start the Anthropic->OpenAI translation proxy and keep it alive.
+// Claude Code talks to it (ANTHROPIC_BASE_URL), it forwards to OPENAI_BASE_URL (Groq/OpenRouter/...).
+let proxyChild = null;
+function startProxy() {
+  if (!proxyConfigured() || proxyChild) return;
+  const script = path.join(WORKSPACE, 'proxy/llm-proxy.mjs');
+  if (!existsSync(script)) { console.error('✋ Free-model proxy missing at ' + script); return; }
+  proxyChild = spawn(process.execPath, [script], {
+    cwd: __dirname,
+    env: { ...process.env, PROXY_PORT: String(PROXY_PORT) },
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+  console.log(`🔌 Free-model proxy: Claude Code -> http://127.0.0.1:${PROXY_PORT} -> ${process.env.OPENAI_BASE_URL} (${process.env.OPENAI_MODEL})`);
+  proxyChild.on('exit', code => {
+    console.error(`✋ Free-model proxy exited (code ${code}); restarting in 2s`);
+    proxyChild = null;
+    setTimeout(startProxy, 2000);
+  });
+}
+startProxy();
+for (const sig of ['SIGINT', 'SIGTERM', 'exit']) {
+  process.on(sig, () => { try { proxyChild?.kill(); } catch {} });
+}
 
 // Connect to Discord, with a clear reason if it can't (so "offline" isn't a mystery).
 if (/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
