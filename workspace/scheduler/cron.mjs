@@ -16,7 +16,8 @@ function parseField(field, min, max) {
           const [a, b] = rangeStr.split('-').map(Number);
           start = a; end = b;
         } else {
-          start = end = parseInt(rangeStr, 10);
+          start = parseInt(rangeStr, 10);
+          // end stays at max: N/step means "start at N, step until max"
         }
       }
       for (let i = start; i <= end; i += step) values.add(i);
