@@ -1912,6 +1912,33 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- Helm Mind: protocol + tool wired, dry-run builds a vault-aware prompt ----
+{
+  const label = 'mind.mjs: verbs + protocol + registry + chat wiring (no Claude run)';
+  try {
+    const mindPath = path.join(WORKSPACE, 'tools/impl/mind.mjs');
+    if (!existsSync(mindPath)) throw new Error('workspace/tools/impl/mind.mjs not found');
+    if (!existsSync(path.join(WORKSPACE, 'mind/MIND.md'))) throw new Error('workspace/mind/MIND.md not found');
+    if (spawnSync('node', ['--check', mindPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
+      throw new Error('mind.mjs syntax check failed');
+    const { VERBS, vaultPath } = await import(mindPath);
+    for (const v of ['save', 'capture', 'find', 'synthesize', 'research', 'daily', 'recap', 'health'])
+      if (!VERBS[v]) throw new Error(`mind verb missing: ${v}`);
+    if (typeof vaultPath() !== 'string' || !vaultPath().includes('HelmBrain')) throw new Error('vaultPath() should point at HelmBrain');
+    // --dry-run must emit a prompt that embeds the protocol + the vault path, without invoking Claude
+    const dry = spawnSync('node', [mindPath, '--dry-run', 'find', 'pricing'], { encoding: 'utf8', timeout: 10_000 });
+    if (dry.status !== 0) throw new Error(`mind --dry-run failed: ${dry.stderr}`);
+    if (!dry.stdout.includes('Helm Mind') || !dry.stdout.includes('VAULT:') || !dry.stdout.includes('TASK (find)'))
+      throw new Error('mind dry-run prompt missing protocol/vault/task');
+    // registry + chat command must be wired
+    const reg = JSON.parse(readFileSync(path.join(WORKSPACE, 'tools/registry.json'), 'utf8'));
+    if (!reg.find(t => t.name === 'mind')) throw new Error('mind not registered in registry.json');
+    const idx = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!idx.includes('tools/impl/mind.mjs')) throw new Error('index.js does not wire the mind command');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

@@ -732,5 +732,26 @@
     ],
     "side_effects": "writes workspace/reverse/<slug>-report.md",
     "confirm": false
+  },
+  {
+    "name": "mind",
+    "summary": "Helm Mind — AI-first second brain over HelmBrain. Verbs: save, capture, find, synthesize, research, daily, recap, health. Reads the vault first and writes AI-first notes back (the vault rewrites itself).",
+    "exec": "node tools/impl/mind.mjs",
+    "args_schema": {
+      "verb": {
+        "type": "string",
+        "required": true,
+        "enum": ["save", "capture", "find", "synthesize", "research", "daily", "recap", "health"]
+      },
+      "input": {
+        "type": "string",
+        "description": "Topic/query/conversation for the verb. Optional for daily/health/recap."
+      }
+    },
+    "requires": [
+      "HelmBrain vault present; Claude engine configured"
+    ],
+    "side_effects": "reads and updates notes in the HelmBrain vault",
+    "confirm": false
   }
 ]

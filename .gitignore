@@ -64,3 +64,6 @@ workspace/upgrades/stuck-archive.jsonl
 # per-install template flavor + exported templates (user-generated/shareable)
 workspace/persona.local.md
 workspace/templates/*.helmtemplate.json
+
+# Helm Mind nightly agent log
+workspace/mind/mind.log

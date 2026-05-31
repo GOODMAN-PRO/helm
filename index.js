@@ -491,6 +491,21 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
+  // ---- Helm Mind: AI-first second brain over HelmBrain ----
+  const mindM = text.match(/^\/?mind\s+(save|capture|find|synthesize|research|daily|recap|health)\b\s*([\s\S]*)$/i);
+  if (mindM) {
+    const verb = mindM[1].toLowerCase();
+    const input = (mindM[2] || '').trim();
+    await msg.reply(`Helm Mind: \`${verb}\`${input ? ` — ${input.slice(0, 80)}` : ''} … working on the vault.`);
+    msg.channel.sendTyping().catch(() => {});
+    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'tools/impl/mind.mjs'), verb, input], {
+      cwd: __dirname, encoding: 'utf8', timeout: 20 * 60_000, maxBuffer: 64 * 1024 * 1024,
+    });
+    const out = (r.stdout || r.stderr || '(no output)').trim();
+    for (const part of chunks(out || '(done)')) await msg.reply(part);
+    return;
+  }
+
   // ---- /cost: today's usage summary (notional tokens, Max subscription) ----
   if (/^\/cost\b/.test(low)) {
     try {
