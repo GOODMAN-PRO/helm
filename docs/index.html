@@ -115,6 +115,25 @@
 
   /* install */
   .install{background:linear-gradient(180deg,var(--panel2),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:34px}
+  /* terminal-style install card */
+  .term{border:1px solid #1b2740;border-radius:14px;overflow:hidden;background:#06090f;box-shadow:0 20px 60px -30px #000}
+  .term-bar{display:flex;align-items:center;gap:14px;padding:11px 14px;background:#0b1320;border-bottom:1px solid #16223a;flex-wrap:wrap}
+  .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+  .dots{display:flex;gap:8px;margin-right:4px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{background:#0e1c2b;border:1px solid #1d3149;color:var(--muted);border-radius:7px;padding:5px 11px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .tab:hover{color:var(--ink)}
+  .tab.active{background:var(--grad);border-color:transparent;color:#05202a;font-weight:700}
+  .beta{margin-left:auto;color:var(--faint);font-size:11px;letter-spacing:1px;border:1px solid #1d3149;border-radius:6px;padding:3px 8px}
+  .term-body{padding:20px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;position:relative}
+  .term-body .comment{color:#5d7088;font-style:italic;margin-bottom:12px}
+  .cmdline{display:flex;align-items:flex-start;gap:10px}
+  .cmdline .prompt{color:#5eead4;user-select:none}
+  .cmdline code{color:#cfeaf2;white-space:pre-wrap;word-break:break-all;flex:1}
+  .tcopy{position:absolute;top:14px;right:14px;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer}
+  .tcopy:hover{border-color:var(--cyan)}
+  .term-note{color:var(--faint);font-size:12.5px;margin-top:12px}
   .oslab{color:var(--muted);font-size:12px;letter-spacing:.4px;margin:16px 0 6px}
   .oslab:first-of-type{margin-top:0}
   .code+.code{margin-top:0}
@@ -190,37 +209,30 @@
     <p class="eyebrow">Get Helm</p>
     <h2>One command. <span class="grad">Then it's yours.</span></h2>
     <div class="install">
-      <p class="oslab">Recommended — any OS, no shell script (just Node)</p>
-      <div class="code">
-        <span>npx github:GOODMAN-PRO/helm</span>
-        <button onclick="copyCmd(this)">Copy</button>
+      <div class="term">
+        <div class="term-bar">
+          <span class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></span>
+          <div class="tabs">
+            <button class="tab active" data-cmd="npx github:GOODMAN-PRO/helm">npx · any OS</button>
+            <button class="tab" data-cmd="curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh">macOS / Linux</button>
+            <button class="tab" data-cmd="irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex">Windows</button>
+            <button class="tab" data-cmd="git clone https://github.com/GOODMAN-PRO/helm.git helm && cd helm && npm install && npm run setup">Manual</button>
+            <button class="tab" data-cmd="mkdir helm && curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main | tar -xz -C helm --strip-components=1 && cd helm && npm install && npm run setup">No git</button>
+          </div>
+          <span class="beta">BETA</span>
+        </div>
+        <div class="term-body">
+          <div class="comment"># Works everywhere. Installs everything. You message it from Discord.</div>
+          <div class="cmdline"><span class="prompt">$</span><code id="acmd">npx github:GOODMAN-PRO/helm</code></div>
+          <button class="tcopy" onclick="copyTerm()">Copy</button>
+        </div>
       </div>
-      <p class="oslab">macOS / Linux (bash or sh)</p>
-      <div class="code">
-        <span>curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh</span>
-        <button onclick="copyCmd(this)">Copy</button>
-      </div>
-      <p class="oslab">Windows (PowerShell)</p>
-      <div class="code">
-        <span>irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex</span>
-        <button onclick="copyCmd(this)">Copy</button>
-      </div>
-      <p class="oslab">Manual (git)</p>
-      <div class="code">
-        <span>git clone https://github.com/GOODMAN-PRO/helm.git helm &amp;&amp; cd helm &amp;&amp; npm install &amp;&amp; npm run setup</span>
-        <button onclick="copyCmd(this)">Copy</button>
-      </div>
-      <p class="oslab">No git (download tarball)</p>
-      <div class="code">
-        <span>mkdir helm &amp;&amp; curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main | tar -xz -C helm --strip-components=1 &amp;&amp; cd helm &amp;&amp; npm install &amp;&amp; npm run setup</span>
-        <button onclick="copyCmd(this)">Copy</button>
-      </div>
+      <p class="term-note">Requires Node 18+ and Claude Code; git is used if present, else a tarball is downloaded. macOS, Windows and Linux.</p>
       <div class="opts">
         <div class="opt"><h4>Multiple gateways</h4><p>A guided setup screen turns on Discord, iMessage, or both — more on the way.</p></div>
         <div class="opt"><h4>Any backend — including free</h4><p>Your Claude subscription, an Anthropic API key, or a free / local model (Ollama, Groq, OpenRouter) at no cost.</p></div>
         <div class="opt"><h4>Run it 24/7</h4><p>Optionally install it as a background service so it's always there.</p></div>
       </div>
-      <p class="note">Requires Node 18+ and Claude Code; git is used if present, else a tarball is downloaded. Power it with your Claude login, an API key, or any Anthropic-compatible endpoint (free tiers / local models). macOS, Windows and Linux.</p>
     </div>
   </section>
 
@@ -327,6 +339,20 @@ function copyCmd(btn){
   const t=btn.previousElementSibling.textContent;
   navigator.clipboard.writeText(t).then(()=>{
     const o=btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=o,1400);
+  });
+}
+// terminal install card: tabs swap the active command
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('acmd').textContent=tab.dataset.cmd;
+  });
+});
+function copyTerm(){
+  const t=document.getElementById('acmd').textContent;
+  navigator.clipboard.writeText(t).then(()=>{
+    const b=event.target; const o=b.textContent; b.textContent='Copied'; setTimeout(()=>b.textContent=o,1400);
   });
 }
 </script>

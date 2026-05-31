@@ -101,9 +101,23 @@ Pick at install (or set `AUTH_MODE` in `.env`):
 
 ## Compared to other agents
 
-Helm is the one that runs on your own hardware **and** ties your whole fleet together — local + open +
-Discord/iMessage + persistent memory + multi-machine fleet + 24/7 self-upgrade + free/local models, in
-one agent. See the full matrix on the [live site](https://goodman-pro.github.io/helm/).
+OpenClaw is the closest peer — also local, open, and multi-channel. Helm's edge is what it does on top:
+one synced brain across your fleet, 24/7 self-improvement, and a parallel build swarm.
+
+| Capability | Helm | OpenClaw |
+|---|:--:|:--:|
+| Runs on your own machine | ✓ | ✓ |
+| Open / self-hosted | ✓ | ✓ |
+| Chat from Discord / iMessage | ✓ | ✓ |
+| Free / local models | ✓ | ✓ |
+| Persistent memory + synced brain | ✓ | ~ |
+| Multi-machine fleet (Mac + Windows) | ✓ | ~ |
+| Clicks & types in any app | ✓ | ~ |
+| Thinks 24/7 &amp; self-upgrades | ✓ | — |
+| Parallel build swarm | ✓ | — |
+
+✓ yes · ~ partial · — no. Full matrix (vs Hermes, Cursor, Manus, Vellum, and more) on the
+[live site](https://goodman-pro.github.io/helm/#compare).
 
 ## Configuration (`.env`)
 
