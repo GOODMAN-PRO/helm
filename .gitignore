@@ -46,3 +46,5 @@ workspace/swarm/bugsweep.json.bak
 
 # secrets vault (encrypted, but never commit)
 workspace/secrets/vault.json
+
+workspace/inbox/

@@ -61,7 +61,8 @@ function runClaudeRemote(prompt) {
     if (!HELM_WIN_HOST) return resolve('Windows node not configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Claude on Windows, then say "use windows" again.');
     // Shell-quote components so paths with spaces survive the remote shell.
     const q = s => `"${s.replace(/"/g, '\\"')}"`;
-    const REMOTE_PERSONA = 'You are Helm running on the owners Windows PC over SSH, with full shell and file access on this machine. Act, do not just advise. Keep replies short and chat-friendly. Confirm before anything destructive, irreversible, or that spends money. Never touch the separate Helm project.';
+    const REMOTE_PERSONA = 'You are Helm running on the owners Windows PC over SSH, with full shell and file access on this machine. Act, do not just advise. Keep replies short and chat-friendly. Confirm before anything destructive, irreversible, or that spends money. Never touch the separate Helm project. ' +
+      'To SCREENSHOT this Windows screen (an SSH session cannot capture the desktop directly), run: schtasks /run /tn HelmShot   then wait ~3 seconds (powershell Start-Sleep 3). It saves the live desktop to C:\\\\Users\\\\User\\\\helm-shot.png. Finish your reply with a line exactly: ATTACH: C:\\\\Users\\\\User\\\\helm-shot.png  and the owner will receive the image.';
     const remoteCmd = `${HELM_WIN_DIR ? `cd ${q(HELM_WIN_DIR)} && ` : ''}${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)} --append-system-prompt ${q(REMOTE_PERSONA)}`;
     const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
     let out = '', err = '';
@@ -77,6 +78,16 @@ function runClaudeRemote(prompt) {
     });
     child.stdin.write(prompt); child.stdin.end();
   });
+}
+
+// Pull a file off the Windows box (for ATTACH paths produced by the windows brain, e.g. screenshots).
+function scpFromWin(winPath) {
+  if (!HELM_WIN_HOST) return null;
+  const INBOX = path.join(WORKSPACE, 'inbox');
+  mkdirSync(INBOX, { recursive: true });
+  const local = path.join(INBOX, `win-${Date.now()}-${path.basename(winPath.replace(/\\/g, '/')) || 'file'}`);
+  const r = spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', `${HELM_WIN_HOST}:${winPath}`, local], { encoding: 'utf8' });
+  return r.status === 0 ? local : null;
 }
 
 // ---- persona: appended to Claude Code's own (tool-enabled) system prompt ----
@@ -205,7 +216,7 @@ client.on(Events.MessageCreate, async msg => {
   if (!dm && !msg.mentions.users.has(client.user.id)) return;   // in servers: only when @mentioned
 
   const text = msg.content.replace(`<@${client.user.id}>`, '').trim();
-  if (!text) return;
+  if (!text && !msg.attachments.size) return;   // allow image-only messages
 
   // ---- stop/cancel: actually kill any in-flight run (handled before anything else) ----
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) {
@@ -253,16 +264,38 @@ client.on(Events.MessageCreate, async msg => {
   }
 
   const target = getTarget();
-  console.log(`📩 [${target}] ${text}`);
+  // ---- download any attachments so Helm can actually SEE/read them ----
+  let prompt = text;
+  if (msg.attachments.size) {
+    const INBOX = path.join(WORKSPACE, 'inbox');
+    mkdirSync(INBOX, { recursive: true });
+    const saved = [];
+    for (const a of msg.attachments.values()) {
+      try {
+        const res = await fetch(a.url);
+        const buf = Buffer.from(await res.arrayBuffer());
+        const p = path.join(INBOX, `${Date.now()}-${(a.name || 'file').replace(/[^\w.\-]/g, '_')}`);
+        writeFileSync(p, buf); saved.push(p);
+      } catch { /* skip a failed download */ }
+    }
+    if (saved.length) prompt = (text || '(no caption)') +
+      `\n\n[The owner attached ${saved.length} file(s) — look at them NOW with your Read tool (Read handles images): ${saved.join(' , ')}]`;
+  }
+  console.log(`📩 [${target}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
   try {
-    const reply = await ask(text, heartbeat => msg.channel.send(heartbeat).catch(() => {}), target);
+    const reply = await ask(prompt, heartbeat => msg.channel.send(heartbeat).catch(() => {}), target);
     clearInterval(typing);
     const { text: body, files } = splitAttachments(reply);
     for (const part of chunks(body || '(see attachment)')) await msg.reply(part);
     for (const f of files) {
-      try { await msg.reply({ files: [f] }); }
+      let lf = f;
+      if (target === 'windows' && /^[A-Za-z]:[\\/]/.test(f)) {       // a Windows path -> pull it to the Mac first
+        lf = scpFromWin(f);
+        if (!lf) { await msg.reply(`(couldn't fetch ${f} from windows)`); continue; }
+      }
+      try { await msg.reply({ files: [lf] }); }
       catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
     }
     console.log(`📤 replied (${body.length} chars, ${files.length} files)`);
