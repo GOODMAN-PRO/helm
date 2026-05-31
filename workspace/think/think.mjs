@@ -41,7 +41,7 @@ const log = m => console.log(`[think] ${ts()} ${m}`);
 
 const CHEAP_PROMPT = [
   'You are Helm THINKING IN THE BACKGROUND. No one is watching this run.',
-  'Do NOT message the owner unless something is genuinely urgent — it is exam season, stay quiet.',
+  'Do NOT message the owner unless something is genuinely urgent — default to quiet, no noise.',
   'You can read your memory (`node workspace/memory/memory.mjs recall <q>` / `dump`), recent episodes, your workspace, and the whole Mac.',
   '',
   'Keep this tick SHORT and cheap (you run every ~15 min). Each tick:',

@@ -72,21 +72,26 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 4. memory.recall "example query" returns the seeded example facts ----
+// ---- 4. memory remember -> recall round-trip (data-independent) ----
 {
-  const label = 'memory.recall "example query" returns the seeded example facts';
+  const label = 'memory.mjs remember -> recall round-trip finds a seeded fact';
+  const mem = path.join(WORKSPACE, 'memory/memory.mjs');
+  const KEY = 'smoke_recall_probe';
   try {
-    const r = spawnSync(
-      'node',
-      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'example query'],
-      { encoding: 'utf8', timeout: 15_000 }
-    );
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'zorbic quaffle widget'], { encoding: 'utf8', timeout: 15_000 });
+    const r = spawnSync('node', [mem, 'recall', 'zorbic quaffle'], { encoding: 'utf8', timeout: 15_000 });
     if (r.status !== 0) throw new Error(`exit ${r.status}: ${r.stderr}`);
     const facts = JSON.parse(r.stdout);
-    const hasExam = facts.some(f => f.kind === 'exam' || /examfacts/i.test(f.key + f.value));
-    if (!hasExam) throw new Error(`no the seeded example facts found in ${JSON.stringify(facts).slice(0, 200)}`);
+    if (!facts.some(f => f.key === KEY)) throw new Error(`seeded fact not recalled: ${JSON.stringify(facts).slice(0, 200)}`);
     ok(label);
   } catch (e) { fail(label, e.message); }
+  finally {
+    try {
+      const d = spawnSync('node', [mem, 'dump'], { encoding: 'utf8' });
+      const id = (JSON.parse(d.stdout) || []).find(f => f.key === KEY)?.id;
+      if (id) spawnSync('node', [mem, 'forget', String(id)], { encoding: 'utf8' });
+    } catch {}
+  }
 }
 
 // ---- 5. tools list returns >= 10 built-ins ----
@@ -412,15 +417,14 @@ function fail(label, reason) {
     if (typeof avail !== 'boolean')
       throw new Error(`isModelAvailable must return boolean, got ${typeof avail}`);
 
-    // recall --keyword-only must succeed regardless of model availability
+    // recall --keyword-only must succeed and return an array regardless of model availability
+    // (data-independent: don't assert specific facts — memory can be empty/fresh)
     const r = spawnSync('node',
-      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'example query', '--keyword-only'],
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'anything', '--keyword-only'],
       { encoding: 'utf8', timeout: 15_000 });
     if (r.status !== 0) throw new Error(`recall --keyword-only failed: ${r.stderr}`);
     const arr = JSON.parse(r.stdout);
     if (!Array.isArray(arr)) throw new Error('recall --keyword-only must return array');
-    const hasExam = arr.some(f => f.kind === 'exam' || /examfacts/i.test(f.key + f.value));
-    if (!hasExam) throw new Error('recall --keyword-only returned no the seeded example facts');
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
