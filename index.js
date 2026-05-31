@@ -5,7 +5,7 @@
 // No framework, no plugins, no gateway service. Read it top to bottom.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
@@ -327,6 +327,13 @@ client.on(Events.MessageCreate, async msg => {
       catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
     }
     console.log(`📤 replied (${body.length} chars, ${files.length} files)`);
+    // durable transcript so nothing is ever lost (the brain distills these into memory)
+    try {
+      const conv = path.join(WORKSPACE, 'conversations');
+      mkdirSync(conv, { recursive: true });
+      appendFileSync(path.join(conv, new Date().toISOString().slice(0, 10) + '.md'),
+        `\n**[${new Date().toISOString().slice(11, 16)}] sir (${target}):** ${text || '(attachment)'}\n**helm:** ${body}\n`);
+    } catch {}
   } catch (e) {
     clearInterval(typing);
     if (e.stopped) return;  // the stop command already acknowledged
