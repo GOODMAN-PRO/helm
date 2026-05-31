@@ -224,7 +224,7 @@
         <div class="term-body">
           <div class="comment"># Works everywhere. Installs everything. You message it from Discord.</div>
           <div class="cmdline"><span class="prompt">$</span><code id="acmd">npx github:GOODMAN-PRO/helm</code></div>
-          <button class="tcopy" onclick="copyTerm()">Copy</button>
+          <button class="tcopy" onclick="copyTerm(this)">Copy</button>
         </div>
       </div>
       <p class="term-note">Requires Node 18+ and Claude Code; git is used if present, else a tarball is downloaded. macOS, Windows and Linux.</p>
@@ -335,12 +335,22 @@
 </footer>
 
 <script>
-function copyCmd(btn){
-  const t=btn.previousElementSibling.textContent;
-  navigator.clipboard.writeText(t).then(()=>{
-    const o=btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=o,1400);
-  });
+function flash(btn){ if(!btn) return; const o=btn.textContent; btn.textContent='Copied'; setTimeout(()=>{btn.textContent=o;},1400); }
+function fallbackCopy(text, btn){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='-1000px';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); flash(btn);
+  }catch(e){}
 }
+function copyText(text, btn){
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(()=>flash(btn)).catch(()=>fallbackCopy(text,btn));
+  } else { fallbackCopy(text, btn); }
+}
+function copyCmd(btn){ copyText(btn.previousElementSibling.textContent, btn); }
+function copyTerm(btn){ copyText(document.getElementById('acmd').textContent, btn); }
 // terminal install card: tabs swap the active command
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click',()=>{
@@ -349,12 +359,6 @@ document.querySelectorAll('.tab').forEach(tab=>{
     document.getElementById('acmd').textContent=tab.dataset.cmd;
   });
 });
-function copyTerm(){
-  const t=document.getElementById('acmd').textContent;
-  navigator.clipboard.writeText(t).then(()=>{
-    const b=event.target; const o=b.textContent; b.textContent='Copied'; setTimeout(()=>b.textContent=o,1400);
-  });
-}
 </script>
 </body>
 </html>
