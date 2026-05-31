@@ -862,6 +862,48 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 38. exam-countdown: parseExamDate handles real value formats; daysUntil arithmetic correct ----
+{
+  const label = 'exam-countdown.mjs: syntax valid; parseExamDate parses ≈ YYYY-MM-DD; daysUntil arithmetic correct';
+  try {
+    // Syntax check
+    const rc = spawnSync('node', ['--check', path.join(WORKSPACE, 'scheduler/exam-countdown.mjs')],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (rc.status !== 0) throw new Error(`syntax check failed: ${rc.stderr}`);
+
+    // Import without executing main (guarded by argv check)
+    const { parseExamDate, daysUntil } = await import(
+      path.join(WORKSPACE, 'scheduler/exam-countdown.mjs')
+    );
+
+    // parseExamDate: range value like "~1 week away (≈ 2026-06-05/06)"
+    const d1 = parseExamDate('~1 week away (≈ 2026-06-05/06)');
+    if (d1 !== '2026-06-05') throw new Error(`range date: expected 2026-06-05, got ${d1}`);
+
+    // parseExamDate: exact value like "~3 days away (≈ 2026-06-02)"
+    const d2 = parseExamDate('~3 days away (≈ 2026-06-02)');
+    if (d2 !== '2026-06-02') throw new Error(`exact date: expected 2026-06-02, got ${d2}`);
+
+    // parseExamDate: no date present → null
+    if (parseExamDate('no date here') !== null)
+      throw new Error('missing date should return null');
+
+    // daysUntil: fixed reference — 2026-05-31 UTC (= 2026-05-31 00:00 GMT+7 after shift)
+    // nowMs is shifted by +7h inside daysUntil; pick a UTC ms that lands on 2026-05-31 in GMT+7
+    const ref = new Date('2026-05-31T00:00:00Z').getTime() - 7 * 3600_000; // UTC midnight that → GMT+7 2026-05-31
+    const days2 = daysUntil('2026-06-02', ref);
+    if (days2 !== 2) throw new Error(`expected 2 days until 2026-06-02 from 2026-05-31, got ${days2}`);
+
+    const days0 = daysUntil('2026-05-31', ref);
+    if (days0 !== 0) throw new Error(`expected 0 days for same day, got ${days0}`);
+
+    const daysNeg = daysUntil('2026-05-30', ref);
+    if (daysNeg !== -1) throw new Error(`expected -1 for yesterday, got ${daysNeg}`);
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
