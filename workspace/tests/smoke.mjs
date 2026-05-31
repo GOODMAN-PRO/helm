@@ -1014,6 +1014,145 @@ function fail(label, reason) {
   finally { if (server) server.close(); }
 }
 
+// ---- 43. plan.mjs: DAG parallelism + reflexion retry + replan round-trip ----
+{
+  const label = 'plan.mjs: DAG parallelism + retry insertion + replan round-trip';
+  const PLAN = path.join(WORKSPACE, 'plans/plan.mjs');
+  try {
+    // 1. Create plan
+    const p = JSON.parse(spawnSync('node', [PLAN, 'create', 'smoke-dag-plan'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (!p.id) throw new Error('create did not return id');
+    const pid = p.id;
+
+    // 2. Add two independent steps (no deps)
+    const sA = JSON.parse(spawnSync('node', [PLAN, 'add-step', String(pid), 'task A'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    const sB = JSON.parse(spawnSync('node', [PLAN, 'add-step', String(pid), 'task B'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+
+    // 3. Add step C that depends on both A and B
+    const sC = JSON.parse(spawnSync('node', [PLAN, 'add-step', String(pid), 'task C',
+      '--deps', `${sA.id},${sB.id}`],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (!Array.isArray(sC.deps) || sC.deps.length !== 2)
+      throw new Error(`step C deps should be [${sA.id},${sB.id}], got ${JSON.stringify(sC.deps)}`);
+
+    // 4. next must return A and B (runnable), not C (deps unsatisfied)
+    const nxt1 = JSON.parse(spawnSync('node', [PLAN, 'next', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (!Array.isArray(nxt1.steps)) throw new Error('next must return steps array');
+    if (nxt1.steps.length !== 2)
+      throw new Error(`expected 2 runnable steps, got ${nxt1.steps.length}`);
+    const taskNames1 = nxt1.steps.map(s => s.task).sort();
+    if (!taskNames1.includes('task A') || !taskNames1.includes('task B'))
+      throw new Error(`expected tasks A and B, got ${JSON.stringify(taskNames1)}`);
+    // backwards-compat: step field must exist
+    if (!nxt1.step) throw new Error('next must still populate step (backwards compat)');
+
+    // 5. Complete A with a result (test result propagation)
+    const cA = JSON.parse(spawnSync('node', [PLAN, 'complete', String(pid), String(sA.id),
+      '--result', 'A-output'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (cA.status !== 'done') throw new Error(`sA should be done, got ${cA.status}`);
+
+    // 6. Complete B with failure — should insert retry step (skip reflexion for speed)
+    const cB = JSON.parse(spawnSync('node', [PLAN, 'complete', String(pid), String(sB.id),
+      '--result', 'error: something went wrong', '--failed', '--no-reflexion'],
+      { encoding: 'utf8', timeout: 15_000 }).stdout);
+    if (!cB.retry_step_inserted) throw new Error('complete --failed must set retry_step_inserted');
+    if (cB.status !== 'failed') throw new Error(`sB should be failed, got ${cB.status}`);
+
+    // 7. Plan should have >= 4 steps (A, B, C, retry-B)
+    const show1 = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (show1.steps.length < 4)
+      throw new Error(`expected >= 4 steps after retry insert, got ${show1.steps.length}`);
+
+    // 8. Checkpoints table must have rows for this plan
+    const { DatabaseSync } = await import('node:sqlite');
+    const planDb = new DatabaseSync(path.join(WORKSPACE, 'plans/plans.db'));
+    const cpRows = planDb.prepare(`SELECT * FROM checkpoints WHERE plan_id = ?`).all(pid);
+    planDb.close();
+    if (cpRows.length < 1) throw new Error(`expected checkpoints for plan ${pid}, got 0`);
+
+    // 9. Exhaust retries on the retry step to trigger escalation
+    const retryStep = show1.steps.find(s => s.retry_count > 0 && s.status === 'pending');
+    if (!retryStep) throw new Error('retry step not found in pending state');
+
+    // retry_count is already 1 — one more failure should also retry (count 1 < 2)
+    const cR1 = JSON.parse(spawnSync('node', [PLAN, 'complete', String(pid), String(retryStep.id),
+      '--result', 'still failing', '--failed', '--no-reflexion'],
+      { encoding: 'utf8', timeout: 15_000 }).stdout);
+    if (!cR1.retry_step_inserted) throw new Error('second retry should still insert a retry step');
+
+    // Now retry_count=2, next failure must escalate
+    const show2 = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    const lastRetry = show2.steps.find(s => s.retry_count === 2 && s.status === 'pending');
+    if (!lastRetry) throw new Error('retry_count=2 step not found');
+
+    const cR2 = JSON.parse(spawnSync('node', [PLAN, 'complete', String(pid), String(lastRetry.id),
+      '--result', 'still failing', '--failed', '--no-reflexion'],
+      { encoding: 'utf8', timeout: 15_000 }).stdout);
+    if (!cR2.escalated) throw new Error('third failure must set escalated=true');
+
+    // Plan should now be blocked
+    const showBlocked = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (showBlocked.status !== 'blocked')
+      throw new Error(`plan should be blocked, got ${showBlocked.status}`);
+
+    // 10. Replan with --steps-json bypass (no claude call; unblocks plan)
+    const newStepsJson = JSON.stringify([
+      { task: 'new task D', tool_or_cmd: null, deps: [] },
+      { task: 'new task E', tool_or_cmd: null, deps: [] },
+    ]);
+    const rp1 = JSON.parse(spawnSync('node', [PLAN, 'replan', String(pid),
+      '--failure', 'task B permanently failed',
+      '--steps-json', newStepsJson],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (rp1.replan_count !== 1) throw new Error(`expected replan_count 1, got ${rp1.replan_count}`);
+    if (!Array.isArray(rp1.steps)) throw new Error('replan must return steps array');
+    if (rp1.steps.length !== 2) throw new Error(`expected 2 inserted steps, got ${rp1.steps.length}`);
+
+    // Plan should be active again
+    const showActive = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (showActive.status !== 'active')
+      throw new Error(`plan should be active after replan, got ${showActive.status}`);
+    if (showActive.replan_count !== 1)
+      throw new Error(`plan replan_count should be 1, got ${showActive.replan_count}`);
+
+    // 11. replan_count cap: 2 more replans hit the limit of 3
+    for (let i = 0; i < 2; i++) {
+      spawnSync('node', [PLAN, 'replan', String(pid), '--steps-json', newStepsJson],
+        { encoding: 'utf8', timeout: 10_000 });
+    }
+    const capRes = spawnSync('node', [PLAN, 'replan', String(pid), '--steps-json', newStepsJson],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (capRes.status === 0) throw new Error('replan should fail after hitting cap of 3');
+
+    // 12. Result substitution: add a step referencing A's result, verify next substitutes it
+    const planDb2 = new DatabaseSync(path.join(WORKSPACE, 'plans/plans.db'));
+    // Mark remaining pending steps done so plan advances cleanly for this sub-check
+    planDb2.prepare(`UPDATE steps SET status='done' WHERE plan_id=? AND status='pending'`).run(pid);
+    planDb2.prepare(`UPDATE plans SET status='active' WHERE id=?`).run(pid);
+    planDb2.close();
+
+    const sRef = JSON.parse(spawnSync('node', [PLAN, 'add-step', String(pid),
+      `use result: {{step.${sA.id}.result}}`],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    const nxtRef = JSON.parse(spawnSync('node', [PLAN, 'next', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (!nxtRef.step) throw new Error('next should return the substitution step');
+    if (!nxtRef.step.task.includes('A-output'))
+      throw new Error(`result substitution failed: got task "${nxtRef.step.task}"`);
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
