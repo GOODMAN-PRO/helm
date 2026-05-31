@@ -178,10 +178,34 @@ const reviewPrompt = (t, builderSummary) => [
     log(`verdict ${t.id}: ${t._verdict}`);
   });
 
-  log('=== MERGE (gated) ===');
+  log('=== CRITIC GATE + MERGE ===');
   const results = [];
   for (const t of todo) {
     if (t._verdict !== 'APPROVE') { results.push({ id: t.id, status: 'rejected', note: t._vtext }); continue; }
+
+    // Critic gate: independent diff review before touching main.
+    // Asks Claude to reply with PASS or FAIL on the first line; on FAIL the task is not merged.
+    if (!DRY) {
+      const critDiff = git(ROOT, 'diff', baseMain, `swarm/${t.id}`).stdout || '(empty diff)';
+      const critR = await runClaude(ROOT, REVIEW_MODEL, [
+        `You are a code critic. Review this git diff and reply with PASS or FAIL on the very first line.`,
+        `After the verdict, list any issues as bullet points (empty list if PASS).`,
+        `Criteria: spec met, no secrets, no ~/helm edits, no weakened tests, node --check safe, smoke-compatible.`,
+        ``,
+        `\`\`\`diff`,
+        critDiff.slice(0, 40_000),
+        `\`\`\``,
+      ].join('\n'));
+      const firstLine = (critR.result || '').trim().split('\n')[0] || '';
+      if (/^FAIL/i.test(firstLine)) {
+        t._critique = critR.result;
+        log(`critic-rejected ${t.id}: ${firstLine}`);
+        results.push({ id: t.id, status: 'critic-rejected', note: critR.result.slice(0, 300) });
+        continue;
+      }
+      log(`critic-passed ${t.id}: ${firstLine}`);
+    }
+
     const before = git(ROOT, 'rev-parse', 'HEAD').stdout.trim();
     t.status = 'merging'; if (!DRY) flushTasks(tasks);
     const m = git(ROOT, 'merge', '--no-ff', '--no-edit', `swarm/${t.id}`);

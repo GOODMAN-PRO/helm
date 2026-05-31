@@ -1014,6 +1014,105 @@ function fail(label, reason) {
   finally { if (server) server.close(); }
 }
 
+// ---- 43. apply-edit.mjs: exports applyEdits; 0-match returns error; no-blocks is no-op ----
+{
+  const label = 'swarm/apply-edit.mjs: applyEdits exported; 0-match error; no-blocks no-op';
+  const { writeFileSync: wfs43, unlinkSync: ufs43 } = await import('node:fs');
+  // Use a .txt temp file (not syntax-checked, not git-tracked) with known content.
+  const tmpRel = 'workspace/swarm/.smoke43.txt';
+  const tmpAbs = path.join(ROOT, tmpRel);
+  wfs43(tmpAbs, 'ALPHA=hello\nBETA=world\n');
+  try {
+    const { applyEdits } = await import(path.join(WORKSPACE, 'swarm/apply-edit.mjs'));
+    if (typeof applyEdits !== 'function') throw new Error('applyEdits not a function');
+
+    // No edit blocks -> no-op (must not mutate any file)
+    const rNone = applyEdits('no edit blocks here', ROOT);
+    if (rNone.applied !== 0) throw new Error('no-block text: expected applied=0, got ' + rNone.applied);
+    if (rNone.errors.length) throw new Error('no-block text: unexpected errors: ' + JSON.stringify(rNone.errors));
+
+    // 0-match: OLD string is not in the temp file -> error with "0 matches"
+    const noMatchText = `<<<OLD ${tmpRel}\nSTRING_NOT_IN_TEMP_FILE\n===\nreplacement\n>>>NEW`;
+    const r0 = applyEdits(noMatchText, ROOT);
+    if (r0.applied !== 0) throw new Error(`expected 0 applied on non-match, got ${r0.applied}`);
+    if (!r0.errors.length) throw new Error('expected at least one error for 0-match');
+    if (!r0.errors[0].error.includes('0 matches')) throw new Error(`wrong error msg: ${r0.errors[0].error}`);
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+  finally { try { ufs43(tmpAbs); } catch {} }
+}
+
+// ---- 44. swarm/tools: view_file, search_repo, search_file are importable and return expected shapes ----
+{
+  const label = 'swarm/tools: view_file (100-line window), search_repo (file list), search_file (capped matches)';
+  try {
+    const { view_file } = await import(path.join(WORKSPACE, 'swarm/tools/view_file.mjs'));
+    const { search_repo } = await import(path.join(WORKSPACE, 'swarm/tools/search_repo.mjs'));
+    const { search_file } = await import(path.join(WORKSPACE, 'swarm/tools/search_file.mjs'));
+
+    if (typeof view_file    !== 'function') throw new Error('view_file not a function');
+    if (typeof search_repo  !== 'function') throw new Error('search_repo not a function');
+    if (typeof search_file  !== 'function') throw new Error('search_file not a function');
+
+    // view_file: reads smoke.mjs from line 1, must return <= 100 lines with line numbers
+    const view = view_file('workspace/tests/smoke.mjs', 1, ROOT);
+    const viewLines = view.split('\n');
+    if (viewLines.length > 100) throw new Error(`view_file returned ${viewLines.length} lines, expected <= 100`);
+    if (!viewLines[0].startsWith('1\t')) throw new Error('view_file line 1 must start with "1\\t"');
+
+    // search_repo: pattern 'smoke' must return <=50 results and include smoke.mjs
+    const files = search_repo('smoke', ROOT);
+    if (!Array.isArray(files)) throw new Error('search_repo must return an array');
+    if (files.length > 50)    throw new Error(`search_repo capped at 50, got ${files.length}`);
+    if (!files.some(f => f.includes('smoke'))) throw new Error('search_repo for "smoke" must include a smoke file');
+
+    // search_file: search smoke.mjs for 'PASS' -> array of {line, text}, capped at 20
+    const matches = search_file('workspace/tests/smoke.mjs', 'PASS', ROOT);
+    if (!Array.isArray(matches)) throw new Error('search_file must return an array');
+    if (matches.length > 20)    throw new Error(`search_file capped at 20 matches, got ${matches.length}`);
+    if (matches.length === 0)   throw new Error('search_file for "PASS" in smoke.mjs returned no results');
+    if (!('line' in matches[0] && 'text' in matches[0])) throw new Error('search_file result must have {line, text}');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 45. swarm/coding-task.mjs: codingTask exported; module loads cleanly ----
+{
+  const label = 'swarm/coding-task.mjs: codingTask exported and module loads without side effects';
+  try {
+    const { codingTask } = await import(path.join(WORKSPACE, 'swarm/coding-task.mjs'));
+    if (typeof codingTask !== 'function') throw new Error('codingTask is not a function');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 46. swarm/swarm.mjs: critic gate present before merge; PASS/FAIL verdict logic wired ----
+{
+  const label = 'swarm/swarm.mjs: critic gate (PASS/FAIL check) present before merge; critic-rejected status wired';
+  try {
+    const swarmSrc = readFileSync(path.join(WORKSPACE, 'swarm/swarm.mjs'), 'utf8');
+
+    if (!swarmSrc.includes('critic'))
+      throw new Error('"critic" keyword not found in swarm.mjs — critic gate missing');
+    if (!swarmSrc.includes('PASS') || !swarmSrc.includes('FAIL'))
+      throw new Error('PASS/FAIL verdict strings missing from swarm.mjs critic gate');
+    if (!swarmSrc.includes('critic-rejected'))
+      throw new Error('"critic-rejected" status not found in swarm.mjs');
+
+    // Critic gate must appear before the first git merge call
+    const criticIdx = swarmSrc.indexOf('critic');
+    const mergeIdx  = swarmSrc.indexOf("git(ROOT, 'merge', '--no-ff'");
+    if (criticIdx === -1 || mergeIdx === -1)
+      throw new Error('could not locate critic gate or merge call in swarm.mjs');
+    if (criticIdx >= mergeIdx)
+      throw new Error('critic gate must appear before the git merge call');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
