@@ -1,0 +1,68 @@
+#!/usr/bin/env node
+// bin/guiclick — Retina-aware click helper.
+// Usage: guiclick <X_px> <Y_px> [button]
+//   X_px, Y_px  — pixel coordinates from a screencapture -x screenshot
+//   button      — left (default) | right | double
+// Detects the display scale via system_profiler, converts pixel → point coords,
+// then calls bin/guicontrol click with the translated coordinates.
+
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const GUICTL = path.join(__dirname, 'guicontrol');
+
+export function detectScale() {
+  const r = spawnSync('system_profiler', ['SPDisplaysDataType', '-json'], {
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  if (r.status !== 0 || !r.stdout) return 2;
+  try {
+    const data = JSON.parse(r.stdout);
+    for (const section of data.SPDisplaysDataType ?? []) {
+      for (const item of section._items ?? []) {
+        const logRes  = String(item.spdisplays_resolution      ?? '');
+        const physRes = String(item.spdisplays_pixelresolution ?? '');
+        const logW    = parseInt(logRes.match(/(\d+)\s*x/)?.[1]  ?? '0', 10);
+        const physW   = parseInt(physRes.match(/(\d+)\s*x/)?.[1] ?? '0', 10);
+        if (logW > 0 && physW > 0 && physW > logW) return Math.round(physW / logW);
+        if (logRes.includes('Retina') || item.spdisplays_retina === 'spdisplays_yes') return 2;
+      }
+    }
+    return 1;
+  } catch {
+    return 2;
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [xpxRaw, ypxRaw, button = 'left'] = process.argv.slice(2);
+  if (!xpxRaw || !ypxRaw) {
+    process.stderr.write('usage: guiclick <X_px> <Y_px> [left|right|double]\n');
+    process.exit(1);
+  }
+  const xpx = Number(xpxRaw);
+  const ypx = Number(ypxRaw);
+  if (isNaN(xpx) || isNaN(ypx)) {
+    process.stderr.write(`guiclick: invalid coordinates: ${xpxRaw} ${ypxRaw}\n`);
+    process.exit(1);
+  }
+
+  const scale = detectScale();
+  const xpt = Math.round(xpx / scale);
+  const ypt = Math.round(ypx / scale);
+
+  process.stderr.write(
+    `guiclick: scale=${scale} — pixel (${xpx}, ${ypx}) → point (${xpt}, ${ypt}) [button=${button}]\n`
+  );
+
+  const verb = button === 'double' ? 'doubleclick' : button === 'right' ? 'rightclick' : 'click';
+  const r = spawnSync(GUICTL, [verb, String(xpt), String(ypt)], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+  if (r.error) { process.stderr.write(`guiclick: exec failed: ${r.error.message}\n`); process.exit(1); }
+  process.exit(r.status ?? 1);
+}

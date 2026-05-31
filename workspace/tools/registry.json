@@ -640,5 +640,33 @@
     ],
     "side_effects": "writes temp PNG; makes a Claude API call via claude -p",
     "confirm": false
+  },
+  {
+    "name": "gui.step",
+    "summary": "Run a shell command, screenshot, verify with Claude that the action succeeded, retry up to N times with failure classification.",
+    "exec": "node tools/impl/gui_task.mjs",
+    "args_schema": {
+      "cmd": {
+        "type": "string",
+        "required": true,
+        "description": "Shell command to execute as the GUI action"
+      },
+      "description": {
+        "type": "string",
+        "required": true,
+        "description": "Natural-language description of what success looks like on screen"
+      },
+      "retries": {
+        "type": "number",
+        "default": 3,
+        "description": "Maximum attempts before failing"
+      }
+    },
+    "requires": [
+      "Screen Recording permission",
+      "claude CLI in PATH"
+    ],
+    "side_effects": "executes cmd, writes temp screenshots, makes Claude API calls via claude -p",
+    "confirm": false
   }
 ]
