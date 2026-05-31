@@ -58,7 +58,7 @@ const STOP = new Set(['the','and','that','this','with','from','have','will','for
   'would','should','about','when','where','what','which','also','been','been','some','only','just',
   'into','than','then','more','most','very','over','helm','owner','nice']);
 const sinceTs = Math.floor(Date.now() / 1000) - SINCE_DAYS * 86400;
-const eps = db.prepare(`SELECT id, ts, summary FROM episodes WHERE ts >= ?`).all(sinceTs);
+const eps = db.prepare(`SELECT id, ts, summary FROM episodes WHERE ts >= ? ORDER BY ts ASC`).all(sinceTs);
 const stemCount = new Map();      // stem -> Set(episode ids)
 const stemExample = new Map();    // stem -> latest summary mentioning it
 for (const e of eps) {
@@ -102,13 +102,17 @@ const decayCandidates = db.prepare(
     WHERE evidence_count < 2 AND last_seen < ? AND confidence > ?
       AND (source IS NULL OR source != 'CLAUDE.md')`
 ).all(decayStartTs, FLOOR);
-const stmtSetConf = db.prepare(`UPDATE facts SET confidence = ? WHERE id = ?`);
+// Also advance last_seen by the number of stale weeks consumed so the same decay
+// step is not re-applied on every subsequent nightly run within the same week bucket.
+const stmtSetConf = db.prepare(
+  `UPDATE facts SET confidence = ?, last_seen = last_seen + ? WHERE id = ?`
+);
 for (const f of decayCandidates) {
   const weeksStale = Math.floor((now - f.last_seen - DECAY_DAYS * 86400) / (7 * 86400));
   if (weeksStale <= 0) continue;
   const newConf = Math.max(FLOOR / 2, f.confidence * Math.pow(0.9, weeksStale + 1));
   if (newConf < f.confidence - 0.01) {
-    if (!DRY) stmtSetConf.run(newConf, f.id);
+    if (!DRY) stmtSetConf.run(newConf, weeksStale * 7 * 86400, f.id);
     stats.decayed++;
   }
 }
