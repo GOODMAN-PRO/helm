@@ -44,6 +44,8 @@ const flushTasks = tasks => { try { writeFileSync(TASKS_FILE, JSON.stringify(tas
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 const git = (cwd, ...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', '-C', cwd, ...a]);
 const notify = msg => { try { sh('/usr/bin/env', ['node', path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
+// Extract the LAST VERDICT line — reviewers may quote previous verdicts before writing their own.
+const lastVerdict = s => { const ms = (s || '').match(/VERDICT:\s*(?:APPROVE|REJECT)[^\n]*/gi); return ms ? ms[ms.length - 1] : ''; };
 
 function runClaude(cwd, model, prompt) {
   return new Promise(resolve => {
@@ -162,14 +164,14 @@ const reviewPrompt = (t, builderSummary) => [
     if (DRY) { t._verdict = 'APPROVE'; return; }
     let r = await runClaude(t._wt, REVIEW_MODEL, reviewPrompt(t, t._build));
     git(t._wt, 'add', '-A'); git(t._wt, 'commit', '-q', '-m', `swarm review: ${t.id}`);
-    let v = (r.result.match(/VERDICT:\s*(APPROVE|REJECT)[^\n]*/i) || [''])[0];
+    let v = lastVerdict(r.result);
     if (/REJECT/i.test(v)) {
       log(`reject ${t.id}: ${v}`);
       const rev = await runClaude(t._wt, BUILD_MODEL, `Revise your "${t.title}" implementation. A reviewer REJECTED it:\n${v}\nFix it, keep \`node workspace/tests/smoke.mjs\` green, then summarize.`);
       git(t._wt, 'add', '-A'); git(t._wt, 'commit', '-q', '-m', `swarm revise: ${t.id}`);
       r = await runClaude(t._wt, REVIEW_MODEL, reviewPrompt(t, rev.result));
       git(t._wt, 'add', '-A'); git(t._wt, 'commit', '-q', '-m', `swarm review2: ${t.id}`);
-      v = (r.result.match(/VERDICT:\s*(APPROVE|REJECT)[^\n]*/i) || [''])[0];
+      v = lastVerdict(r.result);
     }
     t._verdict = /APPROVE/i.test(v) ? 'APPROVE' : 'REJECT';
     t._vtext = v || '(no verdict line)';
@@ -195,7 +197,16 @@ const reviewPrompt = (t, builderSummary) => [
       if (git(ROOT, 'diff', '--name-only', '--diff-filter=U').stdout.trim()) {
         git(ROOT, 'merge', '--abort'); results.push({ id: t.id, status: 'conflict-unresolved' }); log(`unresolved ${t.id}`); continue;
       }
-      git(ROOT, 'commit', '--no-edit');
+      // Commit the resolved merge. If the resolver already committed (MERGE_HEAD gone),
+      // this fails harmlessly. If MERGE_HEAD still exists and commit fails, abort to keep
+      // the repo clean for subsequent tasks.
+      const mc = git(ROOT, 'commit', '--no-edit');
+      if (mc.status !== 0 && sh('git', ['-C', ROOT, 'rev-parse', 'MERGE_HEAD']).status === 0) {
+        git(ROOT, 'merge', '--abort');
+        results.push({ id: t.id, status: 'conflict-unresolved' });
+        log(`merge commit failed ${t.id}: ${(mc.stderr || '').trim()}`);
+        continue;
+      }
     }
     if (git(ROOT, 'diff', '--name-only', before, 'HEAD').stdout.includes('package.json')) sh('npm', ['install', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
     t.status = 'merged-pending-smoke'; if (!DRY) flushTasks(tasks);
