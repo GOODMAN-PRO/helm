@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { getSession, setSession, deleteSession } from './workspace/sessions.mjs';
+import { classifyComplexity, getModelPref, setModelPref } from './workspace/model-routing.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.join(__dirname, '.env') });
@@ -44,6 +45,11 @@ function isOwner(h) {
   return false;
 }
 mkdirSync(WORKSPACE, { recursive: true });
+
+// Pick --model for this turn: fixed pref overrides the complexity classifier.
+function pickModel(prompt) {
+  return getModelPref() ?? classifyComplexity(prompt);
+}
 
 // Returns an --mcp-config value: the path to workspace/mcp/servers.json when valid,
 // or an inline empty-servers JSON as a fallback so Helm always starts even if the
@@ -91,9 +97,11 @@ function runClaude(args, prompt) {
 }
 
 async function ask(handle, prompt) {
+  const model = pickModel(prompt);
+  console.log(`[route] model=${model}`);
   const base = [
     '-p', '--output-format', 'json',
-    '--model', MODEL,
+    '--model', model,
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', PERSONA,
     '--add-dir', WORKSPACE,
@@ -244,7 +252,8 @@ function sendiMessage(text, handle) {
 
 // ---- main loop ----
 let cursor = maxRowId(); // ignore history; only react to messages that arrive after startup
-console.log(`✅ Helm iMessage online  ·  model=${MODEL}  ·  owners=${OWNERS.join(', ')}  ·  cursor=${cursor}`);
+const _startPref = getModelPref();
+console.log(`✅ Helm iMessage online  ·  model=${_startPref || 'auto-route'}  ·  owners=${OWNERS.join(', ')}  ·  cursor=${cursor}`);
 
 let busy = false;
 async function tick() {
@@ -258,6 +267,28 @@ async function tick() {
       if (!row.text) continue;
       if (wasSentByUs(row.text)) continue;         // skip our own replies -> no loop
       console.log(`📩 ${row.text}`);
+
+      // !model: inspect or override per-message model routing
+      const modelCmdM = row.text.match(/^!model(?:\s+(\S+))?\s*$/i);
+      if (modelCmdM) {
+        let reply;
+        if (!modelCmdM[1]) {
+          const pref = getModelPref();
+          reply = pref
+            ? `Fixed model: ${pref}. Say !model auto to restore auto-routing.`
+            : 'Auto-routing active: haiku/sonnet/opus by task type.';
+        } else {
+          try {
+            const result = setModelPref(modelCmdM[1]);
+            reply = result === 'auto'
+              ? 'Model routing restored to auto.'
+              : `Model fixed to ${result}.`;
+          } catch (e) { reply = `Model error: ${e.message}`; }
+        }
+        try { sendiMessage(reply, row.handle); markSent(reply); } catch {}
+        continue;
+      }
+
       try {
         const reply = await ask(row.handle, row.text);
         const { text: body, files } = splitAttachments(reply);
