@@ -15,7 +15,12 @@ const WORKSPACE  = path.resolve(__dirname, '..');
 
 const [,, verb, name, ...rest] = process.argv;
 
-const registry = JSON.parse(readFileSync(REGISTRY, 'utf8'));
+let registry;
+try {
+  registry = JSON.parse(readFileSync(REGISTRY, 'utf8'));
+} catch (e) {
+  die(`cannot load registry (${REGISTRY}): ${e.message}`);
+}
 
 function die(msg, code = 1) { console.error(msg); process.exit(code); }
 
@@ -36,8 +41,10 @@ if (verb === 'call') {
   // Parse --json arg
   let args = {};
   const jsonIdx = rest.indexOf('--json');
-  if (jsonIdx !== -1 && rest[jsonIdx + 1]) {
-    try { args = JSON.parse(rest[jsonIdx + 1]); } catch (e) { die(`bad --json: ${e.message}`); }
+  if (jsonIdx !== -1) {
+    const jsonVal = rest[jsonIdx + 1];
+    if (!jsonVal || jsonVal.startsWith('--')) die('--json requires a JSON string value');
+    try { args = JSON.parse(jsonVal); } catch (e) { die(`bad --json: ${e.message}`); }
   }
 
   // Enforce confirm gate: tools with confirm:true require --force
@@ -51,6 +58,7 @@ if (verb === 'call') {
   }
 
   // Build argv: each key=value as --key value
+  if (typeof tool.exec !== 'string' || !tool.exec) die(`tool ${name}: registry entry missing exec`);
   const argv = tool.exec.split(' ');
   const cmd  = argv[0];
   const cmdArgs = argv.slice(1);
@@ -59,6 +67,7 @@ if (verb === 'call') {
   }
 
   const r = spawnSync(cmd, cmdArgs, { cwd: WORKSPACE, encoding: 'utf8', stdio: 'inherit' });
+  if (r.error) die(`exec failed (${cmd}): ${r.error.message}`);
   process.exit(r.status ?? 1);
 }
 
