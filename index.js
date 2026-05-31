@@ -66,9 +66,17 @@ function runClaudeRemote(prompt) {
       'A screenshot is ONLY to SHOW a result AFTER you have done the work — NEVER reply with just a screenshot instead of doing the task, and never claim you did something you did not. ' +
       'Keep replies short. Confirm before anything destructive, irreversible, or that spends money. Never touch the separate Helm project. ' +
       'To screenshot the Windows desktop (SSH cannot capture it directly): run  schtasks /run /tn HelmShot  then wait ~3s (powershell Start-Sleep 3); it saves to C:\\\\Users\\\\User\\\\helm-shot.png. End that reply with a line exactly: ATTACH: C:\\\\Users\\\\User\\\\helm-shot.png';
+    // SYNC: push the Mac's live brain (CLAUDE.md + memory index) to the PC so windows-Helm shares it.
+    const WIN_BRAIN = 'helm-brain';   // relative to the windows home (C:\Users\User\helm-brain)
+    try {
+      spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, 'if not exist helm-brain\\memory mkdir helm-brain\\memory'], { encoding: 'utf8' });
+      spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', path.join(WORKSPACE, 'CLAUDE.md'), `${HELM_WIN_HOST}:${WIN_BRAIN}/CLAUDE.md`], { encoding: 'utf8' });
+      spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', path.join(WORKSPACE, 'memory/INDEX.md'), `${HELM_WIN_HOST}:${WIN_BRAIN}/memory/INDEX.md`], { encoding: 'utf8' });
+    } catch {}
     const run = sid => {
       const resumeFlag = sid ? `--resume ${q(sid)} ` : '';
-      const remoteCmd = `${HELM_WIN_DIR ? `cd ${q(HELM_WIN_DIR)} && ` : ''}${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
+      // run INSIDE the synced brain dir so Claude auto-loads CLAUDE.md (+ @memory/INDEX.md)
+      const remoteCmd = `cd ${WIN_BRAIN} && ${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
       const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
       let out = '', err = '';
       const kill = setTimeout(() => child.kill(), 30 * 60_000);
