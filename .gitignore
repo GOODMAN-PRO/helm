@@ -56,3 +56,11 @@ workspace/conversations/
 
 workspace/reverse/
 workspace/costs/*.db
+
+# stuck queue (runtime state for nightly self-upgrade)
+workspace/upgrades/stuck-queue.jsonl
+workspace/upgrades/stuck-archive.jsonl
+
+# per-install template flavor + exported templates (user-generated/shareable)
+workspace/persona.local.md
+workspace/templates/*.helmtemplate.json

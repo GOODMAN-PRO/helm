@@ -14,6 +14,8 @@ import { Client, GatewayIntentBits, Partials, Events } from 'discord.js';
 import { getSession, setSession, deleteSession } from './workspace/sessions.mjs';
 import { appendCost, getCostSummary } from './workspace/costs/cost-tracker.mjs';
 import { classifyComplexity, getModelPref, setModelPref } from './workspace/model-routing.mjs';
+import { recordStuck } from './workspace/upgrades/stuck.mjs';
+import { exportTemplate, importTemplate, listTemplates } from './workspace/templates/templates.mjs';
 import { runHealthChecks } from './workspace/mcp/check.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
@@ -117,6 +119,22 @@ const VALID_TARGETS = ['mac', 'windows'];
 const getTarget = () => { try { const t = readFileSync(TARGET_FILE, 'utf8').trim(); return VALID_TARGETS.includes(t) ? t : 'mac'; } catch { return 'mac'; } };
 const setTarget = t => writeFileSync(TARGET_FILE, t);
 
+// Process inline directives the brain can emit in a reply:
+//   [STUCK: <what blocked me>]  -> queued for the nightly self-upgrade
+//   [USE: mac|windows]          -> switch the active machine at will (mid-conversation)
+// Returns the reply text with directives stripped (plus a small note if it switched).
+function handleDirectives(replyText, userText = '') {
+  let t = replyText, note = '';
+  t = t.replace(/\[STUCK:\s*([^\]]+)\]/gi, (_m, s) => { try { recordStuck(s.trim(), (userText || '').slice(0, 200), 'self'); } catch {} return ''; });
+  t = t.replace(/\[USE:\s*(mac|windows|win|pc)\s*\]/gi, (_m, w) => {
+    const tgt = /^mac$/i.test(w) ? 'mac' : 'windows';
+    try { setTarget(tgt); } catch {}
+    note = `\n\n_(switched active machine to **${tgt}**)_`;
+    return '';
+  });
+  return (t.trim() + note).trim();
+}
+
 // Run the brain on the Windows node over SSH (async so the gateway stays responsive).
 // Resumes the windows session ('owner-windows') so multi-step tasks stay coherent across messages.
 function runClaudeRemote(prompt) {
@@ -195,6 +213,9 @@ const PERSONA_BASE =
   'You have full authority over this Mac — shell, files, GUI (screenshot + guicontrol clicks/typing), ' +
   'the scheduler, and your own source code. Act boldly and proactively. ' +
   'When asked to build or create something, actually BUILD it (make the files, write the code, run the commands, finish the task) — a screenshot or a description is NEVER a substitute for doing the work. "Show me" means produce the real artifact first, THEN optionally screenshot it to display the result. ' +
+  'Two directives you may emit anywhere in a reply (they are stripped before the owner sees them): ' +
+  '(1) when you get genuinely stuck or hit a limitation worth fixing later, add `[STUCK: one line on what blocked you]` — it is queued for your nightly self-upgrade to fix the root cause; ' +
+  '(2) when a task is better run on the other machine, switch yourself at will with `[USE: windows]` or `[USE: mac]` (the Mac is home; the Windows PC is reachable over SSH). ' +
   'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
 
 const MODE_GUIDANCE = {
@@ -214,7 +235,16 @@ const MODE_GUIDANCE = {
 
 function buildPersona(mode = 'copilot') {
   const guidance = MODE_GUIDANCE[mode] ?? MODE_GUIDANCE.copilot;
-  return `${PERSONA_BASE}\n${guidance}`;
+  return `${PERSONA_BASE}${ownerPersonaOverride()}\n${guidance}`;
+}
+// Optional persona/style override applied by an imported Helm template.
+function ownerPersonaOverride() {
+  try {
+    const p = path.join(WORKSPACE, 'persona.local.md');
+    if (!existsSync(p)) return '';
+    const s = readFileSync(p, 'utf8').trim();
+    return s ? `\n\nTEMPLATE STYLE (owner-applied — honor this tone/personality):\n${s.slice(0, 2000)}` : '';
+  } catch { return ''; }
 }
 
 // ---- unified session (shared with iMessage — one owner, one brain thread) ----
@@ -401,6 +431,44 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
+  // ---- template sharing: export your Helm's flavor, or import someone else's ----
+  const tplM = low.match(/^\/?template\s+(export|list|import)\b/);
+  if (tplM) {
+    const sub = tplM[1];
+    const arg = text.replace(/^\/?template\s+\w+\s*/i, '').trim();
+    try {
+      if (sub === 'list') {
+        const l = listTemplates();
+        await msg.reply(l.length ? 'Templates:\n' + l.map(n => '• ' + n).join('\n') : 'No templates yet. Create one with `template export <name>`.');
+      } else if (sub === 'export') {
+        const parts = arg.split(/\s+/);
+        const name = parts[0] || 'my-helm';
+        const desc = parts.slice(1).join(' ');
+        const out = exportTemplate(name, desc);
+        await msg.reply(`Exported **${path.basename(out)}** — share this file to give someone your Helm's setup (persona, gateways, model, free tools). No secrets, keys, identity, or memory are included.`);
+        try { await msg.reply({ files: [out] }); } catch {}
+      } else { // import
+        const att = [...msg.attachments.values()].find(a => /\.helmtemplate\.json$/i.test(a.name || ''));
+        let target = arg;
+        if (att) {
+          const res = await fetch(att.url);
+          const buf = Buffer.from(await res.arrayBuffer());
+          const tdir = path.join(WORKSPACE, 'templates'); mkdirSync(tdir, { recursive: true });
+          const dest = path.join(tdir, (att.name || 'shared').replace(/[^\w.-]/g, '_'));
+          writeFileSync(dest, buf); target = dest;
+        }
+        if (!target) { await msg.reply('Attach a `.helmtemplate.json` file, or name a local one: `template import <name>`.'); return; }
+        const r = importTemplate(target);
+        let m = `Imported **${r.name}**${r.description ? ` — ${r.description}` : ''}.\nApplied: ${r.applied.join('; ') || 'nothing'}.`;
+        m += `\nSuggested gateways: ${r.suggests.gateways}, model: ${r.suggests.model}.`;
+        if (r.optionalServers?.length) m += `\nOptional tools that need your own keys: ${r.optionalServers.join(', ')}.`;
+        m += '\nThe persona/tools take effect on the next message.';
+        await msg.reply(m);
+      }
+    } catch (e) { await msg.reply('template error: ' + String(e.message || e).slice(0, 300)); }
+    return;
+  }
+
   // ---- /cost: today's usage summary (notional tokens, Max subscription) ----
   if (/^\/cost\b/.test(low)) {
     try {
@@ -462,7 +530,8 @@ client.on(Events.MessageCreate, async msg => {
   try {
     const reply = await ask(prompt, heartbeat => msg.channel.send(heartbeat).catch(() => {}), target, mode);
     clearInterval(typing);
-    const { text: rawBody, files } = splitAttachments(reply);
+    let { text: rawBody, files } = splitAttachments(reply);
+    rawBody = handleDirectives(rawBody, text);   // [STUCK: ...] -> queue · [USE: mac|windows] -> switch
 
     // Autopilot plan detection: if Claude included [PLAN-PENDING], strip the marker,
     // post the plan, then auto-send "go" after 60 s (cancellable by "stop").
@@ -515,6 +584,14 @@ client.on(Events.MessageCreate, async msg => {
     clearInterval(typing);
     if (e.stopped) return;  // the stop command already acknowledged
     console.error(e);
+    // Helm got stuck — remember it for the overnight self-upgrade to fix the root cause.
+    try {
+      recordStuck(
+        e.timedOut
+          ? `Task hit the 10-min cap: "${(text || '(attachment)').slice(0, 80)}"`
+          : `Failed on "${(text || '(attachment)').slice(0, 60)}": ${String(e.message || e).slice(0, 140)}`,
+        String(e.message || e).slice(0, 500), 'auto');
+    } catch {}
     const m = e.timedOut
       ? '⚠️ that task hit the 10-min cap and was stopped — try breaking it into a smaller step.'
       : `⚠️ brain error: ${String(e.message || e).slice(0, 1800)}`;

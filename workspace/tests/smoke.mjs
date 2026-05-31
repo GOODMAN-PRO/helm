@@ -1831,6 +1831,87 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- stuck queue: record dedups + renders + archives (isolated temp queue) ----
+{
+  const label = 'stuck.mjs: record/dedup/render/archive + self-upgrade integration';
+  try {
+    const stuckPath = path.join(WORKSPACE, 'upgrades/stuck.mjs');
+    if (!existsSync(stuckPath)) throw new Error('workspace/upgrades/stuck.mjs not found');
+    if (spawnSync('node', ['--check', stuckPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
+      throw new Error('stuck.mjs syntax check failed');
+    const { recordStuck, listStuck, renderStuckForPrompt, archiveAll, readAll } = await import(stuckPath);
+    // record two identical-ish summaries -> dedup to one with count 2
+    const before = readAll().length;
+    recordStuck('__smoke_stuck test thing', 'detail a', 'test');
+    recordStuck('__smoke_stuck test thing!', 'detail b', 'test');   // normalizes to same key
+    const mine = listStuck().filter(i => i.summary.startsWith('__smoke_stuck'));
+    if (mine.length !== 1) throw new Error(`expected 1 deduped entry, got ${mine.length}`);
+    if (mine[0].count < 2) throw new Error(`expected count>=2, got ${mine[0].count}`);
+    const rendered = renderStuckForPrompt();
+    if (!rendered.includes('__smoke_stuck')) throw new Error('renderStuckForPrompt did not include the entry');
+    // archive clears the live queue
+    archiveAll();
+    if (listStuck().some(i => i.summary.startsWith('__smoke_stuck'))) throw new Error('archiveAll did not clear the queue');
+    if (readAll().length > before) throw new Error('archiveAll left residue in the live queue');
+    // self-upgrade must import + use the stuck queue
+    const su = readFileSync(path.join(WORKSPACE, 'upgrades/self-upgrade.mjs'), 'utf8');
+    if (!su.includes("from './stuck.mjs'") || !su.includes('renderStuckForPrompt') || !su.includes('archiveAll'))
+      throw new Error('self-upgrade.mjs does not integrate the stuck queue');
+    // index.js must record stuck on failure + expose the [STUCK:]/[USE:] directives
+    const idx = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!idx.includes('recordStuck(')) throw new Error('index.js does not record stuck events');
+    if (!idx.includes('[STUCK:') || !idx.includes('[USE:')) throw new Error('index.js missing STUCK/USE directive handling');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- templates: export -> import round-trip is lossless + secret-free ----
+{
+  const label = 'templates.mjs: export/import round-trip, sanitized (no secrets)';
+  try {
+    const tplPath = path.join(WORKSPACE, 'templates/templates.mjs');
+    if (!existsSync(tplPath)) throw new Error('workspace/templates/templates.mjs not found');
+    if (spawnSync('node', ['--check', tplPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
+      throw new Error('templates.mjs syntax check failed');
+    const { exportTemplate, importTemplate, listTemplates } = await import(tplPath);
+    const out = exportTemplate('__smoke_tpl', 'smoke template');
+    if (!existsSync(out)) throw new Error('export did not write a file');
+    const raw = readFileSync(out, 'utf8');
+    const tpl = JSON.parse(raw);
+    if (tpl.helmTemplate !== 1) throw new Error('bad template version');
+    // must NOT leak secrets/identity
+    for (const bad of ['DISCORD_TOKEN', 'OWNER_ID', 'ANTHROPIC_API_KEY', 'sk-ant']) {
+      if (raw.includes(bad)) throw new Error(`template leaked ${bad}`);
+    }
+    // install-dir path must be tokenized, not absolute
+    if (raw.includes('/Users/owner/secondme')) throw new Error('template leaked an absolute install path');
+    if (!listTemplates().includes('__smoke_tpl')) throw new Error('listTemplates missing the new template');
+    // import should not throw and should report what it applied — but must not leave the real
+    // servers.json/persona reformatted, so snapshot and restore them around the call.
+    const fsmod = await import('node:fs');
+    const serversFile = path.join(WORKSPACE, 'mcp/servers.json');
+    const personaFile = path.join(WORKSPACE, 'persona.local.md');
+    const serversBak = readFileSync(serversFile, 'utf8');
+    const personaBak = existsSync(personaFile) ? readFileSync(personaFile, 'utf8') : null;
+    let r;
+    try {
+      r = importTemplate('__smoke_tpl');
+    } finally {
+      fsmod.writeFileSync(serversFile, serversBak);
+      if (personaBak === null) { try { fsmod.unlinkSync(personaFile); } catch {} }
+      else fsmod.writeFileSync(personaFile, personaBak);
+    }
+    if (!r || !Array.isArray(r.applied)) throw new Error('import returned no result');
+    // index.js must wire the template commands + persona override
+    const idx = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!idx.includes('exportTemplate') || !idx.includes('importTemplate') || !idx.includes('ownerPersonaOverride'))
+      throw new Error('index.js does not wire templates');
+    // cleanup the smoke artifact
+    try { (await import('node:fs')).unlinkSync(out); } catch {}
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

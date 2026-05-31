@@ -14,6 +14,7 @@ import { existsSync, writeFileSync, appendFileSync, readFileSync, rmSync } from 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
+import { renderStuckForPrompt, archiveAll } from './stuck.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/upgrades
 const ROOT = path.resolve(__dirname, '../..');                  // secondme/
@@ -102,6 +103,7 @@ try {
   if (!DRYRUN) {
     let queue = '(no queue file)';
     try { queue = readFileSync(QUEUE, 'utf8'); } catch {}
+    const stuck = renderStuckForPrompt();
     const prompt = [
       'You are Helm performing your scheduled NIGHTLY SELF-UPGRADE on your own codebase at /Users/owner/secondme.',
       '',
@@ -112,11 +114,15 @@ try {
       '- A smoke test (node workspace/tests/smoke.mjs) runs after you finish. If it fails, ALL changes auto-revert. Keep it green; never weaken tests to cheat.',
       '',
       'TASKS tonight, in priority order:',
-      '1. Implement pending items in workspace/upgrades/QUEUE.md; mark each done as you finish it.',
-      '2. Fix bugs (see workspace/upgrades/BUGS_REPORT.md).',
-      '3. Small, safe, high-value improvements aligned with workspace/upgrades/PLAN.md. Prefer finishing started work over starting new.',
+      '1. STUCK QUEUE (highest priority): these are real things Helm got stuck on in daily use. For each, fix the ROOT CAUSE — add the missing capability, handle the error, or remove the limitation — not a band-aid. If an item is too big for one night, do a solid first step.',
+      '2. Implement pending items in workspace/upgrades/QUEUE.md; mark each done as you finish it.',
+      '3. Fix bugs (see workspace/upgrades/BUGS_REPORT.md).',
+      '4. Small, safe, high-value improvements aligned with workspace/upgrades/PLAN.md. Prefer finishing started work over starting new.',
       '',
       'Keep changes focused and reversible. Output a concise summary (<400 words) of what you changed and why. No emojis, no preamble.',
+      '',
+      '--- STUCK QUEUE (things Helm got stuck on; fix root causes) ---',
+      stuck || '(empty — nothing got stuck recently)',
       '',
       '--- QUEUE.md ---',
       queue,
@@ -153,8 +159,12 @@ try {
   // 5. restart + health-check; roll back if unhealthy
   if (!restartAndHealth()) { rollback(base, 'unhealthy after restart', summary); process.exit(0); }
 
+  // Clear the stuck queue once changes are applied and healthy (kept if nothing changed, so it retries).
+  const archived = (changed && !DRYRUN) ? archiveAll() : 0;
+  if (archived) log(`archived ${archived} stuck item(s) addressed this run`);
+
   appendHistory(changed ? `APPLIED ${head.slice(0, 7)}` : 'NO CHANGES', base, head, summary);
-  notify(`Helm self-upgrade ${changed ? `applied ${head.slice(0, 7)}` : 'ran (no changes)'}. ${summary.slice(0, 800)}`);
+  notify(`Helm self-upgrade ${changed ? `applied ${head.slice(0, 7)}` : 'ran (no changes)'}${archived ? `, cleared ${archived} stuck item(s)` : ''}. ${summary.slice(0, 800)}`);
   log('=== self-upgrade done ===');
 } catch (e) {
   log('FATAL: ' + (e.stack || e.message));
