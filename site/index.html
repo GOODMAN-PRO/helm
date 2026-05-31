@@ -90,6 +90,9 @@
   tbody tr:hover{background:#0c1726}
   td.helm{background:#0b1a22}
   td.helm span.mk{font-size:15px}
+  .helmkey{display:flex;flex-wrap:wrap;gap:10px;margin:2px 0 28px}
+  .helmkey .chip{display:inline-flex;align-items:center;gap:7px;background:#0b1a22;border:1px solid #1d3a44;color:var(--ink);font-size:13px;font-weight:500;padding:8px 13px;border-radius:999px}
+  .helmkey .chip b{color:var(--teal);font-weight:800}
   .mk{font-weight:800}
   .yes{color:var(--yes)} .no{color:var(--no)} .part{color:var(--part)}
   .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:14px}
@@ -170,11 +173,7 @@
       </svg>
     </div>
     <h1>Your own AI agent,<br><span class="grad">on your own machine.</span></h1>
-    <p class="sub">Helm lives on your hardware with full shell, files, web and screen. You message it from Discord; it actually does the work and reports back. Owner-locked, private, and powered by the Claude subscription you already pay for.</p>
-    <div class="herocode">
-      <code>curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash</code>
-      <button onclick="copyCmd(this)">Copy</button>
-    </div>
+    <p class="sub">Helm lives on your hardware with full shell, files, web and screen. You message it from Discord; it actually does the work and reports back. Owner-locked, private, and powered by your Claude subscription, an API key, or a free model.</p>
     <div class="cta">
       <a class="btn primary" href="#install">Install options</a>
       <a class="btn ghost" href="#compare">Compare</a>
@@ -184,6 +183,23 @@
 </div>
 
 <div class="wrap">
+  <section id="install">
+    <p class="eyebrow">Get Helm</p>
+    <h2>One command. <span class="grad">Then it's yours.</span></h2>
+    <div class="install">
+      <div class="code">
+        <span id="cmd">curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash</span>
+        <button onclick="copyCmd(this)">Copy</button>
+      </div>
+      <div class="opts">
+        <div class="opt"><h4>Multiple gateways</h4><p>A guided setup screen turns on Discord, iMessage, or both — more on the way.</p></div>
+        <div class="opt"><h4>Any backend — including free</h4><p>Your Claude subscription, an Anthropic API key, or a free / local model (Ollama, Groq, OpenRouter) at no cost.</p></div>
+        <div class="opt"><h4>Run it 24/7</h4><p>Optionally install it as a background service so it's always there.</p></div>
+      </div>
+      <p class="note">Requires Node 18+ and git. Power it with your Claude login, an API key, or any Anthropic-compatible endpoint (free tiers / local models). macOS, Windows and Linux.</p>
+    </div>
+  </section>
+
   <section id="features">
     <p class="eyebrow">What Helm can do</p>
     <h2>Not a chatbot. An agent that <span class="grad">acts</span>.</h2>
@@ -196,7 +212,7 @@
       <div class="card"><div class="ic">⇄</div><h3>Your whole fleet</h3><p>Swap between your Mac and Windows box mid-conversation over Tailscale. One agent, every machine.</p></div>
       <div class="card"><div class="ic">▣</div><h3>Sees and drives your screen</h3><p>Takes screenshots, clicks and types. It can operate apps that have no API when it has to.</p></div>
       <div class="card"><div class="ic">↻</div><h3>Thinks 24/7, upgrades itself</h3><p>Background cognition during the day; nightly self-improvement gated by tests that auto-revert on failure.</p></div>
-      <div class="card"><div class="ic">⌁</div><h3>Powered your way</h3><p>Run it on your Claude Pro/Max subscription, or a pay-as-you-go Anthropic API key. Your choice at install.</p></div>
+      <div class="card"><div class="ic">⌁</div><h3>Powered your way — even free</h3><p>Your Claude Pro/Max subscription, a pay-as-you-go API key, or a free / local model (Ollama, Groq, OpenRouter) at no cost. Your choice at install.</p></div>
       <div class="card"><div class="ic">⚿</div><h3>Encrypted secrets vault</h3><p>Hand it credentials safely — encrypted at rest, never echoed into chat, logs or git.</p></div>
     </div>
   </section>
@@ -205,6 +221,16 @@
     <p class="eyebrow">How Helm compares</p>
     <h2>Built for <span class="grad">you</span>, not a data center.</h2>
     <p class="lead">The OpenClaw ecosystem and the hosted players each nail one slice — lightweight, secure, edge, or memory. Helm is the one that does all of it on your own hardware and ties your whole fleet together.</p>
+    <div class="helmkey">
+      <span class="chip"><b>✓</b> Discord + iMessage gateways</span>
+      <span class="chip"><b>✓</b> Free, local or subscription models</span>
+      <span class="chip"><b>✓</b> Multi-machine fleet (Mac + Windows)</span>
+      <span class="chip"><b>✓</b> Persistent memory + synced brain</span>
+      <span class="chip"><b>✓</b> Thinks 24/7 &amp; self-upgrades</span>
+      <span class="chip"><b>✓</b> Clicks &amp; types in any app</span>
+      <span class="chip"><b>✓</b> Parallel build swarm</span>
+      <span class="chip"><b>✓</b> Encrypted secrets vault</span>
+    </div>
     <div class="tablewrap">
       <table>
         <thead>
@@ -243,6 +269,7 @@
           <tr><td>Encrypted secrets vault</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
           <tr><td>Owner-locked &amp; private</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
           <tr><td>Uses your subscription / BYO key</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>Runs on free / local models</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
           <tr><td>No extra monthly bill</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
         </tbody>
       </table>
@@ -262,23 +289,6 @@
       <div class="step"><div class="n">01</div><h4>You message</h4><p>Send a DM from Discord or iMessage — a task, a question, anything.</p></div>
       <div class="step"><div class="n">02</div><h4>Helm acts on your machine</h4><p>It runs Claude with full tools right on your hardware: shell, files, web, screen, memory.</p></div>
       <div class="step"><div class="n">03</div><h4>It reports back</h4><p>You get the result — files built, problems fixed, a screenshot — straight back in the chat.</p></div>
-    </div>
-  </section>
-
-  <section id="install">
-    <p class="eyebrow">Get Helm</p>
-    <h2>One command. <span class="grad">Then it's yours.</span></h2>
-    <div class="install">
-      <div class="code">
-        <span id="cmd">curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash</span>
-        <button onclick="copyCmd(this)">Copy</button>
-      </div>
-      <div class="opts">
-        <div class="opt"><h4>Pick your gateways</h4><p>A guided setup screen lets you turn on Discord, iMessage, or both.</p></div>
-        <div class="opt"><h4>Pick your backend</h4><p>Your Claude Pro/Max subscription, or an Anthropic API key — no subscription required.</p></div>
-        <div class="opt"><h4>Run it 24/7</h4><p>Optionally install it as a background service so it's always there.</p></div>
-      </div>
-      <p class="note">Requires Node 18+, git, and Claude Code logged into your Anthropic account. macOS, Windows and Linux supported.</p>
     </div>
   </section>
 </div>

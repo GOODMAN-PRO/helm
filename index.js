@@ -35,7 +35,16 @@ const WORKSPACE = path.resolve(__dirname, process.env.WORKSPACE || './workspace'
 // shell var can't override the OAuth login; in apikey mode we keep it (Claude Code auto-uses it).
 function claudeEnv() {
   const e = { ...process.env };
-  if (AUTH_MODE !== 'apikey') delete e.ANTHROPIC_API_KEY;
+  if (AUTH_MODE === 'apikey') {
+    delete e.ANTHROPIC_BASE_URL;                 // hosted Anthropic API — just the key
+  } else if (AUTH_MODE === 'custom') {
+    // free / local / custom endpoint: keep ANTHROPIC_BASE_URL + token + model as-is.
+    // Many gateways expect ANTHROPIC_AUTH_TOKEN; mirror the API key into it if unset.
+    if (e.ANTHROPIC_API_KEY && !e.ANTHROPIC_AUTH_TOKEN) e.ANTHROPIC_AUTH_TOKEN = e.ANTHROPIC_API_KEY;
+  } else {
+    // subscription (OAuth) — strip anything that would override the login
+    delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
+  }
   return e;
 }
 
@@ -72,6 +81,8 @@ const autopilotTimers = new Map();
 
 // Pick --model for this turn: fixed pref overrides the complexity classifier.
 function pickModel(prompt) {
+  // custom/free endpoints expect their own model id (e.g. a Groq/Ollama model name)
+  if (AUTH_MODE === 'custom' && process.env.ANTHROPIC_MODEL) return process.env.ANTHROPIC_MODEL;
   return getModelPref() ?? classifyComplexity(prompt);
 }
 // Returns an inline MCP config JSON string built from workspace/mcp/servers.json.

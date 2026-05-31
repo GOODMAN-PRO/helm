@@ -173,13 +173,17 @@ async function main() {
   const backendItems = [
     { label: 'Claude subscription (Pro / Max)', hint: 'log in with claude — no per-message cost' },
     { label: 'Anthropic API key', hint: 'pay-as-you-go — no subscription needed' },
-    { label: 'OpenAI', hint: 'not yet — Helm runs on Claude Code (Anthropic). On the roadmap.', disabled: true },
+    { label: 'Free / local model', hint: 'no cost — Ollama, Groq, OpenRouter free tiers, or any Anthropic-compatible endpoint' },
   ];
   const backendIdx = await select('How do you want to power Helm?', backendItems);
-  const authMode = backendIdx === 1 ? 'apikey' : 'subscription';
-  let apiKey = '';
+  const authMode = backendIdx === 1 ? 'apikey' : backendIdx === 2 ? 'custom' : 'subscription';
+  let apiKey = '', baseUrl = '', modelId = '';
   if (authMode === 'apikey') {
     apiKey = await text('Anthropic API key', { mask: true, hint: 'console.anthropic.com -> API Keys (starts with sk-ant-)' });
+  } else if (authMode === 'custom') {
+    baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Anthropic-compatible endpoint. Ollama: http://localhost:11434 · or a Groq/OpenRouter proxy URL' });
+    modelId = await text('Model name', { def: 'llama3.1', hint: 'e.g. llama3.1 (Ollama) · llama-3.1-70b-versatile (Groq) · a free OpenRouter model id' });
+    apiKey = await text('API key for that endpoint', { mask: true, hint: 'leave blank for a local model that needs none (e.g. Ollama)' });
   }
 
   // 3) model
@@ -205,7 +209,10 @@ async function main() {
   row('Gateways', `${C.teal}${gateways.join(', ')}${C.reset}`);
   row('Discord token', token ? `${C.grn}set${C.reset} ${C.dim}(hidden)${C.reset}` : `${C.yel}none${C.reset}`);
   row('Owner ID', ownerId || `${C.yel}(none)${C.reset}`);
-  row('Backend', authMode === 'apikey' ? `Anthropic API key ${apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}` : 'Claude subscription (OAuth)');
+  row('Backend',
+    authMode === 'apikey' ? `Anthropic API key ${apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}`
+    : authMode === 'custom' ? `Free / local — ${C.teal}${modelId}${C.reset} @ ${baseUrl}`
+    : 'Claude subscription (OAuth)');
   row('Model', model);
   row('Permissions', perm);
   row('Service', svc ? 'yes' : 'no');
@@ -221,6 +228,11 @@ async function main() {
     `GATEWAYS=${gateways.join(',')}`,
     `AUTH_MODE=${authMode}`,
     ...(authMode === 'apikey' ? [`ANTHROPIC_API_KEY=${apiKey}`] : []),
+    ...(authMode === 'custom' ? [
+      `ANTHROPIC_BASE_URL=${baseUrl}`,
+      `ANTHROPIC_MODEL=${modelId}`,
+      ...(apiKey ? [`ANTHROPIC_API_KEY=${apiKey}`] : []),
+    ] : []),
     `MODEL=${model}`,
     `PERMISSION_MODE=${perm}`,
     `CLAUDE_BIN=${claudeBin}`,
@@ -247,7 +259,8 @@ async function main() {
     console.log(`It's running in the background. Logs: ${ROOT}/agent.log`);
   }
   if (authMode === 'subscription') console.log(`${C.dim}Backend: Claude subscription — make sure you've run ${C.reset}claude${C.dim} once and logged in.${C.reset}`);
-  else console.log(`${C.dim}Backend: Anthropic API key (billed pay-as-you-go).${C.reset}`);
+  else if (authMode === 'apikey') console.log(`${C.dim}Backend: Anthropic API key (billed pay-as-you-go).${C.reset}`);
+  else console.log(`${C.dim}Backend: free / local model (${modelId} @ ${baseUrl}). Make sure that endpoint is running.${C.reset}`);
   console.log(`Then DM your bot on Discord.${gateways.includes('imessage') ? '  (iMessage: grant the node process Full Disk Access in System Settings.)' : ''}`);
   console.log(`${C.dim}Reminder: one Discord token = one running instance.${C.reset}`);
   process.exit(0);
