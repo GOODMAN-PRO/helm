@@ -31,7 +31,7 @@
   /* nav */
   nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
   .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.5px}
-  .brand svg{width:34px;height:34px;border-radius:9px}
+  .brand svg{width:34px;height:34px;border-radius:50%}
   .nav-links{display:flex;gap:26px;font-size:14px;color:var(--muted)}
   .nav-links a:hover{color:var(--ink)}
   @media(max-width:640px){.nav-links{display:none}}
@@ -112,18 +112,18 @@
 <div class="wrap">
   <nav>
     <div class="brand">
-      <!-- inline Helm mark -->
+      <!-- circular Helm avatar mark -->
       <svg viewBox="0 0 512 512" aria-label="Helm"><defs>
-        <radialGradient id="bg" cx="50%" cy="34%" r="80%"><stop offset="0%" stop-color="#1d2738"/><stop offset="55%" stop-color="#111722"/><stop offset="100%" stop-color="#080b11"/></radialGradient>
-        <linearGradient id="wh" gradientUnits="userSpaceOnUse" x1="110" y1="90" x2="402" y2="422"><stop offset="0%" stop-color="#7df0dc"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
-        <radialGradient id="core" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#d6fff7"/><stop offset="60%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></radialGradient>
+        <radialGradient id="nbg" cx="50%" cy="36%" r="75%"><stop offset="0%" stop-color="#1b2942"/><stop offset="55%" stop-color="#0f1722"/><stop offset="100%" stop-color="#070a10"/></radialGradient>
+        <linearGradient id="nwh" gradientUnits="userSpaceOnUse" x1="120" y1="100" x2="392" y2="412"><stop offset="0%" stop-color="#7df0dc"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
+        <radialGradient id="ncore" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#e6fffb"/><stop offset="60%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></radialGradient>
       </defs>
-      <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-      <g transform="translate(256,256)" fill="none" stroke="url(#wh)" stroke-linecap="round">
-        <g stroke-width="15"><line y2="-184"/><line y2="-184" transform="rotate(45)"/><line y2="-184" transform="rotate(90)"/><line y2="-184" transform="rotate(135)"/><line y2="-184" transform="rotate(180)"/><line y2="-184" transform="rotate(225)"/><line y2="-184" transform="rotate(270)"/><line y2="-184" transform="rotate(315)"/></g>
-        <circle r="126" stroke-width="20"/>
+      <circle cx="256" cy="256" r="256" fill="url(#nbg)"/>
+      <g transform="translate(256,256)" fill="none" stroke="url(#nwh)" stroke-linecap="round" stroke-linejoin="round">
+        <g stroke-width="22"><line y2="-190"/><line y2="-190" transform="rotate(45)"/><line y2="-190" transform="rotate(90)"/><line y2="-190" transform="rotate(135)"/><line y2="-190" transform="rotate(180)"/><line y2="-190" transform="rotate(225)"/><line y2="-190" transform="rotate(270)"/><line y2="-190" transform="rotate(315)"/></g>
+        <circle r="150" stroke-width="30"/>
       </g>
-      <circle cx="256" cy="256" r="46" fill="#080b11"/><circle cx="256" cy="256" r="46" fill="none" stroke="url(#wh)" stroke-width="6"/><circle cx="256" cy="256" r="16" fill="url(#core)"/>
+      <circle cx="256" cy="256" r="58" fill="#070a10"/><circle cx="256" cy="256" r="58" fill="none" stroke="url(#nwh)" stroke-width="9"/><circle cx="256" cy="256" r="22" fill="url(#ncore)"/>
       </svg>
       <span>HELM</span>
     </div>
@@ -184,29 +184,27 @@
   <section id="compare">
     <p class="eyebrow">How Helm compares</p>
     <h2>Built for <span class="grad">you</span>, not a data center.</h2>
-    <p class="lead">Cloud agents are powerful but they run on someone else's computer, on someone else's terms. Helm trades the polish of a hosted product for something more valuable: it's yours.</p>
+    <p class="lead">openclaw, Hermes and Cursor are all capable — but most are one bot on one machine, or a coding tool bound to your editor. Helm is a persistent personal agent that lives across your whole fleet, remembers you, and improves itself.</p>
     <div class="tablewrap">
       <table>
         <thead><tr>
           <th>Capability</th>
           <th class="helm">Helm</th>
-          <th>ChatGPT</th>
-          <th>Claude.ai</th>
-          <th>Devin</th>
-          <th>AutoGPT</th>
-          <th>Open&nbsp;Interpreter</th>
+          <th>openclaw</th>
+          <th>Hermes</th>
+          <th>Cursor</th>
         </tr></thead>
         <tbody>
-          <tr><td>Runs on your own machine</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-          <tr><td>Private &amp; owner-locked</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
-          <tr><td>Chat from Discord / iMessage</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Full shell + file access on your box</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-          <tr><td>Controls your real screen (GUI)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Persistent personal memory</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Multi-machine fleet (Mac + Windows)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Self-upgrades over time</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Uses your existing subscription</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Open &amp; self-installed</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Runs on your own machine</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Chat from Discord / iMessage</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Private &amp; owner-locked</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>Full shell + file access on your box</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Controls your real screen (GUI)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Persistent memory + synced brain</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>Multi-machine fleet (Mac + Windows)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Thinks 24/7 &amp; self-upgrades</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Rides your existing Claude subscription</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Open &amp; self-installed</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
         </tbody>
       </table>
     </div>
