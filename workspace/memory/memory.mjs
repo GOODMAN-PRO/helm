@@ -138,9 +138,28 @@ switch (verb) {
           `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, valid_from)
            VALUES (?, ?, ?, ?, ?, 1, unixepoch(), unixepoch())`
         ).run(kind, key, value, source, newConf);
-        db.prepare(`INSERT INTO episodes (summary, channel) VALUES (?, 'memory')`).run(
-          `fact superseded: ${kind}/${key}`
-        );
+        // Skip episode-log noise:
+        //   1. Smoke-test keys (__smoke_*) — these flip on every test run.
+        //   2. Identical supersede within the last 6h for the same (kind, key) — collapse repeats
+        //      (e.g. autonomy_mode flips, mode commands) into a single episode per quiet window.
+        const isSmoke = key.startsWith('__smoke');
+        let recentDup = null;
+        if (!isSmoke) {
+          recentDup = db.prepare(
+            `SELECT id FROM episodes
+              WHERE channel = 'memory'
+                AND summary = ?
+                AND ts >= unixepoch() - 21600
+              LIMIT 1`
+          ).get(`fact superseded: ${kind}/${key}`);
+        }
+        if (!isSmoke && !recentDup) {
+          db.prepare(`INSERT INTO episodes (summary, channel) VALUES (?, 'memory')`).run(
+            `fact superseded: ${kind}/${key}`
+          );
+        } else if (recentDup) {
+          db.prepare(`UPDATE episodes SET ts = unixepoch() WHERE id = ?`).run(recentDup.id);
+        }
         out({ action: 'superseded', id: r.lastInsertRowid, old_id: existing.id, kind, key, value, confidence: newConf, evidence_count: 1 });
       }
     } else {

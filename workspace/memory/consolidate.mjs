@@ -60,16 +60,28 @@ const stats = { distilled: 0, decayed: 0, pruned: 0, deduped: 0 };
 const STOP = new Set(['the','and','that','this','with','from','have','will','for','was','were',
   'are','his','her','its','their','they','them','our','your','all','any','but','not','can','could',
   'would','should','about','when','where','what','which','also','been','been','some','only','just',
-  'into','than','then','more','most','very','over','helm','owner','nice']);
+  'into','than','then','more','most','very','over','helm','owner','nice',
+  // Mechanism/log nouns that show up in episode summaries themselves and would otherwise
+  // dominate the distilled-fact list (e.g. "fact superseded", "think-tick: ...", "memory").
+  'fact','facts','note','notes','mode','preference','preferences','tick','think','memory',
+  'supersed','superseded','supersede','superseding','mention','mentioned','mentions',
+  'episode','episodes','learned','update','updated','dump','index','smoke','workspace',
+  'still','pend','pending','wir','wired','loader','project','projects','skill','skills']);
 const sinceTs = Math.floor(Date.now() / 1000) - SINCE_DAYS * 86400;
 const eps = db.prepare(`SELECT id, ts, summary FROM episodes WHERE ts >= ? ORDER BY ts ASC`).all(sinceTs);
 const stemCount = new Map();      // stem -> Set(episode ids)
 const stemExample = new Map();    // stem -> latest summary mentioning it
 for (const e of eps) {
-  const toks = (e.summary || '').toLowerCase().match(/[a-z]{4,}/g) || [];
+  const summary = e.summary || '';
+  // Skip mechanism-noise episodes (smoke artifacts, fact-supersede notices, think-tick
+  // self-reports) — these are about Helm's bookkeeping, not real world events.
+  if (/^fact superseded:/i.test(summary)) continue;
+  if (/__smoke/.test(summary)) continue;
+  const toks = summary.toLowerCase().match(/[a-z]{4,}/g) || [];
   for (const w of new Set(toks)) {
     if (STOP.has(w)) continue;
     const stem = w.replace(/ies$/, 'y').replace(/(?:ing|ed|s)$/, '') || w;
+    if (STOP.has(stem)) continue;
     if (!stemCount.has(stem)) stemCount.set(stem, new Set());
     stemCount.get(stem).add(e.id);
     stemExample.set(stem, e.summary);

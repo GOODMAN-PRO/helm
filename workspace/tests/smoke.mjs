@@ -1975,6 +1975,65 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- memory: supersede on __smoke key emits NO episode (smoke-test pollution gate) ----
+{
+  const label = 'memory: supersede on __smoke key does not emit fact-superseded episode';
+  const mem = path.join(WORKSPACE, 'memory/memory.mjs');
+  const KEY = '__smoke_episode_gate';
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db.prepare(`DELETE FROM facts    WHERE kind = 'note' AND key = ?`).run(KEY);
+    db.prepare(`DELETE FROM episodes WHERE channel = 'memory' AND summary = ?`).run(`fact superseded: note/${KEY}`);
+    db.close();
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'first'],  { encoding: 'utf8', timeout: 10_000 });
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'second'], { encoding: 'utf8', timeout: 10_000 });
+    const db2 = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    const epRow = db2.prepare(`SELECT COUNT(*) AS n FROM episodes WHERE summary = ?`).get(`fact superseded: note/${KEY}`);
+    db2.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
+    db2.close();
+    if (epRow.n !== 0) throw new Error(`smoke supersede produced ${epRow.n} episode(s); expected 0`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- memory: repeated supersede within 6h dedupes to a single episode ----
+{
+  const label = 'memory: identical supersede within 6h collapses to one episode';
+  const mem = path.join(WORKSPACE, 'memory/memory.mjs');
+  const KEY = 'episode_dedup_probe';
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    db.prepare(`DELETE FROM facts    WHERE kind = 'note' AND key = ?`).run(KEY);
+    db.prepare(`DELETE FROM episodes WHERE channel = 'memory' AND summary = ?`).run(`fact superseded: note/${KEY}`);
+    db.close();
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'v1'], { encoding: 'utf8', timeout: 10_000 });
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'v2'], { encoding: 'utf8', timeout: 10_000 });
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'v3'], { encoding: 'utf8', timeout: 10_000 });
+    spawnSync('node', [mem, 'remember', 'note', KEY, 'v4'], { encoding: 'utf8', timeout: 10_000 });
+    const db2 = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    const epRow = db2.prepare(`SELECT COUNT(*) AS n FROM episodes WHERE summary = ?`).get(`fact superseded: note/${KEY}`);
+    db2.prepare(`DELETE FROM facts WHERE kind = 'note' AND key = ?`).run(KEY);
+    db2.prepare(`DELETE FROM episodes WHERE summary = ?`).run(`fact superseded: note/${KEY}`);
+    db2.close();
+    if (epRow.n !== 1) throw new Error(`expected 1 collapsed episode, got ${epRow.n}`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- screencap: --out outside safe roots is rejected ----
+{
+  const label = 'screencap.mjs: rejects --out paths outside /tmp and workspace';
+  const cap = path.join(WORKSPACE, 'tools/impl/screencap.mjs');
+  try {
+    const r = spawnSync('node', [cap, '--out', '/etc/helm-pwn.png'], { encoding: 'utf8', timeout: 10_000 });
+    if (r.status === 0) throw new Error('screencap exited 0 for /etc/ path');
+    if (!/safe roots/i.test(r.stderr || '')) throw new Error(`unexpected stderr: ${r.stderr}`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
