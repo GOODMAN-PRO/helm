@@ -169,6 +169,19 @@ async function main() {
   }
   ownerId = await text('Your Discord user ID (owner lock)', { hint: 'Discord -> right-click your name -> Copy User ID' });
 
+  // 2.5) backend — how Helm is powered
+  const backendItems = [
+    { label: 'Claude subscription (Pro / Max)', hint: 'log in with claude — no per-message cost' },
+    { label: 'Anthropic API key', hint: 'pay-as-you-go — no subscription needed' },
+    { label: 'OpenAI', hint: 'not yet — Helm runs on Claude Code (Anthropic). On the roadmap.', disabled: true },
+  ];
+  const backendIdx = await select('How do you want to power Helm?', backendItems);
+  const authMode = backendIdx === 1 ? 'apikey' : 'subscription';
+  let apiKey = '';
+  if (authMode === 'apikey') {
+    apiKey = await text('Anthropic API key', { mask: true, hint: 'console.anthropic.com -> API Keys (starts with sk-ant-)' });
+  }
+
   // 3) model
   const model = ['opus', 'sonnet'][await select('Model', [
     { label: 'opus', hint: 'best reasoning — heavier on Max limits' },
@@ -192,6 +205,7 @@ async function main() {
   row('Gateways', `${C.teal}${gateways.join(', ')}${C.reset}`);
   row('Discord token', token ? `${C.grn}set${C.reset} ${C.dim}(hidden)${C.reset}` : `${C.yel}none${C.reset}`);
   row('Owner ID', ownerId || `${C.yel}(none)${C.reset}`);
+  row('Backend', authMode === 'apikey' ? `Anthropic API key ${apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}` : 'Claude subscription (OAuth)');
   row('Model', model);
   row('Permissions', perm);
   row('Service', svc ? 'yes' : 'no');
@@ -205,6 +219,8 @@ async function main() {
     `DISCORD_TOKEN=${token || 'paste-your-discord-bot-token-here'}`,
     `OWNER_ID=${ownerId || 'your-discord-user-id'}`,
     `GATEWAYS=${gateways.join(',')}`,
+    `AUTH_MODE=${authMode}`,
+    ...(authMode === 'apikey' ? [`ANTHROPIC_API_KEY=${apiKey}`] : []),
     `MODEL=${model}`,
     `PERMISSION_MODE=${perm}`,
     `CLAUDE_BIN=${claudeBin}`,
@@ -230,6 +246,8 @@ async function main() {
   } else {
     console.log(`It's running in the background. Logs: ${ROOT}/agent.log`);
   }
+  if (authMode === 'subscription') console.log(`${C.dim}Backend: Claude subscription — make sure you've run ${C.reset}claude${C.dim} once and logged in.${C.reset}`);
+  else console.log(`${C.dim}Backend: Anthropic API key (billed pay-as-you-go).${C.reset}`);
   console.log(`Then DM your bot on Discord.${gateways.includes('imessage') ? '  (iMessage: grant the node process Full Disk Access in System Settings.)' : ''}`);
   console.log(`${C.dim}Reminder: one Discord token = one running instance.${C.reset}`);
   process.exit(0);

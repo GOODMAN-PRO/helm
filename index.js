@@ -27,8 +27,17 @@ const {
   CLAUDE_BIN = 'claude',
   MODEL = 'sonnet',
   PERMISSION_MODE = 'bypassPermissions',
+  AUTH_MODE = 'subscription',   // 'subscription' (Claude Pro/Max OAuth) | 'apikey' (ANTHROPIC_API_KEY)
 } = process.env;
 const WORKSPACE = path.resolve(__dirname, process.env.WORKSPACE || './workspace');
+
+// Env handed to the `claude` engine. In subscription mode we strip ANTHROPIC_API_KEY so a stray
+// shell var can't override the OAuth login; in apikey mode we keep it (Claude Code auto-uses it).
+function claudeEnv() {
+  const e = { ...process.env };
+  if (AUTH_MODE !== 'apikey') delete e.ANTHROPIC_API_KEY;
+  return e;
+}
 
 if (!DISCORD_TOKEN || !OWNER_ID) {
   console.error('✋ Missing DISCORD_TOKEN or OWNER_ID in .env');
@@ -211,7 +220,7 @@ function killAll() {
 }
 function runClaude(args, prompt) {
   return new Promise((resolve, reject) => {
-    const child = spawn(CLAUDE_BIN, args, { cwd: WORKSPACE });
+    const child = spawn(CLAUDE_BIN, args, { cwd: WORKSPACE, env: claudeEnv() });
     running.add(child);
     let out = '', err = '';
     const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000); // 10-min cap
