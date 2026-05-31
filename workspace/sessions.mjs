@@ -11,6 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH   = path.join(__dirname, 'sessions.db');
 
 const db = new DatabaseSync(DB_PATH);
+// Without a busy timeout the second writer gets an immediate SQLITE_BUSY when
+// the Discord and iMessage processes both call setSession concurrently.
+db.exec(`PRAGMA busy_timeout = 5000`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
     key        TEXT PRIMARY KEY,
@@ -57,6 +60,8 @@ export function getSession(key = 'owner') {
 }
 
 export function setSession(key = 'owner', sessionId, adapter = null) {
+  if (sessionId == null || sessionId === '')
+    throw new Error('setSession: sessionId must be a non-empty string');
   stmtSet.run(key, sessionId, adapter);
 }
 
