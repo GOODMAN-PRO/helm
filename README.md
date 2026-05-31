@@ -6,11 +6,19 @@ Your own tiny AI agent. **Discord** (and later **iMessage** on a Mac) → **Clau
 You DM your Discord bot; the message goes to `claude -p` running on your machine (your Max subscription, full tools — shell, files, web); the reply comes back in Discord. Only **you** (the owner) can talk to it. Conversations persist per channel. Long-term memory lives in `workspace/CLAUDE.md`, which the agent reads and updates.
 
 ## Install
-One command (macOS / Linux). It checks prerequisites, fetches the code, installs deps, and walks you through the `.env`:
+One command. It checks prerequisites, fetches the code, installs deps, and walks you through the `.env`.
+
+**macOS / Linux:**
 ```
 curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash
 ```
-Prerequisites: **Node 18+**, **git**, and **Claude Code** (`claude`) logged into your Max/Pro subscription.
+**Windows (PowerShell):**
+```
+irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex
+```
+Prerequisites: **Node 18+**, **git**, and **Claude Code** (`claude`). Power it with your Claude
+Pro/Max subscription, a pay-as-you-go Anthropic API key, **or a free / local model** (Ollama, Groq,
+OpenRouter free tiers, or any Anthropic-compatible endpoint) — pick at install time.
 
 The installer asks for your **Discord bot token** (Developer Portal → your app → Bot → Reset Token) and your **Discord user ID** (right-click your name → Copy User ID), writes a locked-down `.env`, and prints the start command.
 
