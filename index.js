@@ -9,6 +9,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
+import { DatabaseSync } from 'node:sqlite';
 import { Client, GatewayIntentBits, Partials, Events } from 'discord.js';
 import { getSession, setSession, deleteSession } from './workspace/sessions.mjs';
 
@@ -31,6 +32,31 @@ if (!DISCORD_TOKEN || !OWNER_ID) {
   process.exit(1);
 }
 mkdirSync(WORKSPACE, { recursive: true });
+
+// ---- autonomy mode (suggest / copilot / autopilot) ----
+// Stored as preference 'helm.autonomy_mode' in memory.db.
+const MEMORY_DB = path.join(WORKSPACE, 'memory/memory.db');
+const VALID_MODES = ['suggest', 'copilot', 'autopilot'];
+
+function getAutonomyMode() {
+  try {
+    const db = new DatabaseSync(MEMORY_DB);
+    const row = db.prepare(`SELECT value FROM facts WHERE kind = 'preference' AND key = 'helm.autonomy_mode'`).get();
+    db.close();
+    return VALID_MODES.includes(row?.value) ? row.value : 'copilot';
+  } catch { return 'copilot'; }
+}
+
+function setAutonomyMode(mode) {
+  const r = spawnSync(process.execPath, [
+    path.join(WORKSPACE, 'memory/memory.mjs'),
+    'remember', 'preference', 'helm.autonomy_mode', mode,
+  ], { cwd: __dirname, encoding: 'utf8' });
+  return r.status === 0;
+}
+
+// Map of pending autopilot auto-proceed timers keyed by channel id.
+const autopilotTimers = new Map();
 
 // Returns an --mcp-config value: the path to workspace/mcp/servers.json when valid,
 // or an inline empty-servers JSON as a fallback so Helm always starts even if the
@@ -123,7 +149,7 @@ function scpToWin(localPath) {
 }
 
 // ---- persona: appended to Claude Code's own (tool-enabled) system prompt ----
-const PERSONA =
+const PERSONA_BASE =
   'You are Helm, a personal AI agent talking to your owner over Discord DMs. ' +
   "You run on their own machine with full tools (shell, files, web) — act, don't just advise. " +
   'Keep replies short and chat-friendly; this is a messaging app, not a document. ' +
@@ -134,6 +160,26 @@ const PERSONA =
   'the scheduler, and your own source code. Act boldly and proactively. ' +
   'When asked to build or create something, actually BUILD it (make the files, write the code, run the commands, finish the task) — a screenshot or a description is NEVER a substitute for doing the work. "Show me" means produce the real artifact first, THEN optionally screenshot it to display the result. ' +
   'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
+
+const MODE_GUIDANCE = {
+  suggest:
+    'AUTONOMY MODE: suggest — describe what you would do and why; do NOT execute shell commands, ' +
+    'edit files, or run git. Respond with a plan only.',
+  copilot:
+    'AUTONOMY MODE: copilot — for any task involving more than 2 shell commands, file edits, or ' +
+    'git operations, reply ONLY with a short numbered plan and end with "[waiting for your go]". ' +
+    'Do not execute until the owner replies "go" or "yes". For simple 1-2 command tasks, proceed directly.',
+  autopilot:
+    'AUTONOMY MODE: autopilot — for any task involving more than 2 shell commands, file edits, or ' +
+    'git operations, begin your reply with "**Plan:**" followed by a short numbered list, then append ' +
+    'the exact marker [PLAN-PENDING] on its own line, and stop. The system will automatically send ' +
+    '"go" after 60 seconds. For simple 1-2 command tasks, execute immediately without the plan marker.',
+};
+
+function buildPersona(mode = 'copilot') {
+  const guidance = MODE_GUIDANCE[mode] ?? MODE_GUIDANCE.copilot;
+  return `${PERSONA_BASE}\n${guidance}`;
+}
 
 // ---- unified session (shared with iMessage — one owner, one brain thread) ----
 // Key is always 'owner' since this bot is owner-locked.
@@ -169,13 +215,13 @@ function runClaude(args, prompt) {
   });
 }
 
-async function ask(prompt, onHeartbeat, target = 'mac') {
+async function ask(prompt, onHeartbeat, target = 'mac', mode = 'copilot') {
   if (target === 'windows') return runClaudeRemote(prompt);
   const base = [
     '-p', '--output-format', 'json',
     '--model', MODEL,
     '--permission-mode', PERMISSION_MODE,
-    '--append-system-prompt', PERSONA,
+    '--append-system-prompt', buildPersona(mode),
     '--add-dir', WORKSPACE,
     '--add-dir', '/Users/owner', // full home access (ultimate powers); ~/helm stays off-limits per persona
     '--strict-mcp-config', '--mcp-config', mcpConfigArg(), // workspace/mcp/servers.json (filesystem + fetch)
@@ -251,10 +297,28 @@ client.on(Events.MessageCreate, async msg => {
   const text = msg.content.replace(`<@${client.user.id}>`, '').trim();
   if (!text && !msg.attachments.size) return;   // allow image-only messages
 
-  // ---- stop/cancel: actually kill any in-flight run (handled before anything else) ----
+  // ---- stop/cancel: kill in-flight runs AND cancel any pending autopilot timer ----
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) {
     const n = killAll();
-    await msg.reply(n ? `Stopped — killed ${n} running task(s).` : 'Nothing was running.');
+    const hasPending = autopilotTimers.has(msg.channel.id);
+    if (hasPending) { clearTimeout(autopilotTimers.get(msg.channel.id)); autopilotTimers.delete(msg.channel.id); }
+    const parts = [];
+    if (n) parts.push(`killed ${n} running task(s)`);
+    if (hasPending) parts.push('cancelled pending autopilot plan');
+    await msg.reply(parts.length ? `Stopped — ${parts.join(' + ')}.` : 'Nothing was running.');
+    return;
+  }
+
+  // ---- !mode: get or set the autonomy mode ----
+  if (/^!mode\s*$/i.test(text)) {
+    await msg.reply(`Current mode: **${getAutonomyMode()}**. Options: \`suggest\` | \`copilot\` | \`autopilot\`.`);
+    return;
+  }
+  const modeMatch = text.match(/^!mode\s+(suggest|copilot|autopilot)\s*$/i);
+  if (modeMatch) {
+    const newMode = modeMatch[1].toLowerCase();
+    const ok = setAutonomyMode(newMode);
+    await msg.reply(ok ? `Mode set to **${newMode}**.` : 'Failed to save mode preference.');
     return;
   }
 
@@ -317,24 +381,55 @@ client.on(Events.MessageCreate, async msg => {
     if (refs.length) prompt = (text || '(no caption)') +
       `\n\n[The owner attached ${refs.length} file(s) — look at them NOW with your Read tool (Read handles images): ${refs.join(' , ')}]`;
   }
-  console.log(`📩 [${target}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);
+  const mode = getAutonomyMode();
+  console.log(`📩 [${target}][${mode}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
   try {
-    const reply = await ask(prompt, heartbeat => msg.channel.send(heartbeat).catch(() => {}), target);
+    const reply = await ask(prompt, heartbeat => msg.channel.send(heartbeat).catch(() => {}), target, mode);
     clearInterval(typing);
-    const { text: body, files } = splitAttachments(reply);
-    for (const part of chunks(body || '(see attachment)')) await msg.reply(part);
-    for (const f of files) {
-      let lf = f;
-      if (target === 'windows' && /^[A-Za-z]:[\\/]/.test(f)) {       // a Windows path -> pull it to the Mac first
-        lf = scpFromWin(f);
-        if (!lf) { await msg.reply(`(couldn't fetch ${f} from windows)`); continue; }
+    const { text: rawBody, files } = splitAttachments(reply);
+
+    // Autopilot plan detection: if Claude included [PLAN-PENDING], strip the marker,
+    // post the plan, then auto-send "go" after 60 s (cancellable by "stop").
+    const hasPlanPending = mode === 'autopilot' && rawBody.includes('[PLAN-PENDING]');
+    const body = rawBody.replace(/\[PLAN-PENDING\]/g, '').trim();
+
+    if (hasPlanPending) {
+      const planMsg = body + '\n\n_Auto-proceeding in 60 s — reply `stop` to cancel._';
+      for (const part of chunks(planMsg)) await msg.reply(part);
+      const channelRef = msg.channel;
+      const timer = setTimeout(async () => {
+        autopilotTimers.delete(channelRef.id);
+        channelRef.sendTyping().catch(() => {});
+        try {
+          const execReply = await ask('go ahead with the plan', null, target, mode);
+          const { text: execBody, files: execFiles } = splitAttachments(execReply);
+          for (const part of chunks(execBody || '(done)')) await channelRef.send(part);
+          for (const f of execFiles) {
+            let lf = f;
+            if (target === 'windows' && /^[A-Za-z]:[\\/]/.test(f)) { lf = scpFromWin(f); if (!lf) { await channelRef.send(`(couldn't fetch ${f} from windows)`); continue; } }
+            try { await channelRef.send({ files: [lf] }); }
+            catch (e) { await channelRef.send(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
+          }
+        } catch (e) {
+          if (!e.stopped) await channelRef.send(`Plan execution error: ${String(e.message || e).slice(0, 800)}`).catch(() => {});
+        }
+      }, 60_000);
+      autopilotTimers.set(msg.channel.id, timer);
+    } else {
+      for (const part of chunks(body || '(see attachment)')) await msg.reply(part);
+      for (const f of files) {
+        let lf = f;
+        if (target === 'windows' && /^[A-Za-z]:[\\/]/.test(f)) {       // a Windows path -> pull it to the Mac first
+          lf = scpFromWin(f);
+          if (!lf) { await msg.reply(`(couldn't fetch ${f} from windows)`); continue; }
+        }
+        try { await msg.reply({ files: [lf] }); }
+        catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
       }
-      try { await msg.reply({ files: [lf] }); }
-      catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
     }
-    console.log(`📤 replied (${body.length} chars, ${files.length} files)`);
+    console.log(`📤 replied (${body.length} chars, ${files.length} files, mode=${mode}, planPending=${hasPlanPending})`);
     // durable transcript so nothing is ever lost (the brain distills these into memory)
     try {
       const conv = path.join(WORKSPACE, 'conversations');
