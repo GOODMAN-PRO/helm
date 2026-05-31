@@ -1014,6 +1014,98 @@ function fail(label, reason) {
   finally { if (server) server.close(); }
 }
 
+// ---- 43. circuit-breaker: module exports CircuitBreaker; state machine transitions work ----
+{
+  const label = 'circuit-breaker.mjs: CircuitBreaker exports and state transitions (closed->open->half-open->closed)';
+  try {
+    const { CircuitBreaker, DB_PATH } = await import(path.join(WORKSPACE, 'tools/circuit-breaker.mjs'));
+
+    if (typeof CircuitBreaker !== 'function') throw new Error('CircuitBreaker not exported as a class');
+    if (typeof DB_PATH !== 'string') throw new Error('DB_PATH not exported');
+
+    const NAME = '__smoke_cb_test';
+    const cb = new CircuitBreaker(NAME);
+
+    // Should start closed, no guard
+    if (cb.guard() !== null) throw new Error('fresh circuit should allow (guard=null)');
+    if (cb.currentState() !== 'closed') throw new Error('fresh state should be closed');
+
+    // 4 failures should stay closed
+    for (let i = 0; i < 4; i++) cb.onFailure();
+    if (cb.currentState() !== 'closed') throw new Error('4 failures should still be closed');
+
+    // 5th failure opens it
+    cb.onFailure();
+    if (cb.currentState() !== 'open') throw new Error('5th failure should open circuit');
+    if (cb.guard() === null) throw new Error('open circuit should block (guard != null)');
+
+    // Success resets to closed
+    cb.onSuccess();
+    if (cb.currentState() !== 'closed') throw new Error('success should close circuit');
+    if (cb.guard() !== null) throw new Error('closed circuit should allow after reset');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 44. cost-tracker: appendCost + getCostSummary round-trip ----
+{
+  const label = 'cost-tracker.mjs: appendCost records entry; getCostSummary returns it in since window';
+  try {
+    const { appendCost, getCostSummary } = await import(path.join(WORKSPACE, 'costs/cost-tracker.mjs'));
+
+    if (typeof appendCost !== 'function') throw new Error('appendCost not exported');
+    if (typeof getCostSummary !== 'function') throw new Error('getCostSummary not exported');
+
+    const before = Date.now();
+    appendCost('smoke-model', 1000, 200);
+
+    const rows = getCostSummary(new Date(before));
+    const row = rows.find(r => r.model === 'smoke-model');
+    if (!row) throw new Error('appended cost not found in getCostSummary result');
+    if (row.runs < 1) throw new Error('runs should be >= 1');
+    if (row.total_est_tokens <= 0) throw new Error('est_tokens should be > 0 for non-zero chars');
+    // est_tokens = round((1000 + 200) / 4) = 300
+    if (row.total_est_tokens !== 300) throw new Error(`expected 300 est_tokens, got ${row.total_est_tokens}`);
+
+    // getCostSummary(future) must return empty for our smoke entry
+    const future = getCostSummary(new Date(Date.now() + 60_000));
+    if (future.some(r => r.model === 'smoke-model')) throw new Error('future since should exclude past entries');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- 45. /cost command + think/swarm guards: wired in source ----
+{
+  const label = '/cost in index.js; maxTicks/maxWall in think.mjs; swarm wall-time guard in swarm.mjs';
+  try {
+    const iSrc = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!iSrc.includes('/cost'))
+      throw new Error('/cost command handler missing from index.js');
+    if (!iSrc.includes('getCostSummary'))
+      throw new Error('getCostSummary call missing from index.js');
+    if (!iSrc.includes('appendCost'))
+      throw new Error('appendCost call missing from index.js');
+
+    const thinkSrc = readFileSync(path.join(WORKSPACE, 'think/think.mjs'), 'utf8');
+    if (!thinkSrc.includes('MAX_TICKS'))
+      throw new Error('MAX_TICKS guard missing from think.mjs');
+    if (!thinkSrc.includes('MAX_WALL_MS'))
+      throw new Error('MAX_WALL_MS guard missing from think.mjs');
+    if (!thinkSrc.includes('maxTicks'))
+      throw new Error('maxTicks check not wired in think.mjs interval callback');
+
+    const swarmSrc = readFileSync(path.join(WORKSPACE, 'swarm/swarm.mjs'), 'utf8');
+    if (!swarmSrc.includes('SWARM_MAX_WALL_MS'))
+      throw new Error('SWARM_MAX_WALL_MS guard missing from swarm.mjs');
+    if (!swarmSrc.includes('swarm wall time exceeded'))
+      throw new Error('wall-time exceeded log message missing from swarm.mjs');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

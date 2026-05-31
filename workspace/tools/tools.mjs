@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync }    from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { CircuitBreaker } from './circuit-breaker.mjs';
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const REGISTRY   = path.join(__dirname, 'registry.json');
@@ -75,8 +76,15 @@ if (verb === 'call') {
     cmdArgs.push(`--${k}`, String(v));
   }
 
+  const cb = new CircuitBreaker(name);
+  const blocked = cb.guard();
+  if (blocked) { console.error('CIRCUIT BREAKER: ' + blocked); process.exit(3); }
+
   const r = spawnSync(cmd, cmdArgs, { cwd: WORKSPACE, encoding: 'utf8', stdio: 'inherit' });
-  if (r.error) die(`exec failed (${cmd}): ${r.error.message}`);
+  if (r.error) { cb.onFailure(); die(`exec failed (${cmd}): ${r.error.message}`); }
+  // code 2 = confirm gate (not a tool failure); code 0 = success
+  if (r.status === 0) cb.onSuccess();
+  else if (r.status !== 2) cb.onFailure();
   process.exit(r.status ?? 1);
 }
 

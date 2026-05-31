@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { Client, GatewayIntentBits, Partials, Events } from 'discord.js';
 import { getSession, setSession, deleteSession } from './workspace/sessions.mjs';
+import { appendCost, getCostSummary } from './workspace/costs/cost-tracker.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -208,7 +209,9 @@ async function ask(prompt, onHeartbeat, target = 'mac') {
   try {
     const j = JSON.parse(out);
     if (j.session_id) setSession('owner', j.session_id, 'discord');
-    return (j.result ?? '').toString().trim() || '(empty reply)';
+    const reply = (j.result ?? '').toString().trim() || '(empty reply)';
+    try { appendCost(MODEL, prompt.length, reply.length); } catch {}
+    return reply;
   } catch {
     return out.trim() || '(no output)';
   }
@@ -293,6 +296,20 @@ client.on(Events.MessageCreate, async msg => {
   }
   if (/^\/?(where|which|target|status)\b/.test(low)) {
     await msg.reply(`Active machine: **${getTarget()}**${getTarget() === 'windows' && !HELM_WIN_HOST ? ' (not configured)' : ''}.`);
+    return;
+  }
+
+  // ---- /cost: today's usage summary (notional tokens, Max subscription) ----
+  if (/^\/cost\b/.test(low)) {
+    try {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const rows = getCostSummary(today);
+      if (!rows.length) { await msg.reply('No usage tracked today yet.'); return; }
+      const lines = rows.map(r =>
+        `${r.model.padEnd(12)} ${String(r.runs).padStart(3)} runs  ~${r.total_est_tokens.toLocaleString()} tokens`
+      );
+      await msg.reply('Today\'s usage (Max subscription — no billing):\n```\n' + lines.join('\n') + '\n```');
+    } catch (e) { await msg.reply('cost tracker error: ' + e.message.slice(0, 200)); }
     return;
   }
 

@@ -37,6 +37,9 @@ const AGENT_CAP_MS = 60 * 60_000;
 const SWARM_WT = path.join(ROOT, '.swarm');
 const LOG = path.join(__dirname, 'swarm.log');
 const REPORT = path.join(__dirname, 'REPORT.md');
+// Overall wall-time guard: abort queued tasks if the swarm runs too long.
+const SWARM_MAX_WALL_MS = parseInt(process.env.SWARM_MAX_WALL_MIN || '240', 10) * 60_000;
+const SWARM_START = Date.now();
 
 const ts = () => new Date().toISOString();
 const log = m => { const l = `[swarm ${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
@@ -73,7 +76,14 @@ async function pool(items, size, fn) {
   const ret = [];
   let i = 0;
   await Promise.all(Array.from({ length: Math.max(1, Math.min(size, items.length)) }, async () => {
-    while (i < items.length) { const idx = i++; ret[idx] = await fn(items[idx], idx); }
+    while (i < items.length) {
+      if ((Date.now() - SWARM_START) > SWARM_MAX_WALL_MS) {
+        log(`WARN: swarm wall time exceeded (${SWARM_MAX_WALL_MS / 60_000} min) — aborting remaining tasks`);
+        i = items.length; // drain queue without processing remaining items
+        break;
+      }
+      const idx = i++; ret[idx] = await fn(items[idx], idx);
+    }
   }));
   return ret;
 }
