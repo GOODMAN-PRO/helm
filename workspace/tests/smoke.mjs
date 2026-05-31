@@ -983,6 +983,33 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 42. dashboard: /api/state includes recentRuns array; HTML includes Recent Job Runs panel ----
+{
+  const label = 'dashboard: /api/state has recentRuns array; HTML renders Recent Job Runs panel';
+  let server;
+  try {
+    // Re-import using a cache-busting search (module is already cached from check 21 — use the
+    // same cached import, which is fine: we just need the already-started module shape).
+    const { start } = await import(path.join(WORKSPACE, 'dashboard/server.mjs'));
+    const { server: s, url } = await start(0);
+    server = s;
+
+    const apiRes = await fetch(url + '/api/state');
+    if (apiRes.status !== 200) throw new Error(`GET /api/state returned ${apiRes.status}`);
+    const state = await apiRes.json();
+    if (!('recentRuns' in state)) throw new Error('/api/state missing recentRuns key');
+    if (!Array.isArray(state.recentRuns)) throw new Error('recentRuns must be an array');
+
+    const homeRes = await fetch(url + '/');
+    if (homeRes.status !== 200) throw new Error(`GET / returned ${homeRes.status}`);
+    const html = await homeRes.text();
+    if (!html.includes('Recent Job Runs')) throw new Error('HTML missing "Recent Job Runs" panel heading');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+  finally { if (server) server.close(); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
