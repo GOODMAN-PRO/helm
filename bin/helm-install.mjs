@@ -73,8 +73,9 @@ if (path.resolve(PKG_ROOT) === path.resolve(TARGET)) {
 
 // 3) dependencies
 say('Installing dependencies (npm install)...');
-// shell:true is required on Windows (Node refuses to spawn npm.cmd directly) and harmless on POSIX
-if (spawnSync('npm', ['install', '--no-audit', '--no-fund'], { cwd: TARGET, stdio: 'inherit', shell: true }).status !== 0)
+// run via the shell as a single string: required on Windows (Node won't spawn npm.cmd directly),
+// and avoids the DEP0190 warning that args-array + shell:true triggers. Args are static/safe.
+if (spawnSync('npm install --no-audit --no-fund', { cwd: TARGET, stdio: 'inherit', shell: true }).status !== 0)
   die(`npm install failed — run 'npm install' in ${TARGET}.`);
 ok('dependencies installed');
 

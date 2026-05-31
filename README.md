@@ -57,7 +57,7 @@ cp .env.example .env        # set DISCORD_TOKEN + OWNER_ID, then: npm start
 
 # No git — download the tarball
 mkdir helm && curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main \
-  | tar -xz -C helm --strip-components=1 && cd helm && npm install && npm run setup
+  | tar -xz -C helm --strip-components=1 && cd helm && npm install && npm run wizard
 
 # From a clone, re-run the cross-platform installer any time
 node bin/helm-install.mjs
