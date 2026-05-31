@@ -1106,6 +1106,59 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 46. !mode command: index.js has the handler; preference round-trips through memory.db ----
+{
+  const label = '!mode: handler present in index.js; helm.autonomy_mode preference round-trips';
+  try {
+    // Verify source has the !mode handler and autonomy infrastructure.
+    const src = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    if (!src.includes('getAutonomyMode'))
+      throw new Error('getAutonomyMode missing from index.js');
+    if (!src.includes('setAutonomyMode'))
+      throw new Error('setAutonomyMode missing from index.js');
+    if (!src.includes('helm.autonomy_mode'))
+      throw new Error("preference key 'helm.autonomy_mode' missing from index.js");
+    if (!src.includes('autopilotTimers'))
+      throw new Error('autopilotTimers Map missing from index.js (autopilot plan scheduling)');
+    if (!src.includes('[PLAN-PENDING]'))
+      throw new Error('[PLAN-PENDING] marker handling missing from index.js');
+    if (!src.includes('buildPersona'))
+      throw new Error('buildPersona missing from index.js');
+    if (!src.includes('MODE_GUIDANCE'))
+      throw new Error('MODE_GUIDANCE missing from index.js');
+
+    // Verify CLAUDE.md has plan-before-act and confidence signaling sections.
+    const claudeMd = readFileSync(path.join(WORKSPACE, 'CLAUDE.md'), 'utf8');
+    if (!claudeMd.includes('Plan-before-act'))
+      throw new Error('Plan-before-act section missing from CLAUDE.md');
+    if (!claudeMd.includes('Confidence signaling'))
+      throw new Error('Confidence signaling section missing from CLAUDE.md');
+    if (!claudeMd.includes('[PLAN-PENDING]'))
+      throw new Error('[PLAN-PENDING] marker documentation missing from CLAUDE.md');
+
+    // Preference round-trip: write 'autopilot' via memory.mjs, read it back, clean up.
+    const KEY = 'helm.autonomy_mode';
+    const mem = path.join(WORKSPACE, 'memory/memory.mjs');
+    spawnSync('node', [mem, 'remember', 'preference', KEY, 'autopilot'],
+      { encoding: 'utf8', timeout: 10_000 });
+
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(WORKSPACE, 'memory/memory.db'));
+    const row = db.prepare(`SELECT value FROM facts WHERE kind = 'preference' AND key = ?`).get(KEY);
+    const stored = row?.value;
+
+    // Restore to copilot (the default) so we don't leave a changed preference behind.
+    spawnSync('node', [mem, 'remember', 'preference', KEY, 'copilot'],
+      { encoding: 'utf8', timeout: 10_000 });
+    db.close();
+
+    if (stored !== 'autopilot')
+      throw new Error(`expected 'autopilot' in DB, got '${stored}'`);
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
