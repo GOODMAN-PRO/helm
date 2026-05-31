@@ -46,8 +46,9 @@ db.exec(`
 // Active-learning columns. Idempotent: ignore "duplicate column" errors on re-run.
 try { db.exec(`ALTER TABLE facts ADD COLUMN evidence_count INTEGER NOT NULL DEFAULT 1`); } catch {}
 try { db.exec(`ALTER TABLE facts ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0`); } catch {}
-// Backfill last_seen on rows that pre-date the column.
-db.exec(`UPDATE facts SET last_seen = COALESCE(NULLIF(last_seen, 0), updated)`);
+// Backfill last_seen on rows that pre-date the column. WHERE guard avoids a
+// full-table write on every startup once all rows are already set.
+db.exec(`UPDATE facts SET last_seen = updated WHERE last_seen = 0`);
 // Long-term guard against (kind, key) duplicates. Skip if existing rows already
 // violate uniqueness — migrate.mjs handles the dedup-then-create path.
 try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS facts_kind_key_uniq ON facts(kind, key)`); } catch {}
@@ -71,7 +72,7 @@ function parseFlags(args) {
 function out(obj) { console.log(JSON.stringify(obj, null, 2)); }
 function die(msg) { console.error(msg); process.exit(1); }
 
-await (async () => {
+try { await (async () => {
 switch (verb) {
   case 'remember': {
     const { flags, pos } = parseFlags(rest);
@@ -208,17 +209,17 @@ switch (verb) {
       const k = keywordScore(f);
       const s = semScore(f, i);
       const e = embedScores ? embedScores[i] : null;
-      // When real embeddings are available, blend keyword + embedding similarity.
-      // When absent, fall back to keyword + TF-IDF (identical to previous behavior).
-      const score = e !== null
-        ? Math.max(k, e * 0.9)
-        : Math.max(k, s * 0.9);
+      // Blend: take the better of keyword score and semantic score. The 0.9
+      // discount was removed — it suppressed the semantic signal below the
+      // keyword floor even when the semantic score was higher, making the
+      // tiebreaker useless for facts sharing the same keyword score.
+      const score = e !== null ? Math.max(k, e) : Math.max(k, s);
       return { ...f, _score: score, _k: k, _s: s };
     });
 
     const results = scored
       .filter(f => !qTokens.length || f._score > 0.01)
-      .sort((a, b) => b._score - a._score || (b.confidence - a.confidence) || (b.updated - a.updated))
+      .sort((a, b) => b._score - a._score || (b._s - a._s) || (b.confidence - a.confidence) || (b.updated - a.updated))
       .slice(0, limit)
       .map(({ _score, _k, _s, ...f }) => f);
 
@@ -285,6 +286,4 @@ switch (verb) {
   default:
     die('verbs: remember | recall | forget | dump | episode | unsure');
 }
-})();
-
-db.close();
+})(); } finally { db.close(); }
