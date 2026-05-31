@@ -56,27 +56,40 @@ const getTarget = () => { try { const t = readFileSync(TARGET_FILE, 'utf8').trim
 const setTarget = t => writeFileSync(TARGET_FILE, t);
 
 // Run the brain on the Windows node over SSH (async so the gateway stays responsive).
+// Resumes the windows session ('owner-windows') so multi-step tasks stay coherent across messages.
 function runClaudeRemote(prompt) {
   return new Promise(resolve => {
     if (!HELM_WIN_HOST) return resolve('Windows node not configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Claude on Windows, then say "use windows" again.');
-    // Shell-quote components so paths with spaces survive the remote shell.
-    const q = s => `"${s.replace(/"/g, '\\"')}"`;
-    const REMOTE_PERSONA = 'You are Helm running on the owners Windows PC over SSH, with full shell and file access on this machine. Act, do not just advise. Keep replies short and chat-friendly. Confirm before anything destructive, irreversible, or that spends money. Never touch the separate Helm project. ' +
-      'To SCREENSHOT this Windows screen (an SSH session cannot capture the desktop directly), run: schtasks /run /tn HelmShot   then wait ~3 seconds (powershell Start-Sleep 3). It saves the live desktop to C:\\\\Users\\\\User\\\\helm-shot.png. Finish your reply with a line exactly: ATTACH: C:\\\\Users\\\\User\\\\helm-shot.png  and the owner will receive the image.';
-    const remoteCmd = `${HELM_WIN_DIR ? `cd ${q(HELM_WIN_DIR)} && ` : ''}${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)} --append-system-prompt ${q(REMOTE_PERSONA)}`;
-    const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
-    let out = '', err = '';
-    const kill = setTimeout(() => child.kill(), 30 * 60_000);
-    child.stdout.on('data', d => { out += d; });
-    child.stderr.on('data', d => { err += d; });
-    child.on('error', e => { clearTimeout(kill); resolve(`Windows SSH error: ${e.message}`); });
-    child.on('close', code => {
-      clearTimeout(kill);
-      if (code !== 0) return resolve(`Windows exec failed (exit ${code}): ${(err || '').trim().slice(0, 500)}`);
-      try { resolve((JSON.parse(out).result ?? '').toString().trim() || '(empty reply)'); }
-      catch { resolve(out.trim() || '(no output)'); }
-    });
-    child.stdin.write(prompt); child.stdin.end();
+    const q = s => `"${s.replace(/"/g, '\\"')}"`;   // shell-quote for the remote shell
+    const REMOTE_PERSONA = "You are Helm on the owner's Windows PC over SSH, with full shell and file access. " +
+      'ACT — actually DO what the owner asks end to end: create the files, build the thing, run the commands, accomplish the task. ' +
+      'A screenshot is ONLY to SHOW a result AFTER you have done the work — NEVER reply with just a screenshot instead of doing the task, and never claim you did something you did not. ' +
+      'Keep replies short. Confirm before anything destructive, irreversible, or that spends money. Never touch the separate Helm project. ' +
+      'To screenshot the Windows desktop (SSH cannot capture it directly): run  schtasks /run /tn HelmShot  then wait ~3s (powershell Start-Sleep 3); it saves to C:\\\\Users\\\\User\\\\helm-shot.png. End that reply with a line exactly: ATTACH: C:\\\\Users\\\\User\\\\helm-shot.png';
+    const run = sid => {
+      const resumeFlag = sid ? `--resume ${q(sid)} ` : '';
+      const remoteCmd = `${HELM_WIN_DIR ? `cd ${q(HELM_WIN_DIR)} && ` : ''}${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
+      const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
+      let out = '', err = '';
+      const kill = setTimeout(() => child.kill(), 30 * 60_000);
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', e => { clearTimeout(kill); resolve(`Windows SSH error: ${e.message}`); });
+      child.on('close', code => {
+        clearTimeout(kill);
+        if (code !== 0) {
+          if (sid) { deleteSession('owner-windows'); return run(null); }   // stale session -> retry fresh
+          return resolve(`Windows exec failed (exit ${code}): ${(err || '').trim().slice(0, 500)}`);
+        }
+        try {
+          const j = JSON.parse(out);
+          if (j.session_id) setSession('owner-windows', j.session_id, 'windows');
+          resolve((j.result ?? '').toString().trim() || '(empty reply)');
+        } catch { resolve(out.trim() || '(no output)'); }
+      });
+      child.stdin.write(prompt); child.stdin.end();
+    };
+    run(getSession('owner-windows'));
   });
 }
 
@@ -111,6 +124,7 @@ const PERSONA =
   'or that spends money. ' +
   'You have full authority over this Mac — shell, files, GUI (screenshot + guicontrol clicks/typing), ' +
   'the scheduler, and your own source code. Act boldly and proactively. ' +
+  'When asked to build or create something, actually BUILD it (make the files, write the code, run the commands, finish the task) — a screenshot or a description is NEVER a substitute for doing the work. "Show me" means produce the real artifact first, THEN optionally screenshot it to display the result. ' +
   'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
 
 // ---- unified session (shared with iMessage — one owner, one brain thread) ----
