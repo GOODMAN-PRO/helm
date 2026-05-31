@@ -324,4 +324,9 @@ client.on(Events.MessageCreate, async msg => {
   }
 });
 
+// Prevent Discord WebSocket errors from crashing Node (unhandled EventEmitter error event = fatal).
+client.on('error', err => console.error('Discord client error:', err));
+// Prevent any stray unhandled async rejection from killing the process.
+process.on('unhandledRejection', reason => console.error('Unhandled rejection:', reason));
+
 client.login(DISCORD_TOKEN);
