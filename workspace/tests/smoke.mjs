@@ -584,6 +584,50 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 25. plan.mjs: add-step reactivates done plan; complete rejects already-done step ----
+{
+  const label = 'plan.mjs: add-step reactivates done plan; complete rejects already-done step';
+  const PLAN = path.join(WORKSPACE, 'plans/plan.mjs');
+  try {
+    // Create plan and add + complete one step so plan auto-closes
+    const p = JSON.parse(spawnSync('node', [PLAN, 'create', 'smoke-plan-25'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    const pid = p.id;
+
+    const s1 = JSON.parse(spawnSync('node', [PLAN, 'add-step', String(pid), 'step one'],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+
+    const done1 = JSON.parse(spawnSync('node', [PLAN, 'complete', String(pid), String(s1.id)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (done1.status !== 'done') throw new Error(`step should be done, got ${done1.status}`);
+
+    const after1 = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (after1.status !== 'done') throw new Error(`plan should be done after all steps complete, got ${after1.status}`);
+
+    // Fix 1: add-step to a done plan must reactivate it
+    spawnSync('node', [PLAN, 'add-step', String(pid), 'step two'],
+      { encoding: 'utf8', timeout: 10_000 });
+    const after2 = JSON.parse(spawnSync('node', [PLAN, 'show', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (after2.status !== 'active')
+      throw new Error(`plan should be reactivated after add-step, got ${after2.status}`);
+
+    // next must return the pending step, not null
+    const nxt = JSON.parse(spawnSync('node', [PLAN, 'next', String(pid)],
+      { encoding: 'utf8', timeout: 10_000 }).stdout);
+    if (!nxt.step) throw new Error('next should return pending step after reopen, got null');
+    if (nxt.step.task !== 'step two') throw new Error(`unexpected step task: ${nxt.step.task}`);
+
+    // Fix 2: complete an already-done step must exit non-zero
+    const r2 = spawnSync('node', [PLAN, 'complete', String(pid), String(s1.id)],
+      { encoding: 'utf8', timeout: 10_000 });
+    if (r2.status === 0) throw new Error('completing an already-done step should exit non-zero');
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

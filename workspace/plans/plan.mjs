@@ -110,6 +110,10 @@ if (verb === 'create') {
   const r = db.prepare(`
     INSERT INTO steps (plan_id, idx, task, tool_or_cmd) VALUES (?, ?, ?, ?) RETURNING *
   `).get(planId, idx, task, tool);
+
+  // Reactivate plan if it was closed — a new pending step makes it active again.
+  db.prepare(`UPDATE plans SET status='active' WHERE id=? AND status='done'`).run(planId);
+
   out(stepRow(r));
 
 } else if (verb === 'next') {
@@ -145,6 +149,7 @@ if (verb === 'create') {
 
   const step = db.prepare(`SELECT * FROM steps WHERE id = ? AND plan_id = ?`).get(stepId, planId);
   if (!step) die(`step ${stepId} not found in plan ${planId}`);
+  if (step.status !== 'pending') die(`step ${stepId} is already ${step.status}`);
 
   db.prepare(`
     UPDATE steps SET status='done', result=?, checkpoint=?, updated=unixepoch() WHERE id=?
