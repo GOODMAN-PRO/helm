@@ -35,6 +35,17 @@ const WORKSPACE = path.resolve(__dirname, process.env.WORKSPACE || './workspace'
 
 // Env handed to the `claude` engine. In subscription mode we strip ANTHROPIC_API_KEY so a stray
 // shell var can't override the OAuth login; in apikey mode we keep it (Claude Code auto-uses it).
+// Resolve a runnable `claude` on this OS. On Windows, CLAUDE_BIN is often the extension-less npm
+// shim (e.g. ...\npm\claude) which Node can't spawn — prefer claude.exe, else claude.cmd (needs a shell).
+function resolveClaude() {
+  const bin = CLAUDE_BIN || 'claude';
+  if (process.platform !== 'win32') return { cmd: bin, shell: false };
+  if (/\.exe$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: false };
+  if (/\.cmd$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: true };
+  if (existsSync(bin + '.exe')) return { cmd: bin + '.exe', shell: false };
+  if (existsSync(bin + '.cmd')) return { cmd: bin + '.cmd', shell: true };
+  return { cmd: bin, shell: true };   // let the shell resolve via PATHEXT
+}
 function claudeEnv() {
   const e = { ...process.env };
   if (AUTH_MODE === 'apikey') {
@@ -261,7 +272,8 @@ function killAll() {
 }
 function runClaude(args, prompt) {
   return new Promise((resolve, reject) => {
-    const child = spawn(CLAUDE_BIN, args, { cwd: WORKSPACE, env: claudeEnv() });
+    const cb = resolveClaude();
+    const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell });
     running.add(child);
     let out = '', err = '';
     const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000); // 10-min cap
