@@ -4,6 +4,8 @@
 // module never fails even when the package is absent or the model undownloaded.
 
 let _pipeline = null;
+// Single shared promise prevents concurrent callers from double-initializing.
+let _loadPromise = null;
 
 export function ensureVectorsTable(db) {
   db.exec(`
@@ -16,14 +18,16 @@ export function ensureVectorsTable(db) {
   `);
 }
 
+// WeakSet tracks which db instances already have the vectors table, so we don't
+// re-execute the DDL on every getOrComputeVector() call.
+const _tablesReady = new WeakSet();
+
 // Warms the pipeline if not already loaded. Returns true when loaded, false if unavailable.
 // Never triggers a download (allowRemoteModels = false).
 export async function ensurePipelineLoaded() {
+  if (_pipeline) return true;  // already loaded — skip re-initialization
   try {
-    const mod = await import('@xenova/transformers');
-    mod.env.allowRemoteModels = false;
-    mod.env.allowLocalModels = true;
-    _pipeline = await mod.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    await getPipeline();
     return true;
   } catch {
     return false;
@@ -35,11 +39,20 @@ export const isModelAvailable = ensurePipelineLoaded;
 
 async function getPipeline() {
   if (_pipeline) return _pipeline;
-  const mod = await import('@xenova/transformers');
-  mod.env.allowRemoteModels = false;
-  mod.env.allowLocalModels = true;
-  _pipeline = await mod.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-  return _pipeline;
+  if (!_loadPromise) {
+    _loadPromise = import('@xenova/transformers').then(mod => {
+      mod.env.allowRemoteModels = false;
+      mod.env.allowLocalModels = true;
+      return mod.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    }).then(p => {
+      _pipeline = p;
+      return p;
+    }).catch(e => {
+      _loadPromise = null;  // allow retry if model becomes available later
+      throw e;
+    });
+  }
+  return _loadPromise;
 }
 
 // Compute a sentence embedding vector (384-dim, L2-normalised).
@@ -62,12 +75,20 @@ export function cosineSimilarity(a, b) {
 }
 
 // Look up a cached vector for factId in db.vectors; compute and store if absent.
-// db must be a node:sqlite DatabaseSync instance (passed from memory.mjs).
+// Returns null when the model is unavailable. db must be a node:sqlite DatabaseSync instance.
 export async function getOrComputeVector(db, factId, text) {
-  ensureVectorsTable(db);
+  if (!_tablesReady.has(db)) {
+    ensureVectorsTable(db);
+    _tablesReady.add(db);
+  }
   const row = db.prepare('SELECT vector FROM vectors WHERE fact_id = ?').get(factId);
   if (row) return JSON.parse(row.vector);
-  const vec = await embedText(text);
+  let vec;
+  try {
+    vec = await embedText(text);
+  } catch {
+    return null;  // model absent or unavailable — caller handles null gracefully
+  }
   db.prepare('INSERT OR REPLACE INTO vectors (fact_id, vector) VALUES (?, ?)').run(
     factId, JSON.stringify(vec)
   );
