@@ -15,12 +15,18 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync, truncateSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH   = path.join(__dirname, 'events.db');
 const CHAT_DB   = `${process.env.HOME}/Library/Messages/chat.db`;
+
+// Truncate logs at startup if they exceed 5 MB to prevent unbounded growth.
+const LOG_CAP = 5 * 1024 * 1024;
+for (const lf of [path.join(__dirname, 'poller.log'), path.join(__dirname, 'poller.err')]) {
+  try { if (statSync(lf).size > LOG_CAP) truncateSync(lf, 0); } catch {}
+}
 
 const args     = process.argv.slice(2);
 const iFlag    = args.indexOf('--interval');
@@ -61,20 +67,22 @@ function getMessagesUnread() {
     return null;
   }
   const tmp = `/tmp/helm-chat-snapshot-${Date.now()}.db`;
+  let snap = null;
+  let result = null;
   try {
     execFileSync('cp', [CHAT_DB, tmp], { timeout: 5000 });
-    const snap = new DatabaseSync(tmp);
-    // is_read=0 and item_type=0 (message, not attachment etc.) coming inward (is_from_me=0)
+    snap = new DatabaseSync(tmp);
     const row = snap.prepare(
       "SELECT COUNT(*) as n FROM message WHERE is_read=0 AND is_from_me=0 AND item_type=0"
     ).get();
-    snap.close();
-    execFileSync('rm', ['-f', tmp]);
-    return row?.n ?? 0;
+    result = row?.n ?? 0;
   } catch (e) {
     warnOnce('chat-read', `Cannot read chat.db: ${e.message}`);
-    return null;
+  } finally {
+    try { snap?.close(); } catch {}
+    try { execFileSync('rm', ['-f', tmp]); } catch {}
   }
+  return result;
 }
 
 // ---- Calendar ----

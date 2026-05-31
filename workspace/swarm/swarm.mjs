@@ -40,6 +40,7 @@ const REPORT = path.join(__dirname, 'REPORT.md');
 
 const ts = () => new Date().toISOString();
 const log = m => { const l = `[swarm ${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
+const flushTasks = tasks => { try { writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2)); } catch (e) { log('WARN: could not flush tasks: ' + e.message); } };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 const git = (cwd, ...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', '-C', cwd, ...a]);
 const notify = msg => { try { sh('/usr/bin/env', ['node', path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
@@ -116,7 +117,21 @@ const reviewPrompt = (t, builderSummary) => [
   let tasks;
   try { tasks = JSON.parse(readFileSync(TASKS_FILE, 'utf8')); }
   catch (e) { log('cannot read tasks: ' + e.message); process.exit(1); }
-  const todo = tasks.filter(t => t.status !== 'done');
+  const todo = tasks.filter(t => {
+    if (t.status === 'done') return false;
+    // Already merged but smoke confirmation was lost (e.g. crash after merge, before smoke).
+    // The code is in main — do not re-apply. Operator should verify smoke manually.
+    if (t.status === 'merged-pending-smoke') {
+      log(`task ${t.id} already merged (status: merged-pending-smoke) — skipping rebuild`);
+      return false;
+    }
+    // Crash during git merge itself. State of main is unknown — operator must inspect.
+    if (t.status === 'merging') {
+      log(`WARN: task ${t.id} status is 'merging' — possible crash mid-merge, operator review required — skipping`);
+      return false;
+    }
+    return true;
+  });
   if (!todo.length) { log('no pending tasks'); return; }
   log(`start: ${todo.length} tasks, ${WORKERS} builders / ${REVIEWERS} reviewers, build=${BUILD_MODEL} review=${REVIEW_MODEL}${DRY ? ' [DRY]' : ''}`);
 
@@ -166,6 +181,7 @@ const reviewPrompt = (t, builderSummary) => [
   for (const t of todo) {
     if (t._verdict !== 'APPROVE') { results.push({ id: t.id, status: 'rejected', note: t._vtext }); continue; }
     const before = git(ROOT, 'rev-parse', 'HEAD').stdout.trim();
+    t.status = 'merging'; if (!DRY) flushTasks(tasks);
     const m = git(ROOT, 'merge', '--no-ff', '--no-edit', `swarm/${t.id}`);
     if (m.status !== 0) {
       // conflict — combine both sides with a resolver agent instead of bailing
@@ -182,21 +198,23 @@ const reviewPrompt = (t, builderSummary) => [
       git(ROOT, 'commit', '--no-edit');
     }
     if (git(ROOT, 'diff', '--name-only', before, 'HEAD').stdout.includes('package.json')) sh('npm', ['install', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
+    t.status = 'merged-pending-smoke'; if (!DRY) flushTasks(tasks);
     const smoke = sh('node', ['workspace/tests/smoke.mjs'], { cwd: ROOT, timeout: 12 * 60_000 });
     if (smoke.status !== 0) {
       git(ROOT, 'reset', '--hard', before);
       sh('npm', ['ci', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
+      t.status = 'pending'; if (!DRY) flushTasks(tasks);
       results.push({ id: t.id, status: 'reverted-smoke' }); log(`reverted ${t.id} (smoke fail)`);
     } else {
       results.push({ id: t.id, status: 'merged', commit: git(ROOT, 'rev-parse', '--short', 'HEAD').stdout.trim() });
-      t.status = 'done'; log(`merged ${t.id}`);
+      t.status = 'done'; if (!DRY) flushTasks(tasks); log(`merged ${t.id}`);
     }
   }
 
   for (const t of todo) { sh('git', ['-C', ROOT, 'worktree', 'remove', '--force', t._wt]); git(ROOT, 'branch', '-D', `swarm/${t.id}`); }
 
   if (DRY) { git(ROOT, 'reset', '--hard', baseMain); log('DRY: main restored'); }
-  else { writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2)); }
+  else { flushTasks(tasks); }
 
   const summary = results.map(r => `- ${r.id}: ${r.status}${r.commit ? ' (' + r.commit + ')' : ''}${r.note ? ' — ' + r.note : ''}`).join('\n');
   appendFileSync(REPORT, `\n## swarm run ${ts()} ${DRY ? '[DRY] ' : ''}\n${summary}\n`);

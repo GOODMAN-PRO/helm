@@ -13,7 +13,7 @@
 // --once      capture one frame and exit (useful for testing)
 
 import { execSync, execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, unlinkSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, truncateSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -24,6 +24,12 @@ const FRAMES_DIR  = path.join(__dirname, 'frames');
 const DB_PATH     = path.join(__dirname, 'events.db');
 const OCR_BINARY  = path.resolve(__dirname, '../../..', 'bin', 'ocr-helper');
 const RING_MAX    = 200;
+
+// Truncate logs at startup if they exceed 5 MB to prevent unbounded growth.
+const LOG_CAP = 5 * 1024 * 1024;
+for (const lf of [path.join(__dirname, 'watcher.log'), path.join(__dirname, 'watcher.err')]) {
+  try { if (statSync(lf).size > LOG_CAP) truncateSync(lf, 0); } catch {}
+}
 
 // Parse flags
 const args = process.argv.slice(2);
@@ -53,6 +59,7 @@ db.exec(`
 const insertEvent = db.prepare(
   'INSERT INTO events (ts, hash, png_path, ocr_text) VALUES (?,?,?,?)'
 );
+const deleteEvent = db.prepare('DELETE FROM events WHERE png_path = ?');
 
 // Perceptual hash: downscale to 8x8 grayscale, threshold by mean.
 // Returns a 64-char binary string of '0'/'1'.
@@ -74,15 +81,17 @@ function hamming(a, b) {
   return d;
 }
 
-// Enforce ring buffer: delete oldest PNGs beyond RING_MAX.
+// Enforce ring buffer: delete oldest PNGs beyond RING_MAX and their DB rows.
 function enforceRing() {
   const files = readdirSync(FRAMES_DIR)
     .filter(f => f.endsWith('.png'))
-    .map(f => ({ f, mtime: +new Date(f.split('-')[0]) }))
+    .map(f => ({ f, mtime: parseInt(f.split('-')[0], 10) }))  // was +new Date(str) → NaN
     .sort((a, b) => a.mtime - b.mtime);
   while (files.length > RING_MAX) {
     const oldest = files.shift();
-    try { unlinkSync(path.join(FRAMES_DIR, oldest.f)); } catch {}
+    const fpath = path.join(FRAMES_DIR, oldest.f);
+    try { unlinkSync(fpath); } catch {}
+    try { deleteEvent.run(fpath); } catch {}  // keep DB in sync
   }
 }
 

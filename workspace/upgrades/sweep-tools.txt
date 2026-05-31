@@ -1,0 +1,52 @@
+You are Helm, doing a full bug-sweep of a specific zone of your own codebase.
+
+Zone you OWN (read + write):
+- `/Users/owner/secondme/workspace/tools/` — everything (registry.json + tools.mjs +
+  every impl in tools/impl/)
+
+DO NOT touch:
+- `/Users/owner/Helm/` — off-limits.
+- `/Users/owner/secondme/workspace/upgrades/` — self-upgrade infra.
+- Anything outside `workspace/tools/`. Other agents own those.
+- `CLAUDE.md`, `tests/smoke*.mjs`.
+
+Goal: find every real bug across the 31 tools and fix them. Not nits.
+
+Per-tool checklist (run for each impl):
+- Schema vs args: does the impl actually accept the args the registry advertises?
+- Arg injection: `--key value` parsing — what happens if value starts with `--`?
+- Shell injection: any `exec`/`spawn` with shell:true and unescaped user input?
+- Path injection: any user path used without sanitization?
+- Confirm gate: tools with `confirm: true` in registry — does the dispatcher actually
+  block them without `--force`? (Phase 2 added the gate, verify still works.)
+- Exit codes: does the tool exit 0 only on success, non-zero on failure?
+- Error output: does failure write to stderr (not stdout JSON)?
+- Side effects: does the registry's `side_effects` field match what the tool does?
+- Idempotency: tools that look idempotent (e.g., `memory.remember` for same kind+key)
+  should be.
+- Race conditions: tools that write shared state (browser-state.json, sessions.db).
+- Timeouts: external calls (osascript, curl) should have sensible timeouts.
+- The `confirm:true` for `imessage.send` and `imessage.send_to` should be honored.
+- The Calendar JXA tools — verify they don't have the duplicate-key bug fixed earlier
+  in the notify poller. Same _and: [...] pattern needed.
+
+Process:
+1. Read `workspace/tools/registry.json` (31 entries) and `workspace/tools/tools.mjs`.
+2. Read every file in `workspace/tools/impl/`.
+3. Run `node --check` on every .mjs.
+4. Run smoke suites: `smoke.mjs`, `smoke-phase2.mjs`, `smoke-phase3.mjs`. Baseline.
+5. List bugs. file:line, severity, fix.
+6. Apply fixes. Re-run syntax + smoke after each non-trivial one.
+7. Verify `node workspace/tools/tools.mjs list` still returns all 31 tools.
+
+Important: do not REMOVE any tool from the registry. If a tool is broken beyond reasonable
+repair, mark it as `"disabled": true` in registry and write WHY in the report.
+
+Report to `/Users/owner/secondme/workspace/upgrades/SWEEP_TOOLS_REPORT.md`:
+- Verified-clean tools
+- Bugs found (table: file:line, severity, status)
+- Fixes applied
+- Disabled tools (if any) and why
+- One-line verdict
+
+Style: no emojis, no flattery, no preamble.

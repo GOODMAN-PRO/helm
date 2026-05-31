@@ -289,6 +289,78 @@ ${renderAllCards(state)}
 </main>
 <script>
 (function() {
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function fmtTs(unix) {
+    if (!unix) return '—';
+    return new Date(unix * 1000).toLocaleString('en-GB', { hour12: false });
+  }
+  function renderServices(services) {
+    const rows = services.map(s =>
+      '<tr><td><span class="dot ' + (s.running ? 'green' : 'red') + '"></span></td>' +
+      '<td class="mono">' + esc(s.name) + '</td>' +
+      '<td>' + (s.running ? 'running' : 'stopped') + '</td>' +
+      '<td class="mono dim">' + esc(s.pid) + '</td>' +
+      '<td class="mono dim">' + esc(s.exitStatus) + '</td></tr>'
+    ).join('');
+    return '<table><thead><tr><th></th><th>Label</th><th>State</th><th>PID</th><th>Exit</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  function renderMemory(mem) {
+    const kinds = Object.entries(mem.byKind || {}).map(([k, n]) => '<span class="badge">' + esc(k) + ' ' + n + '</span>').join(' ');
+    const rows = (mem.recent || []).map(f =>
+      '<tr><td class="mono dim">' + esc(f.kind) + '</td>' +
+      '<td class="mono">' + esc(f.key) + '</td>' +
+      '<td>' + esc(String(f.value).slice(0, 80)) + '</td>' +
+      '<td class="mono dim">' + Number(f.confidence).toFixed(2) + '</td>' +
+      '<td class="dim">' + fmtTs(f.updated) + '</td></tr>'
+    ).join('');
+    return '<p>Total facts: <strong>' + mem.total + '</strong> &nbsp; ' + kinds + '</p>' +
+      '<table><thead><tr><th>Kind</th><th>Key</th><th>Value</th><th>Conf</th><th>Updated</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  function renderJobs(jobs) {
+    if (!jobs.length) return '<p class="dim">No jobs found.</p>';
+    const rows = jobs.map(j =>
+      '<tr class="' + (j.enabled ? '' : 'dim') + '">' +
+      '<td><span class="dot ' + (j.enabled ? 'green' : 'grey') + '"></span></td>' +
+      '<td class="mono">' + esc(j.name) + '</td>' +
+      '<td class="mono">' + esc(j.cron) + '</td>' +
+      '<td class="dim">' + fmtTs(j.last_run) + '</td>' +
+      '<td class="dim">' + fmtTs(j.next_run) + '</td></tr>'
+    ).join('');
+    return '<table><thead><tr><th></th><th>Name</th><th>Cron</th><th>Last run</th><th>Next run</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  function renderJournal(entries) {
+    if (!entries.length) return '<p class="dim">No journal entries.</p>';
+    return entries.map(e =>
+      '<details><summary class="mono">' + esc(e.file) + '</summary>' +
+      '<pre>' + esc(e.excerpt) + (e.excerpt.length >= 500 ? '\n…' : '') + '</pre></details>'
+    ).join('');
+  }
+  function renderUpgrades(sections) {
+    if (!sections.length) return '<p class="dim">No upgrade history.</p>';
+    return sections.map(s => {
+      const firstLine = s.split('\n')[0];
+      const rest = s.split('\n').slice(1).join('\n').trim();
+      return '<details><summary>' + esc(firstLine) + '</summary><pre>' + esc(rest.slice(0, 600)) + (rest.length > 600 ? '\n…' : '') + '</pre></details>';
+    }).join('');
+  }
+  function renderGit(commits) {
+    if (!commits.length) return '<p class="dim">No commits.</p>';
+    return '<ol>' + commits.map(c => '<li class="mono">' + esc(c) + '</li>').join('') + '</ol>';
+  }
+  function renderAllCards(state) {
+    return '<div class="card"><h2>Services</h2>' + renderServices(state.services) + '</div>' +
+      '<div class="card"><h2>Fleet Target</h2><p class="fleet-badge">' + esc(state.fleetTarget) + '</p>' +
+      '<p class="dim" style="margin-top:8px">Read from workspace/active-target</p></div>' +
+      '<div class="card full"><h2>Memory</h2>' + renderMemory(state.memory) + '</div>' +
+      '<div class="card full"><h2>Scheduler Jobs</h2>' + renderJobs(state.jobs) + '</div>' +
+      '<div class="card"><h2>Think Journal</h2>' + renderJournal(state.journal) + '</div>' +
+      '<div class="card"><h2>Self-Upgrade History</h2>' + renderUpgrades(state.upgradeHistory) + '</div>' +
+      '<div class="card"><h2>Git Log (last 5)</h2>' + renderGit(state.gitLog) + '</div>';
+  }
+
   let t = 10;
   const cd = document.getElementById('countdown');
   const flash = document.getElementById('flash');
@@ -296,34 +368,21 @@ ${renderAllCards(state)}
   function tick() {
     t--;
     if (cd) cd.textContent = t;
-    if (t <= 0) {
-      t = 10;
-      refresh();
-    }
+    if (t <= 0) { t = 10; refresh(); }
   }
-
   function flash_() {
     flash.classList.add('show');
     setTimeout(() => flash.classList.remove('show'), 1200);
   }
-
   async function refresh() {
     try {
       const res = await fetch('/api/state');
       if (!res.ok) return;
       const state = await res.json();
       const main = document.getElementById('main');
-      if (main) {
-        // innerHTML update from server is safe here (trusted local server, no user input)
-        const r = await fetch('/');
-        if (!r.ok) return;
-        const html = await r.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        main.innerHTML = doc.getElementById('main').innerHTML;
-        const tsEl = document.getElementById('ts');
-        if (tsEl) tsEl.textContent = state.ts;
-      }
+      if (main) main.innerHTML = renderAllCards(state);
+      const tsEl = document.getElementById('ts');
+      if (tsEl) tsEl.textContent = state.ts;
       flash_();
     } catch {}
   }

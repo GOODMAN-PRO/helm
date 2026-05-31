@@ -54,7 +54,7 @@ async function main() {
     console.log(JSON.stringify({ ok: true, description }));
 
   } else if (verb === 'find') {
-    const query = rawArgs[1] || get('query');
+    const query = get('query') || rawArgs[1];
     if (!query) { console.error('find requires a query: vision.mjs find <query>'); process.exit(1); }
     screenshot(imgPath);
     const response = askClaude(

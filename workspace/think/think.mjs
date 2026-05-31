@@ -29,6 +29,11 @@ const UPGRADE_LOCK = path.join(ROOT, '.upgrade.lock');
 const REFRESH = path.join(WORKSPACE, 'memory', 'refresh-index.mjs');
 const CONSOLIDATE = path.join(WORKSPACE, 'memory', 'consolidate.mjs');
 const WEEKLY_MARK = path.join(__dirname, '.last-weekly-review');
+// Local time intentional — aligns with launchd's local-time StartCalendarInterval used by
+// com.helm.selfupgrade and com.helm.discord. Window follows owner's overnight on whichever
+// machine Helm is running on.
+const THINK_QUIET_START = 0; // 00:00 local
+const THINK_QUIET_END   = 5; // 05:00 local
 mkdirSync(JOURNAL_DIR, { recursive: true });
 
 const ts = () => new Date().toISOString();
@@ -84,9 +89,21 @@ function weeklyDue() {
 
 function tick() {
   if (existsSync(UPGRADE_LOCK)) { log('self-upgrade running — skip'); return; }
-  if (existsSync(THINK_LOCK)) { log('previous think still running — skip'); return; }
+  if (existsSync(THINK_LOCK)) {
+    try {
+      const lockedPid = parseInt(readFileSync(THINK_LOCK, 'utf8').trim(), 10);
+      // kill(pid, 0) throws if the process is gone — that means a stale lock.
+      process.kill(lockedPid, 0);
+      log('previous think still running — skip');
+      return;
+    } catch {
+      // Process is gone; stale lock left by crash or SIGKILL. Remove it and continue.
+      try { rmSync(THINK_LOCK); } catch {}
+      log('stale think lock removed, proceeding');
+    }
+  }
   const h = new Date().getHours();
-  if (h >= 0 && h < 5) { log('nightly upgrade window (00:00-05:00) — skip'); return; }
+  if (h >= THINK_QUIET_START && h < THINK_QUIET_END) { log('nightly upgrade window (00:00-05:00) — skip'); return; }
 
   const deep = weeklyDue();
   const prompt = deep ? WEEKLY_PROMPT : CHEAP_PROMPT;

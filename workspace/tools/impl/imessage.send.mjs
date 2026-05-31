@@ -17,6 +17,6 @@ const SCRIPT = `on run {msgText, targetHandle}
   end tell
 end run`;
 
-const r = spawnSync('/usr/bin/osascript', ['-e', SCRIPT, text, handle], { encoding: 'utf8' });
+const r = spawnSync('/usr/bin/osascript', ['-e', SCRIPT, text, handle], { encoding: 'utf8', timeout: 30_000 });
 if (r.status !== 0) { console.error(r.stderr || 'osascript failed'); process.exit(1); }
 console.log(JSON.stringify({ ok: true, handle, length: text.length }));

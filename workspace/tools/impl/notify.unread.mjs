@@ -56,7 +56,9 @@ function getCalendarNext() {
     if (r.status !== 0) {
       return { value: null, warning: `Calendar inaccessible (grant Automation > Calendar): ${r.stderr?.trim()}` };
     }
-    const evs = JSON.parse(r.stdout.trim());
+    const raw = r.stdout.trim();
+    const cleaned = raw.replace(/^"|"$/g, '').replace(/\\"/g, '"');
+    const evs = JSON.parse(cleaned.startsWith('[') ? cleaned : raw);
     return { value: evs[0] ?? null };
   } catch (e) {
     return { value: null, warning: `Calendar query failed: ${e.message}` };

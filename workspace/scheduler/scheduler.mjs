@@ -92,6 +92,13 @@ function fireJob(job) {
   const child = spawn(CLAUDE_BIN, args, { cwd: WORKSPACE });
   let out = '', err = '';
 
+  // 2-hour hard cap — prevents a hung job from holding a process reference forever.
+  const JOB_TIMEOUT = 2 * 60 * 60 * 1000;
+  const killTimer = setTimeout(() => {
+    log(`job "${job.name}" exceeded ${JOB_TIMEOUT / 60000}min — killing`);
+    child.kill();
+  }, JOB_TIMEOUT);
+
   child.stdout.on('data', d => {
     out += d;
     appendLog(runDir, { event: 'stdout', data: d.toString() });
@@ -105,6 +112,7 @@ function fireJob(job) {
   child.stdin.end();
 
   child.on('close', code => {
+    clearTimeout(killTimer);
     appendLog(runDir, { event: 'close', code });
     let result = '(no output)';
     try {
@@ -122,6 +130,7 @@ function fireJob(job) {
   });
 
   child.on('error', e => {
+    clearTimeout(killTimer);
     appendLog(runDir, { event: 'error', message: e.message });
     finaliseRun(runDir, `ERROR: ${e.message}`);
     log(`job "${job.name}" error: ${e.message}`);

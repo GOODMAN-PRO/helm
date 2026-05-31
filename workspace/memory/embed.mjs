@@ -16,9 +16,9 @@ export function ensureVectorsTable(db) {
   `);
 }
 
-// Returns true only if model files are already in the local cache.
+// Warms the pipeline if not already loaded. Returns true when loaded, false if unavailable.
 // Never triggers a download (allowRemoteModels = false).
-export async function isModelAvailable() {
+export async function ensurePipelineLoaded() {
   try {
     const mod = await import('@xenova/transformers');
     mod.env.allowRemoteModels = false;
@@ -29,6 +29,9 @@ export async function isModelAvailable() {
     return false;
   }
 }
+
+// DEPRECATED: remove after one release cycle. Alias kept for in-flight callers.
+export const isModelAvailable = ensurePipelineLoaded;
 
 async function getPipeline() {
   if (_pipeline) return _pipeline;

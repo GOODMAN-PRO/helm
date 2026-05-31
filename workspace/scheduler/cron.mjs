@@ -8,6 +8,8 @@ function parseField(field, min, max) {
     if (part.includes('/')) {
       const [rangeStr, stepStr] = part.split('/');
       const step = parseInt(stepStr, 10);
+      if (!Number.isInteger(step) || step <= 0)
+        throw new Error(`invalid cron step '${stepStr}': must be a positive integer`);
       let start = min, end = max;
       if (rangeStr !== '*') {
         if (rangeStr.includes('-')) {
@@ -47,15 +49,19 @@ export function cronMatches(expr, date = new Date()) {
 }
 
 // Returns the next Date (after `from`) when the expression fires.
-// Searches minute-by-minute up to 366 days out; returns null if nothing found.
+// Searches minute-by-minute up to 366 days out; returns null if nothing found or expression invalid.
 export function nextCronDate(expr, from = new Date()) {
-  const d = new Date(from);
-  d.setSeconds(0, 0);
-  d.setUTCMinutes(d.getUTCMinutes() + 1); // start one minute after `from`
-  const limit = new Date(from.getTime() + 366 * 24 * 60 * 60 * 1000);
-  while (d < limit) {
-    if (cronMatches(expr, d)) return new Date(d);
-    d.setUTCMinutes(d.getUTCMinutes() + 1);
+  try {
+    const d = new Date(from);
+    d.setSeconds(0, 0);
+    d.setUTCMinutes(d.getUTCMinutes() + 1); // start one minute after `from`
+    const limit = new Date(from.getTime() + 366 * 24 * 60 * 60 * 1000);
+    while (d < limit) {
+      if (cronMatches(expr, d)) return new Date(d);
+      d.setUTCMinutes(d.getUTCMinutes() + 1);
+    }
+    return null;
+  } catch {
+    return null;
   }
-  return null;
 }

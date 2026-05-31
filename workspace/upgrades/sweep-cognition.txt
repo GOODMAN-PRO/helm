@@ -1,0 +1,60 @@
+You are Helm, doing a full bug-sweep of a specific zone of your own codebase.
+
+Zone you OWN (read + write):
+- `/Users/owner/secondme/workspace/memory/`
+- `/Users/owner/secondme/workspace/think/`
+- `/Users/owner/secondme/workspace/dashboard/`
+- `/Users/owner/secondme/workspace/mcp/`
+- `/Users/owner/secondme/workspace/swarm/`
+
+DO NOT touch:
+- `/Users/owner/Helm/`.
+- `/Users/owner/secondme/workspace/upgrades/`.
+- Anything outside your zone (other agents own those).
+- `CLAUDE.md`, `tests/smoke*.mjs`, `tools/registry.json`, `tools/impl/memory.*` (tools-zone owns).
+
+These subsystems include cognitive features that JUST landed via self-upgrade:
+- memory consolidation (`memory/consolidate.mjs` — nightly distil + decay + dedupe)
+- semantic recall (likely an embeddings module added recently)
+- active-learning quality (evidence count, "preferences unsure" listing)
+- adaptive think (`think/` — cheap most ticks, weekly review)
+Verify these recent additions are wired correctly (DB schema, file paths, no broken
+imports) BEFORE flagging behavioural quibbles.
+
+Hunt for:
+- Schema mismatches between new migrations and existing tables.
+- UNIQUE / PRIMARY KEY indexes missing.
+- Embedding model paths assumed present (e.g., hardcoded paths to a model file).
+- `memory.mjs recall` regression — does semantic ranking gracefully fall back to keyword
+  when embeddings aren't loaded? Does the output shape stay the same?
+- `think/` daemon: does it lock correctly to prevent two ticks running at once? Is the
+  weekly-review trigger free of timezone drift? Does it skip the 00:00-05:00 window
+  as advertised?
+- `dashboard/`: any open HTTP listener? If yes, bound to localhost only? Any XSS / path
+  traversal if it serves static files? Auth?
+- `mcp/`: `workspace/mcp/servers.json` should be valid JSON with no auth tokens
+  committed. Confirm graceful degradation when servers fail to start.
+- `swarm/`: state-machine sanity. If a swarm round was interrupted mid-merge, does it
+  resume safely?
+- Episode logging: is it append-only and crash-safe?
+- Memory consolidation: idempotent? Decay floor honoured? CLAUDE.md sources protected?
+
+Process:
+1. Read every file in your zone.
+2. node --check on every .mjs.
+3. Inspect every DB: `memory/memory.db`, `think/*.db` if any, `dashboard/*.db` if any.
+   Confirm schemas + that the data isn't corrupt.
+4. Run any in-zone tests. Run global smoke `node workspace/tests/smoke.mjs` to baseline.
+5. List bugs, fix them, re-run smoke.
+
+Important: do NOT regenerate `memory/INDEX.md` — it's a derived file. If your fixes
+change memory schema, run `node workspace/memory/refresh-index.mjs` once at the end.
+
+Report to `/Users/owner/secondme/workspace/upgrades/SWEEP_COGNITION_REPORT.md`:
+- Verified clean modules
+- Bugs found (file:line, severity, status)
+- Fixes applied
+- Open questions / things that need owner ask
+- One-line verdict
+
+Style: no emojis, no flattery, no preamble.

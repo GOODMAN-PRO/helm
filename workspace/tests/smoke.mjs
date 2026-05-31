@@ -548,6 +548,42 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- 24. swarm state machine: intermediate states in source + filtering logic ----
+{
+  const label = 'swarm: state machine has merging/merged-pending-smoke states; filtering logic correct';
+  try {
+    const swarmSrc = readFileSync(path.join(WORKSPACE, 'swarm/swarm.mjs'), 'utf8');
+
+    // Source must declare the two intermediate states
+    if (!swarmSrc.includes("'merging'"))
+      throw new Error("state 'merging' not found in swarm.mjs");
+    if (!swarmSrc.includes("'merged-pending-smoke'"))
+      throw new Error("state 'merged-pending-smoke' not found in swarm.mjs");
+
+    // flushTasks must be present and called after state transitions
+    if (!swarmSrc.includes('flushTasks'))
+      throw new Error('flushTasks helper not found in swarm.mjs');
+
+    // startup filter must skip merging tasks (operator review required)
+    if (!swarmSrc.includes('operator review required'))
+      throw new Error("'operator review required' warning not found — merging skip missing");
+
+    // state must be written before the merge call (merging) and after (merged-pending-smoke)
+    // Use the assignment form to skip occurrences in the startup filter.
+    const mergingAssign = swarmSrc.indexOf("t.status = 'merging'");
+    const mergeCall = swarmSrc.indexOf("git(ROOT, 'merge', '--no-ff'");
+    const pendingSmokeAssign = swarmSrc.indexOf("t.status = 'merged-pending-smoke'");
+    if (mergingAssign === -1 || mergeCall === -1)
+      throw new Error("could not locate t.status='merging' assignment or merge call");
+    if (mergingAssign >= mergeCall)
+      throw new Error("t.status='merging' must be written before the git merge call");
+    if (pendingSmokeAssign === -1 || pendingSmokeAssign <= mergeCall)
+      throw new Error("t.status='merged-pending-smoke' must be written after the git merge call");
+
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

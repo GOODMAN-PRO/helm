@@ -73,7 +73,7 @@ for (const e of eps) {
 }
 const stmtFindFact = db.prepare(`SELECT id, evidence_count FROM facts WHERE kind = 'learned' AND key = ?`);
 const stmtUpsertLearned = db.prepare(
-  `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen)
+  `INSERT OR REPLACE INTO facts (kind, key, value, source, confidence, evidence_count, last_seen)
    VALUES ('learned', ?, ?, 'consolidate', ?, ?, unixepoch())`
 );
 const stmtUpdateLearned = db.prepare(

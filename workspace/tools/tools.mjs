@@ -59,7 +59,7 @@ if (verb === 'call') {
   }
 
   const r = spawnSync(cmd, cmdArgs, { cwd: WORKSPACE, encoding: 'utf8', stdio: 'inherit' });
-  process.exit(r.status ?? 0);
+  process.exit(r.status ?? 1);
 }
 
 die('verbs: list | call');

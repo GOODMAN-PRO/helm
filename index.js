@@ -59,7 +59,9 @@ const setTarget = t => writeFileSync(TARGET_FILE, t);
 function runClaudeRemote(prompt) {
   return new Promise(resolve => {
     if (!HELM_WIN_HOST) return resolve('Windows node not configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Claude on Windows, then say "use windows" again.');
-    const remoteCmd = `${HELM_WIN_DIR ? `cd ${HELM_WIN_DIR} && ` : ''}${HELM_WIN_CLAUDE} -p --output-format json --model ${MODEL} --permission-mode ${PERMISSION_MODE}`;
+    // Shell-quote components so paths with spaces survive the remote shell.
+    const q = s => `"${s.replace(/"/g, '\\"')}"`;
+    const remoteCmd = `${HELM_WIN_DIR ? `cd ${q(HELM_WIN_DIR)} && ` : ''}${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(MODEL)} --permission-mode ${q(PERMISSION_MODE)}`;
     const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
     let out = '', err = '';
     const kill = setTimeout(() => child.kill(), 30 * 60_000);
@@ -92,17 +94,27 @@ const PERSONA =
 // Key is always 'owner' since this bot is owner-locked.
 
 // ---- the brain: one Claude run on your subscription ----
-// cap: 30 min for chat messages (scheduler-initiated runs have no cap).
+// Track in-flight runs so "stop" can actually kill them. 10-min hard cap for chat.
+const running = new Set();
+function killAll() {
+  let n = 0;
+  for (const c of running) { c._stopped = true; try { c.kill('SIGKILL'); n++; } catch {} }
+  running.clear();
+  return n;
+}
 function runClaude(args, prompt) {
   return new Promise((resolve, reject) => {
     const child = spawn(CLAUDE_BIN, args, { cwd: WORKSPACE });
+    running.add(child);
     let out = '', err = '';
-    const kill = setTimeout(() => child.kill(), 30 * 60_000); // 30-min cap for chat
+    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000); // 10-min cap
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
-    child.on('error', e => { clearTimeout(kill); reject(e); });
+    child.on('error', e => { clearTimeout(kill); running.delete(child); reject(e); });
     child.on('close', code => {
-      clearTimeout(kill);
+      clearTimeout(kill); running.delete(child);
+      if (child._stopped) return reject(Object.assign(new Error('stopped by owner'), { stopped: true }));
+      if (child._timedOut) return reject(Object.assign(new Error('hit 10-min cap'), { timedOut: true }));
       if (code === 0) resolve(out);
       else reject(new Error(err.trim() || `claude exited ${code}`));
     });
@@ -125,12 +137,15 @@ async function ask(prompt, onHeartbeat, target = 'mac') {
   const sid = getSession('owner');
   const args = sid ? [...base, '--resume', sid] : base;
   let out;
-  let hbStart, hbInterval;
+  let hbStart, hbInterval, pings = 0;
   try {
-    // Heartbeat: after 30s with no reply, ping every 60s.
+    // Heartbeat: after 30s, ping every 60s — but at most 5 times, so a stuck run can't spam forever.
     hbStart = setTimeout(() => {
       onHeartbeat?.('still working...');
-      hbInterval = setInterval(() => onHeartbeat?.('still working...'), 60_000);
+      hbInterval = setInterval(() => {
+        if (++pings >= 5) { clearInterval(hbInterval); return; }
+        onHeartbeat?.('still working...');
+      }, 60_000);
     }, 30_000);
 
     out = await runClaude(args, prompt);
@@ -140,7 +155,7 @@ async function ask(prompt, onHeartbeat, target = 'mac') {
   } catch (e) {
     clearTimeout(hbStart);
     clearInterval(hbInterval);
-    if (!sid) throw e;           // genuine failure on a fresh chat
+    if (e.stopped || e.timedOut || !sid) throw e;  // never retry a cancel/timeout (that's what caused the hour-long loop)
     deleteSession('owner');      // stale/expired session -> retry fresh once
     out = await runClaude(base, prompt);
   }
@@ -190,6 +205,13 @@ client.on(Events.MessageCreate, async msg => {
   const text = msg.content.replace(`<@${client.user.id}>`, '').trim();
   if (!text) return;
 
+  // ---- stop/cancel: actually kill any in-flight run (handled before anything else) ----
+  if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) {
+    const n = killAll();
+    await msg.reply(n ? `Stopped — killed ${n} running task(s).` : 'Nothing was running.');
+    return;
+  }
+
   // ---- fleet commands (handled before the brain) ----
   const low = text.toLowerCase();
   const useM = low.match(/^\/?use\s+(mac|windows|win|pc)\b/);
@@ -221,8 +243,12 @@ client.on(Events.MessageCreate, async msg => {
     console.log(`📤 replied (${body.length} chars, ${files.length} files)`);
   } catch (e) {
     clearInterval(typing);
+    if (e.stopped) return;  // the stop command already acknowledged
     console.error(e);
-    await msg.reply(`⚠️ brain error: ${String(e.message || e).slice(0, 1800)}`);
+    const m = e.timedOut
+      ? '⚠️ that task hit the 10-min cap and was stopped — try breaking it into a smaller step.'
+      : `⚠️ brain error: ${String(e.message || e).slice(0, 1800)}`;
+    await msg.reply(m);
   }
 });
 

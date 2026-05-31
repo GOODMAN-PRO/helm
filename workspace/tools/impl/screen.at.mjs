@@ -17,6 +17,10 @@ if (tsIdx === -1) {
   process.exit(1);
 }
 const ts = parseInt(args[tsIdx + 1], 10);
+if (isNaN(ts)) {
+  console.error('--ts must be a valid integer (Unix ms)');
+  process.exit(1);
+}
 
 if (!existsSync(DB_PATH)) {
   console.log(JSON.stringify(null));

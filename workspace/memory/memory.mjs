@@ -188,9 +188,9 @@ switch (verb) {
     let embedScores = null;
     if (!keywordOnly) {
       try {
-        const { isModelAvailable, embedText, cosineSimilarity, getOrComputeVector } =
+        const { ensurePipelineLoaded, embedText, cosineSimilarity, getOrComputeVector } =
           await import('./embed.mjs');
-        if (await isModelAvailable()) {
+        if (await ensurePipelineLoaded()) {
           const qVec = await embedText(query || ' ');
           embedScores = await Promise.all(
             allFacts.map(f =>
@@ -246,6 +246,8 @@ switch (verb) {
     const id = parseInt(pos[0], 10);
     if (!id) die('usage: forget <id>');
     const r = db.prepare(`DELETE FROM facts WHERE id = ?`).run(id);
+    // Remove any cached embedding vector (table may not exist yet; ignore error).
+    try { db.prepare(`DELETE FROM vectors WHERE fact_id = ?`).run(id); } catch {}
     out({ deleted: r.changes, id });
     break;
   }

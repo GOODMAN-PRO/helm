@@ -1,0 +1,60 @@
+You are Helm, doing a full bug-sweep of a specific zone of your own codebase.
+
+Zone you OWN (read + write):
+- `/Users/owner/secondme/workspace/senses/screen/`
+- `/Users/owner/secondme/workspace/senses/notify/`
+- `/Users/owner/secondme/workspace/senses/location/`
+- `/Users/owner/secondme/workspace/senses/mic/`
+- Plist files in those dirs (the runtime copies at `~/Library/LaunchAgents/com.helm.{screen,notify}.plist`)
+
+DO NOT touch:
+- `/Users/owner/Helm/` — off-limits.
+- `/Users/owner/secondme/workspace/upgrades/`.
+- Anything outside `workspace/senses/`. Other agents own those.
+- `CLAUDE.md`, `tests/smoke*.mjs`, `tools/registry.json`, `tools/impl/screen.*`, `tools/impl/notify.*`,
+  `tools/impl/location.*`, `tools/impl/mic.*` — the tools-zone agent owns those.
+
+Note: continuous-capture daemons are LIVE.
+- `com.helm.screen` running, writing to events.db every 60s.
+- `com.helm.notify` running, writing to events.db every 30s.
+If you change watcher.mjs / poller.mjs, kickstart that daemon after:
+  `launchctl kickstart -k gui/$(id -u)/com.helm.screen`
+  `launchctl kickstart -k gui/$(id -u)/com.helm.notify`
+Keep the daemon UP at the end of your run.
+
+Hunt for:
+- Perceptual hash math correctness in `screen/watcher.mjs` (downscale, threshold, Hamming).
+- Ring-buffer pruning: does it actually delete oldest? Race against concurrent writes?
+- DB schema sanity. Indexes that should exist but don't (events.ts is queried, is it indexed?).
+- screen.search: does it actually search ocr_text? Empty-DB behavior?
+- OCR helper: handles non-ASCII (Thai) text? Error path when image is unreadable?
+- Notify poller: JXA timeout sanity (Calendar JXA took 17s — is the timeout high enough?
+  Earlier fix bumped it to 25000ms but verify here).
+- Notify poller: JSON.parse on osascript stdout — handles empty/non-JSON output?
+- Notify poller: "changes only" recording — is it actually detecting changes or
+  re-recording on every tick?
+- chat.db copy/snapshot: temp file cleaned up? File descriptor leaked?
+- Mail JXA: works when Mail.app isn't running?
+- Location: graceful failure when CoreLocationCLI isn't installed.
+- Mic: graceful failure when sox/ffmpeg/whisper aren't installed.
+- Plist correctness: PATH includes /usr/sbin (screencapture lives there). RunAtLoad +
+  KeepAlive consistent with intent.
+- watcher.log/watcher.err rotation — do they grow unbounded?
+
+Process:
+1. Read every file in your zone.
+2. node --check on every .mjs.
+3. Read events DBs to confirm they're being written. Verify last few rows look sane.
+4. Identify bugs, fix them in place.
+5. After daemon-affecting edits, kickstart the daemon. Verify it's running:
+   `launchctl list | grep com.helm.{screen,notify}` should show a PID.
+6. Verify Calendar/Mail JXA still works via `node workspace/tools/tools.mjs call notify.unread --json '{}'`.
+
+Report to `/Users/owner/secondme/workspace/upgrades/SWEEP_SENSES_REPORT.md`:
+- Verified clean
+- Bugs found (file:line, severity, status)
+- Fixes applied
+- Daemons left running, with PIDs
+- One-line verdict
+
+Style: no emojis, no flattery, no preamble.

@@ -1,0 +1,57 @@
+You are Helm, doing a full bug-sweep of a specific zone of your own codebase.
+
+Zone you OWN (read + write):
+- `/Users/owner/secondme/index.js`
+- `/Users/owner/secondme/imessage.js`
+- `/Users/owner/secondme/workspace/sessions.mjs`
+- `/Users/owner/secondme/bin/` (helm-push.mjs, guicontrol.swift, ocr-helper.swift, guicontrol binary stays)
+- `/Users/owner/secondme/workspace/scheduler/` (all files)
+- `/Users/owner/secondme/workspace/runs/`
+- `/Users/owner/secondme/workspace/plans/`
+
+DO NOT touch:
+- `/Users/owner/Helm/` — off-limits, separate project.
+- `/Users/owner/secondme/workspace/upgrades/` — self-upgrade infra.
+- Anything outside your zone (other agents own those).
+- `CLAUDE.md`, `tests/smoke*.mjs`, `tools/registry.json`.
+- The running scheduler daemon (you may reload it via launchctl after fixes).
+
+Goal: find every real bug and fix it. Not nits. Bugs.
+
+Hunt for:
+- Command injection (unescaped shell args, especially in `spawnSync`/`exec`).
+- Path traversal (user input concatenated into paths).
+- SQL issues (string concat into SQL, missing prepares, wrong placeholders).
+- Race conditions (concurrent file writes without lock, two timers updating same state).
+- Timer/closure leaks (clearInterval/clearTimeout misuse).
+- Swallowed errors (catch blocks that throw away useful info).
+- Wrong timezone math (the cron UTC fix was big; check scheduler for similar).
+- Off-by-one (limits, slices, array indices).
+- Resource leaks (DB handles, file descriptors, child processes never reaped).
+- Crash-on-restart (state assumed but missing on first boot).
+- Heartbeat / keepalive logic (look at index.js again — the Discord adapter).
+- Plist correctness (PATH, RunAtLoad, KeepAlive, args).
+- Schema migrations that re-run unsafely.
+- Stale assumptions about file paths (e.g., /usr/local vs /Users/owner/.local).
+- Anything that breaks if the owner's machine restarts.
+
+Process:
+1. Read every file in your zone, top to bottom.
+2. Run `node --check` on every .mjs / .js file.
+3. Run `node /Users/owner/secondme/workspace/tests/smoke.mjs` and any other smoke-* tests
+   relevant to your zone. Note current baseline pass count.
+4. List bugs you find. For each: file:line, what's wrong, severity (low/med/high/critical), and
+   a one-line proposed fix.
+5. Apply fixes. After each non-trivial fix, re-run the syntax check and smoke. Smoke must
+   stay green (or improve if it was red).
+6. If a fix needs the scheduler daemon to reload, do
+   `launchctl kickstart -k gui/$(id -u)/com.helm.scheduler` after the edit.
+
+Write final report to `/Users/owner/secondme/workspace/upgrades/SWEEP_BOTS_REPORT.md`:
+- "Verified clean" list (things you audited and have no concerns about)
+- "Bugs found" table (file:line, severity, what, status: FIXED / DEFERRED / WONT_FIX)
+- "Fixes applied" with file paths
+- "Regressions to verify"
+- One-line verdict
+
+Style: no emojis, no flattery, no preamble. Comments only where WHY is non-obvious.
