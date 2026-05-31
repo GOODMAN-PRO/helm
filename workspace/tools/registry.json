@@ -640,5 +640,69 @@
     ],
     "side_effects": "writes temp PNG; makes a Claude API call via claude -p",
     "confirm": false
+  },
+  {
+    "name": "reverse.web",
+    "summary": "Reverse-engineer a web URL: detect stack, extract API endpoints + XHR calls, produce a clone scaffold + OpenAPI stub. Report written to workspace/reverse/<slug>-report.md.",
+    "exec": "node tools/impl/reverse.mjs web",
+    "args_schema": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "URL to analyze (must be a target you own or are authorized to inspect)"
+      },
+      "name": {
+        "type": "string",
+        "description": "Optional slug for the report filename (default: derived from URL)"
+      }
+    },
+    "requires": [
+      "outbound HTTPS",
+      "Playwright Chromium (optional — auto-skipped if not installed; enables live XHR capture)"
+    ],
+    "side_effects": "writes workspace/reverse/<slug>-report.md; outbound HTTP request to target",
+    "confirm": false
+  },
+  {
+    "name": "reverse.app",
+    "summary": "Reverse-engineer a macOS .app bundle or binary: Info.plist, otool -L, framework detection, interesting strings, entitlements. Report written to workspace/reverse/<slug>-report.md.",
+    "exec": "node tools/impl/reverse.mjs app",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "Absolute path to a .app bundle or binary (must be a target you own or are authorized to inspect)"
+      },
+      "name": {
+        "type": "string",
+        "description": "Optional slug for the report filename (default: derived from basename)"
+      }
+    },
+    "requires": [
+      "macOS tools: file, otool, strings, codesign, plutil (all pre-installed on macOS)"
+    ],
+    "side_effects": "writes workspace/reverse/<slug>-report.md",
+    "confirm": false
+  },
+  {
+    "name": "reverse.file",
+    "summary": "Reverse-engineer any file: identify format from magic bytes + file command, hexdump first 256 bytes, extract printable strings. Report written to workspace/reverse/<slug>-report.md.",
+    "exec": "node tools/impl/reverse.mjs file",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "Absolute path to the file to analyze (must be a file you own or are authorized to inspect)"
+      },
+      "name": {
+        "type": "string",
+        "description": "Optional slug for the report filename (default: derived from basename)"
+      }
+    },
+    "requires": [
+      "macOS tools: file, xxd, strings (all pre-installed on macOS)"
+    ],
+    "side_effects": "writes workspace/reverse/<slug>-report.md",
+    "confirm": false
   }
 ]
