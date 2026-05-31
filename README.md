@@ -37,19 +37,29 @@ curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | 
 ```powershell
 irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex
 ```
+**Any OS (Node / npx)** — no clone, no shell script:
+```bash
+npx github:GOODMAN-PRO/helm
+```
 
-Prerequisites: **Node 18+**, **git**, and **Claude Code** (`claude`). The setup wizard lets you choose
-your gateways (Discord / iMessage), your backend (subscription / API key / free model), and whether to
-run 24/7 as a background service.
+Prerequisites: **Node 18+** and **Claude Code** (`claude`); **git** is used if present, otherwise the
+installer downloads a tarball. The setup wizard lets you choose your gateways (Discord / iMessage),
+your backend (subscription / API key / free model), and whether to run 24/7 as a background service.
 
 <details>
-<summary>Manual install</summary>
+<summary>More ways</summary>
 
 ```bash
-git clone https://github.com/GOODMAN-PRO/helm.git helm && cd helm
-npm install
-cp .env.example .env        # set DISCORD_TOKEN + OWNER_ID
-npm start
+# Manual (git)
+git clone https://github.com/GOODMAN-PRO/helm.git helm && cd helm && npm install
+cp .env.example .env        # set DISCORD_TOKEN + OWNER_ID, then: npm start
+
+# No git — download the tarball
+mkdir helm && curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main \
+  | tar -xz -C helm --strip-components=1 && cd helm && npm install && npm run setup
+
+# From a clone, re-run the cross-platform installer any time
+node bin/helm-install.mjs
 ```
 </details>
 

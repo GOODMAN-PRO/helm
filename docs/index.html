@@ -115,6 +115,9 @@
 
   /* install */
   .install{background:linear-gradient(180deg,var(--panel2),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:34px}
+  .oslab{color:var(--muted);font-size:12px;letter-spacing:.4px;margin:16px 0 6px}
+  .oslab:first-of-type{margin-top:0}
+  .code+.code{margin-top:0}
   .code{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#06090f;border:1px solid #1b2740;border-radius:12px;padding:14px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:#cfeaf2;overflow-x:auto}
   .code button{flex:none;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer}
   .code button:hover{border-color:var(--cyan)}
@@ -187,8 +190,19 @@
     <p class="eyebrow">Get Helm</p>
     <h2>One command. <span class="grad">Then it's yours.</span></h2>
     <div class="install">
+      <p class="oslab">macOS / Linux</p>
       <div class="code">
-        <span id="cmd">curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash</span>
+        <span>curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash</span>
+        <button onclick="copyCmd(this)">Copy</button>
+      </div>
+      <p class="oslab">Windows (PowerShell)</p>
+      <div class="code">
+        <span>irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex</span>
+        <button onclick="copyCmd(this)">Copy</button>
+      </div>
+      <p class="oslab">Any OS — Node / npx (no clone)</p>
+      <div class="code">
+        <span>npx github:GOODMAN-PRO/helm</span>
         <button onclick="copyCmd(this)">Copy</button>
       </div>
       <div class="opts">
@@ -196,7 +210,7 @@
         <div class="opt"><h4>Any backend — including free</h4><p>Your Claude subscription, an Anthropic API key, or a free / local model (Ollama, Groq, OpenRouter) at no cost.</p></div>
         <div class="opt"><h4>Run it 24/7</h4><p>Optionally install it as a background service so it's always there.</p></div>
       </div>
-      <p class="note">Requires Node 18+ and git. Power it with your Claude login, an API key, or any Anthropic-compatible endpoint (free tiers / local models). macOS, Windows and Linux.</p>
+      <p class="note">Requires Node 18+ and Claude Code; git is used if present, else a tarball is downloaded. Power it with your Claude login, an API key, or any Anthropic-compatible endpoint (free tiers / local models). macOS, Windows and Linux.</p>
     </div>
   </section>
 

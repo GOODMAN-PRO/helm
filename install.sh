@@ -32,10 +32,10 @@ say "${c_b}== Helm installer ==${c_0}"
 # 1) prerequisites ----------------------------------------------------------
 command -v node  >/dev/null || die "Node not found. Install Node 18+ first (https://nodejs.org), then re-run."
 command -v claude>/dev/null || die "Claude Code (claude) not found. Install it, run 'claude' once and log into your Max subscription, then re-run."
-command -v git   >/dev/null || die "git not found. Install git, then re-run."
+command -v git >/dev/null || command -v curl >/dev/null || die "Need either git or curl to fetch Helm."
 NODE_MAJ="$(node -p 'process.versions.node.split(".")[0]')"
 [ "$NODE_MAJ" -ge 18 ] || die "Node $(node -v 2>/dev/null) is too old; need 18+."
-ok "node $(node -v)   claude $(claude --version 2>/dev/null | head -n1)   git present"
+ok "node $(node -v)   claude $(claude --version 2>/dev/null | head -n1)   $(command -v git >/dev/null && echo git || echo 'curl (no git)')"
 
 # 2) fetch source -----------------------------------------------------------
 if [ -n "$SRC" ]; then
@@ -59,9 +59,15 @@ if [ -n "$SRC" ]; then
 elif [ -d "$TARGET/.git" ]; then
   say "Updating existing install at $TARGET"
   git -C "$TARGET" pull --ff-only && ok "updated"
-else
+elif command -v git >/dev/null; then
   say "Cloning $REPO_URL -> $TARGET"
   git clone --depth 1 "$REPO_URL" "$TARGET" && ok "cloned"
+else
+  # no git — download the tarball instead (works with just curl + tar)
+  say "git not found — downloading tarball..."
+  TARBALL="${HELM_TARBALL:-https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main}"
+  mkdir -p "$TARGET"
+  curl -fsSL "$TARBALL" | tar -xz -C "$TARGET" --strip-components=1 && ok "downloaded" || die "download failed — install git and re-run."
 fi
 cd "$TARGET"
 
