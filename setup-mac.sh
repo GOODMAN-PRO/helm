@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# SecondMe — one-shot Mac/Linux setup. Run from inside the secondme folder:
+# Helm — one-shot Mac/Linux setup (legacy; prefer install.sh). Run from inside this folder:
 #   chmod +x setup-mac.sh && ./setup-mac.sh
 set -e
-echo "== SecondMe setup =="
+echo "== Helm setup =="
 
 # 1. prerequisites
 if ! command -v node >/dev/null; then

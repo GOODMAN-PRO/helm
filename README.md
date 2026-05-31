@@ -5,12 +5,31 @@ Your own tiny AI agent. **Discord** (and later **iMessage** on a Mac) → **Clau
 ## What it does
 You DM your Discord bot; the message goes to `claude -p` running on your machine (your Max subscription, full tools — shell, files, web); the reply comes back in Discord. Only **you** (the owner) can talk to it. Conversations persist per channel. Long-term memory lives in `workspace/CLAUDE.md`, which the agent reads and updates.
 
-## Run (Windows)
+## Install
+One command (macOS / Linux). It checks prerequisites, fetches the code, installs deps, and walks you through the `.env`:
 ```
+curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash
+```
+Prerequisites: **Node 18+**, **git**, and **Claude Code** (`claude`) logged into your Max/Pro subscription.
+
+The installer asks for your **Discord bot token** (Developer Portal → your app → Bot → Reset Token) and your **Discord user ID** (right-click your name → Copy User ID), writes a locked-down `.env`, and prints the start command.
+
+Run it once in the foreground:
+```
+cd ~/helm && npm start
+```
+Keep it running 24/7 (launchd on macOS, systemd --user on Linux):
+```
+bash ~/helm/scripts/install-service.sh
+```
+
+### Manual install
+```
+git clone https://github.com/OWNER/REPO.git helm && cd helm
 npm install
+cp .env.example .env   # then set DISCORD_TOKEN + OWNER_ID
 npm start
 ```
-Then DM your bot. (`.env` is pre-filled: `DISCORD_TOKEN`, `OWNER_ID`, `CLAUDE_BIN`.)
 
 ## Knobs (`.env`)
 | var | meaning |

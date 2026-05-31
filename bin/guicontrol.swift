@@ -1,4 +1,4 @@
-// guicontrol — tiny mouse/keyboard driver for SecondMe (replaces cliclick).
+// guicontrol — tiny mouse/keyboard driver for Helm (replaces cliclick).
 // Usage:
 //   guicontrol click X Y          left click at screen coords
 //   guicontrol doubleclick X Y
