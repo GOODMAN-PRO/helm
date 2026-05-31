@@ -81,13 +81,15 @@
 
   /* comparison */
   .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
-  table{border-collapse:collapse;width:100%;min-width:720px;font-size:14px}
-  th,td{padding:14px 12px;text-align:center;border-bottom:1px solid var(--line)}
-  th:first-child,td:first-child{text-align:left;color:var(--ink);font-weight:500;min-width:230px}
-  thead th{font-size:12.5px;color:var(--muted);font-weight:600;letter-spacing:.4px;background:#0c1421;position:sticky;top:0}
-  thead th.helm{color:#06222b;background:var(--grad);border-top-left-radius:0}
+  table{border-collapse:collapse;width:100%;min-width:1180px;font-size:13px}
+  th,td{padding:11px 8px;text-align:center;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left;color:var(--ink);font-weight:500;min-width:210px}
+  thead th{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.2px;background:#0c1421;vertical-align:bottom;line-height:1.25;white-space:normal}
+  thead th.helm{color:#06222b;background:var(--grad)}
+  thead tr.grp th.g{color:var(--cyan);font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;background:#0a131f;border-left:1px solid #25384f;padding:8px}
   tbody tr:hover{background:#0c1726}
   td.helm{background:#0b1a22}
+  td.helm span.mk{font-size:15px}
   .mk{font-weight:800}
   .yes{color:var(--yes)} .no{color:var(--no)} .part{color:var(--part)}
   .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:14px}
@@ -205,35 +207,43 @@
     <p class="lead">The OpenClaw ecosystem and the hosted players each nail one slice — lightweight, secure, edge, or memory. Helm is the one that does all of it on your own hardware and ties your whole fleet together.</p>
     <div class="tablewrap">
       <table>
-        <thead><tr>
-          <th>Agent</th>
-          <th class="helm">On&nbsp;your machine</th>
-          <th>Open / self-host</th>
-          <th>Discord / iMessage</th>
-          <th>Persistent memory</th>
-          <th>Multi-machine fleet</th>
-          <th>Self-upgrades</th>
-          <th>Your sub / BYO key</th>
-        </tr></thead>
-        <tbody>
-          <tr class="helmrow">
-            <td class="agent"><b>Helm</b><span>Personal agent across your whole fleet</span></td>
-            <td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td>
+        <thead>
+          <tr class="grp">
+            <th></th>
+            <th></th>
+            <th class="g" colspan="5">Open-source &amp; local</th>
+            <th class="g" colspan="5">Managed &amp; hosted</th>
           </tr>
-
-          <tr class="cat"><td colspan="8">Open-source &amp; local</td></tr>
-          <tr><td class="agent"><b>Hermes Agent</b><span>Closest open-source OpenClaw alternative</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr>
-          <tr><td class="agent"><b>TrustClaw</b><span>Secure app-connected automation</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
-          <tr><td class="agent"><b>ZeroClaw</b><span>Lightweight local agents</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
-          <tr><td class="agent"><b>PicoClaw</b><span>Edge devices &amp; low-power hardware</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
-          <tr><td class="agent"><b>NanoClaw</b><span>Container-isolated local execution</span></td><td class="helm"><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
-
-          <tr class="cat"><td colspan="8">Managed &amp; hosted</td></tr>
-          <tr><td class="agent"><b>Claude Cowork</b><span>Hosted workflows for Claude users</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr>
-          <tr><td class="agent"><b>Manus</b><span>Polished managed agent workflows</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td class="agent"><b>Perplexity Computer</b><span>Browser-heavy research &amp; monitoring</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td class="agent"><b>Kimi Claw</b><span>Hosted OpenClaw experience</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td class="agent"><b>Vellum</b><span>Personal memory-first AI assistant</span></td><td class="helm"><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
+          <tr>
+            <th>Capability</th>
+            <th class="helm">Helm</th>
+            <th>Hermes Agent</th>
+            <th>TrustClaw</th>
+            <th>ZeroClaw</th>
+            <th>PicoClaw</th>
+            <th>NanoClaw</th>
+            <th>Claude Cowork</th>
+            <th>Manus</th>
+            <th>Perplexity Computer</th>
+            <th>Kimi Claw</th>
+            <th>Vellum</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Runs on your own machine</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Open / self-hosted</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Chat from Discord / iMessage</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>Full shell + file access</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Clicks &amp; types in any app (no API)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Persistent memory + synced brain</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Multi-machine fleet (Mac + Windows)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Background thinking 24/7</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Self-upgrades (auto, tested)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Parallel build swarm</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
+          <tr><td>Encrypted secrets vault</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>Owner-locked &amp; private</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>Uses your subscription / BYO key</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
+          <tr><td>No extra monthly bill</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
         </tbody>
       </table>
     </div>
