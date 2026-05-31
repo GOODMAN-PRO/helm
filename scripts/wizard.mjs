@@ -263,7 +263,7 @@ function applyConfig(cfg) {
     if (r.status !== 0) console.log('!!  service install reported an issue — start manually with: npm start');
   }
   console.log('\nHelm is set up.');
-  console.log(cfg.svc ? `It's running in the background. Logs: ${ROOT}/agent.log` : `Start it:  cd "${ROOT}" && npm start`);
+  console.log(cfg.svc ? `It's running in the background. Logs: ${ROOT}/agent.log` : `Start it:  cd "${ROOT}"  then  node index.js`);
   if (cfg.authMode === 'subscription') console.log("Backend: Claude subscription — make sure you've run 'claude' once and logged in.");
   else if (cfg.authMode === 'apikey') console.log('Backend: Anthropic API key (billed pay-as-you-go).');
   else console.log(`Backend: free / local model (${cfg.modelId} @ ${cfg.baseUrl}) — make sure that endpoint is running.`);

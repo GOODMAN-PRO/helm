@@ -62,6 +62,10 @@ if ($Src) {
 } elseif (Test-Path (Join-Path $Dir ".git")) {
   Write-Host "Updating existing install at $Dir"
   git -C $Dir pull --ff-only
+} elseif (Test-Path (Join-Path $Dir "index.js")) {
+  # existing non-git install (came from a zip) -> refresh the code via zip, keep .env
+  Write-Host "Updating existing install at $Dir (zip)"
+  Get-HelmZip $Dir
 } else {
   Write-Host "Cloning $Repo -> $Dir"
   # git often isn't proxy-aware; if the clone can't reach github.com, fall back to the zip download.
@@ -107,6 +111,6 @@ if (Test-Path ".env") {
 
 Write-Host ""
 Write-Host "Done. Installed at: $Dir" -ForegroundColor Cyan
-Write-Host "Start it:   cd `"$Dir`"; npm start"
+Write-Host "Start it:   cd `"$Dir`"; node index.js     (use 'node index.js' on Windows - 'npm start' can be blocked by script policy)"
 Write-Host "Run 24/7:   powershell -ExecutionPolicy Bypass -File `"$Dir\scripts\install-service.ps1`""
 Write-Host "Reminder: one Discord token = one running instance. Stop any other copy first."

@@ -82,21 +82,23 @@ if [ -n "$SRC" ]; then
     cp -R "$SRC"/. "$TARGET"/ ; rm -rf "$TARGET/.git" "$TARGET/node_modules" "$TARGET/.env"
   fi
   ok "source copied"
-elif [ -d "$TARGET/.git" ]; then
-  say "Updating existing install at $TARGET"
-  git -C "$TARGET" pull --ff-only && ok "updated"
 else
   TARBALL="${HELM_TARBALL:-https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main}"
-  fetch_tarball() {
-    say "Downloading Helm (tarball)..."
+  fetch_tarball() {  # overwrites tracked files but keeps .env and other untracked state
     command -v curl >/dev/null || die "Need curl to download Helm."
     mkdir -p "$TARGET"
-    curl -fsSL "$TARBALL" | tar -xz -C "$TARGET" --strip-components=1 || die "download failed — check your connection/proxy and re-run."
+    curl -fsSL "$TARBALL" | tar -xz -C "$TARGET" --strip-components=1 || die "download failed - check your connection/proxy and re-run."
   }
-  if command -v git >/dev/null; then
+  if [ -d "$TARGET/.git" ]; then
+    say "Updating existing install at $TARGET"
+    git -C "$TARGET" pull --ff-only && ok "updated"
+  elif [ -f "$TARGET/index.js" ]; then
+    say "Updating existing install at $TARGET (download)"
+    fetch_tarball; ok "updated"
+  elif command -v git >/dev/null; then
     say "Cloning $REPO_URL -> $TARGET"
     if git clone --depth 1 "$REPO_URL" "$TARGET" 2>/dev/null; then ok "cloned"; else
-      warn "git clone failed (proxy/firewall?) — downloading the tarball instead"
+      warn "git clone failed (proxy/firewall?) - downloading the tarball instead"
       rm -rf "$TARGET"; fetch_tarball; ok "downloaded"
     fi
   else
