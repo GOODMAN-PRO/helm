@@ -10,6 +10,7 @@
 // Requires Accessibility permission for whatever process launches it.
 import Cocoa
 import CoreGraphics
+import ApplicationServices
 
 let a = CommandLine.arguments
 func die(_ m: String) -> Never { FileHandle.standardError.write((m + "\n").data(using: .utf8)!); exit(1) }
@@ -63,5 +64,6 @@ case "move":         move(num(2), num(3))
 case "type":         guard a.count > 2 else { die("type needs text") }; typeText(a[2])
 case "key":          key(CGKeyCode(Int(num(2))), flags(a.count > 3 ? a[3] : nil))
 case "scroll":       post(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: Int32(num(2)), wheel2: 0, wheel3: 0))
+case "trusted":      print(AXIsProcessTrusted() ? "ACCESSIBILITY_OK" : "ACCESSIBILITY_DENIED")
 default:             die("unknown command: \(a[1])")
 }
