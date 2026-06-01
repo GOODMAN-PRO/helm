@@ -336,7 +336,7 @@ function fail(label, reason) {
   const label = 'memory.mjs recall: output shape includes the original fact columns';
   try {
     const r = spawnSync('node',
-      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'example query'],
+      [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', 'project deadlines'],
       { encoding: 'utf8', timeout: 10_000 });
     if (r.status !== 0) throw new Error(`exit ${r.status}: ${r.stderr}`);
     const arr = JSON.parse(r.stdout);
@@ -923,48 +923,6 @@ function fail(label, reason) {
     const loIdx = arr.findIndex(f => f.key === KEY_LO);
     if (hiIdx === -1 || loIdx === -1) throw new Error(`test facts not in recall results (hi=${hiIdx}, lo=${loIdx})`);
     if (hiIdx >= loIdx) throw new Error(`high-confidence fact (idx ${hiIdx}) did not rank above low-confidence (idx ${loIdx})`);
-    ok(label);
-  } catch (e) { fail(label, e.message); }
-}
-
-// ---- 40. exam-countdown: parseExamDate handles real value formats; daysUntil arithmetic correct ----
-{
-  const label = 'exam-countdown.mjs: syntax valid; parseExamDate parses ≈ YYYY-MM-DD; daysUntil arithmetic correct';
-  try {
-    // Syntax check
-    const rc = spawnSync('node', ['--check', path.join(WORKSPACE, 'scheduler/exam-countdown.mjs')],
-      { encoding: 'utf8', timeout: 10_000 });
-    if (rc.status !== 0) throw new Error(`syntax check failed: ${rc.stderr}`);
-
-    // Import without executing main (guarded by argv check)
-    const { parseExamDate, daysUntil } = await imp(
-      path.join(WORKSPACE, 'scheduler/exam-countdown.mjs')
-    );
-
-    // parseExamDate: range value like "~1 week away (≈ 2026-06-05/06)"
-    const d1 = parseExamDate('~1 week away (≈ 2026-06-05/06)');
-    if (d1 !== '2026-06-05') throw new Error(`range date: expected 2026-06-05, got ${d1}`);
-
-    // parseExamDate: exact value like "~3 days away (≈ 2026-06-02)"
-    const d2 = parseExamDate('~3 days away (≈ 2026-06-02)');
-    if (d2 !== '2026-06-02') throw new Error(`exact date: expected 2026-06-02, got ${d2}`);
-
-    // parseExamDate: no date present → null
-    if (parseExamDate('no date here') !== null)
-      throw new Error('missing date should return null');
-
-    // daysUntil: fixed reference — 2026-05-31 UTC (= 2026-05-31 00:00 GMT+7 after shift)
-    // nowMs is shifted by +7h inside daysUntil; pick a UTC ms that lands on 2026-05-31 in GMT+7
-    const ref = new Date('2026-05-31T00:00:00Z').getTime() - 7 * 3600_000; // UTC midnight that → GMT+7 2026-05-31
-    const days2 = daysUntil('2026-06-02', ref);
-    if (days2 !== 2) throw new Error(`expected 2 days until 2026-06-02 from 2026-05-31, got ${days2}`);
-
-    const days0 = daysUntil('2026-05-31', ref);
-    if (days0 !== 0) throw new Error(`expected 0 days for same day, got ${days0}`);
-
-    const daysNeg = daysUntil('2026-05-30', ref);
-    if (daysNeg !== -1) throw new Error(`expected -1 for yesterday, got ${daysNeg}`);
-
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
@@ -1886,8 +1844,9 @@ function fail(label, reason) {
     for (const bad of ['DISCORD_TOKEN', 'OWNER_ID', 'ANTHROPIC_API_KEY', 'sk-ant']) {
       if (raw.includes(bad)) throw new Error(`template leaked ${bad}`);
     }
-    // install-dir path must be tokenized, not absolute
-    if (raw.includes('/Users/owner/secondme')) throw new Error('template leaked an absolute install path');
+    // install-dir path must be tokenized, not absolute (check against THIS machine's real install root)
+    const installRoot = path.resolve(WORKSPACE, '..');
+    if (raw.includes(installRoot)) throw new Error('template leaked an absolute install path');
     if (!listTemplates().includes('__smoke_tpl')) throw new Error('listTemplates missing the new template');
     // import should not throw and should report what it applied — but must not leave the real
     // servers.json/persona reformatted, so snapshot and restore them around the call.

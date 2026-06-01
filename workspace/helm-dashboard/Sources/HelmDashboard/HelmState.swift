@@ -188,14 +188,14 @@ final class HelmState: ObservableObject {
     // MARK: - SQLite reads
 
     private func resolvedDBPath() -> String {
-        // Try the absolute known path first
-        let knownPath = "/Users/owner/secondme/workspace/sessions.db"
+        // Try the install's workspace under the current user's home first
+        let knownPath = NSHomeDirectory() + "/secondme/workspace/sessions.db"
         if FileManager.default.fileExists(atPath: knownPath) { return knownPath }
         return dbPath
     }
 
     private func resolvedMemoryDBPath() -> String {
-        let knownPath = "/Users/owner/secondme/workspace/memory/memory.db"
+        let knownPath = NSHomeDirectory() + "/secondme/workspace/memory/memory.db"
         if FileManager.default.fileExists(atPath: knownPath) { return knownPath }
         return "/tmp/memory.db"
     }
@@ -204,7 +204,7 @@ final class HelmState: ObservableObject {
         // sessions.db only has session keys, not message history.
         // Real messages live in workspace/conversations/ as .md files.
         // We read those instead.
-        let convDir = "/Users/owner/secondme/workspace/conversations"
+        let convDir = NSHomeDirectory() + "/secondme/workspace/conversations"
         guard let files = try? FileManager.default.contentsOfDirectory(atPath: convDir) else { return }
         let mdFiles = files.filter { $0.hasSuffix(".md") }.sorted().reversed().prefix(3)
 

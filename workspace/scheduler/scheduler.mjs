@@ -8,6 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path   from 'node:path';
+import os     from 'node:os';
 import { config as loadEnv } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -90,7 +91,7 @@ function fireJob(job) {
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', persona,
     '--add-dir', WORKSPACE,
-    '--add-dir', '/Users/owner', // full home access; ~/helm off-limits per persona
+    '--add-dir', os.homedir(), // full home access, on whatever OS this is
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
   ];
 

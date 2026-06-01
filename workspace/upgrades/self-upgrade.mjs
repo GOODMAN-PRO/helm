@@ -105,10 +105,10 @@ try {
     try { queue = readFileSync(QUEUE, 'utf8'); } catch {}
     const stuck = renderStuckForPrompt();
     const prompt = [
-      'You are Helm performing your scheduled NIGHTLY SELF-UPGRADE on your own codebase at /Users/owner/secondme.',
+      `You are Helm performing your scheduled NIGHTLY SELF-UPGRADE on your own codebase at ${ROOT}.`,
       '',
       'HARD CONSTRAINTS (violating any = failure):',
-      '- Work ONLY inside /Users/owner/secondme. NEVER touch ~/helm, the Helm Supabase project, or com.helm.agent — that is a SEPARATE project and is strictly off-limits.',
+      `- Work ONLY inside ${ROOT}. Respect any off-limits paths/projects the owner named in @owner.md; never reach into unrelated projects.`,
       '- Both bots MUST stay startable. After editing index.js or imessage.js run `node --check` on each.',
       '- Do NOT edit .env, do NOT delete owner data (drills/, memory/, sessions.db), do NOT spend money, do NOT install global software.',
       '- A smoke test (node workspace/tests/smoke.mjs) runs after you finish. If it fails, ALL changes auto-revert. Keep it green; never weaken tests to cheat.',

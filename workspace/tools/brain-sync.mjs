@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // brain-sync.mjs — keep the SINGLE HelmBrain Obsidian vault identical on the Mac and the Windows box.
 //
-// There is exactly ONE vault. It lives at /Users/owner/HelmBrain on the Mac and
-// C:\Users\User\HelmBrain on Windows. Edits happen on either machine; this reconciles them.
+// There is exactly ONE vault. It lives at $HOME/HelmBrain on macOS/Linux and
+// %USERPROFILE%\HelmBrain on Windows. Edits happen on either machine; this reconciles them.
 //
 // Mechanism: git over **bundles** (not git-over-ssh — Windows' cmd.exe shell mangles the quoting
 // git uses, so we never run git-upload-pack remotely). Instead each side packs its history into a
@@ -24,10 +24,12 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, writeFileSync, unlinkSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-const MAC_VAULT = '/Users/owner/HelmBrain';
+const MAC_VAULT = path.join(os.homedir(), 'HelmBrain');   // local vault ($HOME/HelmBrain)
 const WIN_HOST = process.env.HELM_WIN_HOST || 'helm-win';
-const WIN_VAULT = '%USERPROFILE%\\HelmBrain';   // C:\Users\User\HelmBrain
+const WIN_VAULT = '%USERPROFILE%\\HelmBrain';   // remote Windows vault
 const BRANCH = 'main';
 const DRY = process.argv.includes('--dry-run');
 const INIT = process.argv.includes('--init');
@@ -99,7 +101,7 @@ function commitWin(label) {
 // First-time: give the Windows vault the Mac's history so they share one root.
 function seedWindowsFromMac() {
   const exists = win(`if exist ${WIN_VAULT}\\nul (echo YES) else (echo NO)`).out;
-  if (!/YES/.test(exists)) die(`Windows vault ${WIN_VAULT} missing — refusing to create a duplicate. Seed C:\\Users\\User\\HelmBrain from the Mac once, then re-run --init.`);
+  if (!/YES/.test(exists)) die(`Windows vault ${WIN_VAULT} missing — refusing to create a duplicate. Seed %USERPROFILE%\\HelmBrain from the home machine once, then re-run --init.`);
   const hasGit = win(`if exist ${WIN_VAULT}\\.git (echo YES) else (echo NO)`).out;
   if (/YES/.test(hasGit)) { log('windows: git already initialised'); return; }
   log('windows: seeding git from Mac history');

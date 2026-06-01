@@ -8,14 +8,14 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/owner/.local/bin/node</string>
-    <string>/Users/owner/secondme/workspace/senses/notify/poller.mjs</string>
+    <string>__HELM_HOME__/.local/bin/node</string>
+    <string>__HELM_HOME__/secondme/workspace/senses/notify/poller.mjs</string>
     <string>--interval</string>
     <string>30</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/owner/secondme</string>
+  <string>__HELM_HOME__/secondme</string>
 
   <key>RunAtLoad</key>
   <true/>
@@ -24,17 +24,17 @@
   <true/>
 
   <key>StandardOutPath</key>
-  <string>/Users/owner/secondme/workspace/senses/notify/poller.log</string>
+  <string>__HELM_HOME__/secondme/workspace/senses/notify/poller.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/owner/secondme/workspace/senses/notify/poller.err</string>
+  <string>__HELM_HOME__/secondme/workspace/senses/notify/poller.err</string>
 
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/Users/owner/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>__HELM_HOME__/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
     <key>HOME</key>
-    <string>/Users/owner</string>
+    <string>__HELM_HOME__</string>
   </dict>
 </dict>
 </plist>

@@ -1,6 +1,6 @@
 // OCR helper using macOS Vision framework.
 // Compile:
-//   swiftc ocr-helper.swift -o /Users/owner/secondme/bin/ocr-helper
+//   swiftc ocr-helper.swift -o ../../../bin/ocr-helper   (path relative to this file's dir)
 // Usage:
 //   ocr-helper /path/to/image.png
 // Output: recognised text on stdout, one line per observation.

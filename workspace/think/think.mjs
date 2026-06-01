@@ -50,7 +50,7 @@ const CHEAP_PROMPT = [
   'You can read your memory (`node workspace/memory/memory.mjs recall <q>` / `dump`), recent episodes, your workspace, and the whole Mac.',
   '',
   'Keep this tick SHORT and cheap (you run every ~15 min). Each tick:',
-  '1. ACTIVE LEARNING — READ today\'s transcript at workspace/conversations/<today>.md (and yesterday\'s). For any durable fact/preference the owner revealed, persist it AND mirror it into /Users/owner/HelmBrain/02 People/About Me.md so nothing said in chat is ever lost:',
+  '1. ACTIVE LEARNING — READ today\'s transcript at workspace/conversations/<today>.md (and yesterday\'s). For any durable fact/preference the owner revealed, persist it AND mirror it into the HelmBrain vault in the owner\'s home dir ($HOME/HelmBrain or %USERPROFILE%\\HelmBrain) under "02 People/About Me.md" so nothing said in chat is ever lost:',
   '   node workspace/memory/memory.mjs remember <kind> <stable-short-key> "<value>" --source observed --confidence 0.6',
   '   (preferences use kind=preference; reuse the same key to update in place — confidence only rises with independent repeats.)',
   '2. Notice anything worth preparing later (a drill, a reminder, a draft). If useful, prepare it in the workspace or add a DISABLED scheduler job. Do NOT ping the owner now.',

@@ -22,7 +22,7 @@ conversations, research and captures **rewrite existing notes**, they don't just
 - `06 Archive/` — done/inactive
 - `MOCs/` — Maps of Content / synthesis pages that link clusters together
 
-(Path is machine-aware: `/Users/owner/HelmBrain` on Mac, `C:\Users\User\HelmBrain` on Windows. Never create a new vault.)
+(Path is OS-aware: `HelmBrain` in the owner's home dir — `$HOME/HelmBrain` on macOS/Linux, `%USERPROFILE%\HelmBrain` on Windows. Never create a new vault.)
 
 ## AI-first note format
 Every note is optimized for future-Helm retrieval first, human reading second:

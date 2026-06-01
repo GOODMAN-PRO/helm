@@ -16,7 +16,7 @@ const WORKSPACE  = path.resolve(__dirname, '..');
 // Registry exec paths are hardcoded to the canonical install root. When running
 // from a git worktree (e.g. during swarm/sweep tasks), remap them to the local
 // root so tool scripts read the correct local databases.
-const CANONICAL_ROOT = '/Users/owner/secondme';
+const CANONICAL_ROOT = path.resolve(WORKSPACE, '..');  // this install's root (registry exec paths are relative)
 const LOCAL_ROOT     = path.resolve(WORKSPACE, '..');
 
 const [,, verb, name, ...rest] = process.argv;

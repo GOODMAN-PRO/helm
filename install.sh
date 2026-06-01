@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | bash
 #
 # Local test (install from a local source dir into a throwaway target, no clone):
-#   HELM_SRC=/Users/owner/secondme HELM_DIR=/tmp/helm-test bash install.sh
+#   HELM_SRC=/path/to/helm-source HELM_DIR=/tmp/helm-test bash install.sh
 #
 # Env overrides:
 #   HELM_REPO  git URL to clone from           (default: the published GitHub repo)

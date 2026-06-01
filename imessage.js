@@ -117,7 +117,7 @@ async function ask(handle, prompt) {
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', PERSONA,
     '--add-dir', WORKSPACE,
-    '--add-dir', '/Users/owner', // full home access (ultimate powers); ~/helm stays off-limits per persona
+    '--add-dir', os.homedir(), // full home access (ultimate powers), on whatever OS this is
     '--strict-mcp-config', '--mcp-config', mcpConfigArg(), // workspace/mcp/servers.json (filesystem + fetch)
   ];
   const sid = getSession('owner');

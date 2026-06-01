@@ -12,6 +12,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
@@ -23,7 +24,7 @@ const MIND_MD = path.join(ROOT, 'workspace/mind/MIND.md');
 
 export function vaultPath() {
   if (process.env.HELM_BRAIN) return process.env.HELM_BRAIN;
-  return process.platform === 'win32' ? 'C:\\Users\\User\\HelmBrain' : '/Users/owner/HelmBrain';
+  return path.join(os.homedir(), 'HelmBrain');   // OS-aware: $HOME/HelmBrain (or %USERPROFILE%\HelmBrain)
 }
 
 export const VERBS = {

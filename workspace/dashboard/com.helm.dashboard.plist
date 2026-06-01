@@ -8,24 +8,24 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/owner/.local/bin/node</string>
-    <string>/Users/owner/secondme/workspace/dashboard/server.mjs</string>
+    <string>__HELM_HOME__/.local/bin/node</string>
+    <string>__HELM_HOME__/secondme/workspace/dashboard/server.mjs</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/owner/secondme</string>
+  <string>__HELM_HOME__/secondme</string>
 
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/Users/owner/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <string>__HELM_HOME__/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/Users/owner/secondme/workspace/dashboard/dashboard.log</string>
+  <string>__HELM_HOME__/secondme/workspace/dashboard/dashboard.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/owner/secondme/workspace/dashboard/dashboard.log</string>
+  <string>__HELM_HOME__/secondme/workspace/dashboard/dashboard.log</string>
 
   <key>RunAtLoad</key>
   <true/>

@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE = path.resolve(__dirname, '..');
@@ -71,7 +72,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
     ], { encoding: 'utf8', timeout: 15_000, shell: false });
 
     // Alternative: check the playwright cache dir
-    const cacheBase = path.join(process.env.HOME || '/Users/owner', 'Library/Caches/ms-playwright');
+    const cacheBase = path.join(os.homedir(), 'Library/Caches/ms-playwright');
     if (!existsSync(cacheBase)) throw new Error('ms-playwright cache dir not found — run: npx playwright install chromium');
     const { readdirSync } = await import('node:fs');
     const entries = readdirSync(cacheBase);

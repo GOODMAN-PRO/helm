@@ -7,6 +7,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { DatabaseSync } from 'node:sqlite';
@@ -185,7 +186,7 @@ function runClaudeRemote(prompt) {
     const REMOTE_PERSONA = "You are Helm on the owner's Windows PC over SSH, with full shell and file access. " +
       'ACT — actually DO what the owner asks end to end: create the files, build the thing, run the commands, accomplish the task. ' +
       'A screenshot is ONLY to SHOW a result AFTER you have done the work — NEVER reply with just a screenshot instead of doing the task, and never claim you did something you did not. ' +
-      'Keep replies short. Confirm before anything destructive, irreversible, or that spends money. Never touch the separate Helm project. ' +
+      'Keep replies short. Confirm before anything destructive, irreversible, or that spends money. Respect any off-limits paths the owner named in their profile. ' +
       'To screenshot the Windows desktop (SSH cannot capture it directly): run  schtasks /run /tn HelmShot  then wait ~3s (powershell Start-Sleep 3); it saves to C:\\\\Users\\\\User\\\\helm-shot.png. End that reply with a line exactly: ATTACH: C:\\\\Users\\\\User\\\\helm-shot.png';
     // SYNC: push the Mac's live brain (CLAUDE.md + memory index) to the PC so windows-Helm shares it.
     const WIN_BRAIN = 'helm-brain';   // relative to the windows home (C:\Users\User\helm-brain)
@@ -244,20 +245,25 @@ function scpToWin(localPath) {
 }
 
 // ---- persona: appended to Claude Code's own (tool-enabled) system prompt ----
+// Describe the machine Helm is actually running on, so it never assumes a Mac.
+const OS_NAME = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux';
 const PERSONA_BASE =
   'You are Helm, a personal AI agent talking to your owner over Discord DMs. ' +
   "You run on their own machine with full tools (shell, files, web) — act, don't just advise. " +
+  `This machine is **${OS_NAME}** (${os.platform()}/${os.arch()}) — use the right paths and commands for it; never assume it's a Mac. ` +
   'Keep replies short and chat-friendly; this is a messaging app, not a document. ' +
-  'Your long-term memory is CLAUDE.md in the working directory — read it, and append durable ' +
-  'facts about your owner or ongoing work. Confirm before anything destructive, irreversible, ' +
-  'or that spends money. ' +
-  'You have full authority over this Mac — shell, files, GUI (screenshot + guicontrol clicks/typing), ' +
+  'Your long-term memory is CLAUDE.md in the working directory (which imports @owner.md, your private ' +
+  "profile of who the owner is) — read it. If @owner.md has no real identity yet, you don't know your " +
+  'owner: introduce yourself and run the onboarding interview before personalizing — do NOT invent a ' +
+  'name or honorific. Write durable facts to @owner.md, not CLAUDE.md. Confirm before anything ' +
+  'destructive, irreversible, or that spends money. ' +
+  'You have full authority over this machine — shell, files, the screen (cross-platform screenshots), ' +
   'the scheduler, and your own source code. Act boldly and proactively. ' +
   'When asked to build or create something, actually BUILD it (make the files, write the code, run the commands, finish the task) — a screenshot or a description is NEVER a substitute for doing the work. "Show me" means produce the real artifact first, THEN optionally screenshot it to display the result. ' +
   'Two directives you may emit anywhere in a reply (they are stripped before the owner sees them): ' +
   '(1) when you get genuinely stuck or hit a limitation worth fixing later, add `[STUCK: one line on what blocked you]` — it is queued for your nightly self-upgrade to fix the root cause; ' +
-  '(2) when a task is better run on the other machine, switch yourself at will with `[USE: windows]` or `[USE: mac]` (the Mac is home; the Windows PC is reachable over SSH). ' +
-  'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
+  '(2) when a task is better run on another machine in the fleet, switch yourself at will with `[USE: windows]` or `[USE: mac]`. ' +
+  'Respect any off-limits paths/projects the owner names in @owner.md.';
 
 const MODE_GUIDANCE = {
   suggest:
@@ -333,7 +339,7 @@ async function ask(prompt, onHeartbeat, target = 'mac', mode = 'copilot') {
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', buildPersona(mode),
     '--add-dir', WORKSPACE,
-    '--add-dir', '/Users/owner', // full home access (ultimate powers); ~/helm stays off-limits per persona
+    '--add-dir', os.homedir(), // full home access (ultimate powers), on whatever OS this is
     '--strict-mcp-config', '--mcp-config', mcpConfigArg(), // workspace/mcp/servers.json (filesystem + fetch)
   ];
   const sid = getSession('owner');
@@ -684,7 +690,7 @@ client.on(Events.MessageCreate, async msg => {
       const conv = path.join(WORKSPACE, 'conversations');
       mkdirSync(conv, { recursive: true });
       appendFileSync(path.join(conv, new Date().toISOString().slice(0, 10) + '.md'),
-        `\n**[${new Date().toISOString().slice(11, 16)}] sir (${target}):** ${text || '(attachment)'}\n**helm:** ${body}\n`);
+        `\n**[${new Date().toISOString().slice(11, 16)}] owner (${target}):** ${text || '(attachment)'}\n**helm:** ${body}\n`);
     } catch {}
   } catch (e) {
     clearInterval(typing);

@@ -8,8 +8,8 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/owner/.local/bin/node</string>
-    <string>/Users/owner/secondme/workspace/senses/screen/watcher.mjs</string>
+    <string>__HELM_HOME__/.local/bin/node</string>
+    <string>__HELM_HOME__/secondme/workspace/senses/screen/watcher.mjs</string>
     <string>--interval</string>
     <string>60</string>
     <string>--threshold</string>
@@ -18,7 +18,7 @@
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/owner/secondme</string>
+  <string>__HELM_HOME__/secondme</string>
 
   <key>RunAtLoad</key>
   <true/>
@@ -27,17 +27,17 @@
   <true/>
 
   <key>StandardOutPath</key>
-  <string>/Users/owner/secondme/workspace/senses/screen/watcher.log</string>
+  <string>__HELM_HOME__/secondme/workspace/senses/screen/watcher.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/owner/secondme/workspace/senses/screen/watcher.err</string>
+  <string>__HELM_HOME__/secondme/workspace/senses/screen/watcher.err</string>
 
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/Users/owner/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</string>
+    <string>__HELM_HOME__/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</string>
     <key>HOME</key>
-    <string>/Users/owner</string>
+    <string>__HELM_HOME__</string>
   </dict>
 </dict>
 </plist>

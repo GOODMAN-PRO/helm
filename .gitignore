@@ -73,3 +73,30 @@ workspace/templates/*.helmtemplate.json
 
 # Helm Mind nightly agent log
 workspace/mind/mind.log
+
+# ---- owner-generated / personal workspace state (NEVER publish) ----
+# Helm's onboarding writes the owner's profile here; keep it private.
+workspace/owner.md
+workspace/owner.local.md
+# personal projects, plans and status the agent generates while working
+workspace/business/
+workspace/companies/
+workspace/status.md
+# personal scheduler jobs (the scheduler engine stays tracked; jobs are per-owner)
+workspace/scheduler/exam-countdown.mjs
+# generated upgrade/sweep reports, prompts and logs (code in this dir stays tracked)
+workspace/upgrades/*_REPORT.md
+workspace/upgrades/*_PROGRESS.md
+workspace/upgrades/*_REVIEW.md
+workspace/upgrades/PLAN.md
+workspace/upgrades/UPGRADE_LOG.md
+workspace/upgrades/*-prompt.txt
+workspace/upgrades/sweep-*.txt
+# swarm runtime task lists + reports (swarm engine stays tracked)
+workspace/swarm/*.json
+workspace/swarm/REPORT.md
+# captured browser pages
+workspace/.playwright-mcp/
+
+# runtime error logs
+*.err
