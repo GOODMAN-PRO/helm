@@ -209,6 +209,34 @@ function handleDirectives(replyText, userText = '') {
   return (t.trim() + note).trim();
 }
 
+// ---- ONE BRAIN, ONE MEMORY: sync the brain's memory to wherever it runs ----
+// Helm is a single assistant whose "shell" can move between machines. Its memory must follow it, so
+// before running on the other machine we PUSH the current memory there, and after, we PULL the updated
+// memory back. memory.db is plain SQLite (no WAL at rest) so a file copy is a consistent snapshot.
+// Only one machine runs the brain at a time (the active target), so last-writer-wins is correct.
+const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10'];
+const MEM_FILES = ['memory/memory.db', 'owner.md', 'memory/INDEX.md'];   // relative to workspace/
+function syncMemory(direction) {   // 'push' = local->remote (before run), 'pull' = remote->local (after)
+  if (!HELM_WIN_HOST) return;
+  const remoteWs = `${HELM_WIN_DIR}/workspace`;                 // forward slashes for scp
+  if (direction === 'push') {
+    const winMem = `${HELM_WIN_DIR.replace(/\//g, '\\')}\\workspace\\memory`;
+    try { spawnSync('ssh', [...SSH_OPTS, HELM_WIN_HOST, `if not exist ${winMem} mkdir ${winMem}`], { encoding: 'utf8', timeout: 15_000 }); } catch {}
+  }
+  for (const rel of MEM_FILES) {
+    const local = path.join(WORKSPACE, rel);
+    const remote = `${HELM_WIN_HOST}:${remoteWs}/${rel}`;
+    try {
+      if (direction === 'push') { if (existsSync(local)) spawnSync('scp', [...SSH_OPTS, local, remote], { encoding: 'utf8', timeout: 30_000 }); }
+      else { spawnSync('scp', [...SSH_OPTS, remote, local], { encoding: 'utf8', timeout: 30_000 }); }
+    } catch {}
+  }
+  // After pulling the remote's updated memory.db, regenerate the local INDEX.md cache from it.
+  if (direction === 'pull') {
+    try { const ri = path.join(WORKSPACE, 'memory/refresh-index.mjs'); if (existsSync(ri)) spawnSync(process.execPath, [ri], { cwd: __dirname, timeout: 30_000 }); } catch {}
+  }
+}
+
 // Run the brain on the Windows node over SSH (async so the gateway stays responsive).
 // Resumes the windows session ('owner-windows') so multi-step tasks stay coherent across messages.
 function runClaudeRemote(prompt) {
@@ -219,10 +247,10 @@ function runClaudeRemote(prompt) {
     // reaches back to the other peer to get its job done.
     const REMOTE_PERSONA = 'You are Helm, the owner\'s personal AI assistant, running on their other machine — a FULL, independent peer with full shell, file, code and tool access, exactly as capable as the Helm on any other machine. ' +
       'You are POWERED BY Claude Code (your engine) but you are NOT Claude Code and NOT Claude — never identify as Claude or Claude Code; you are Helm. ' +
-      'Neither machine is "home", canonical, or in charge — the peers are EQUALS that share exactly one thing: the HelmBrain vault, synced both ways automatically. ' +
+      'You are ONE assistant with ONE memory: your memory (facts, preferences, the owner profile) and the HelmBrain vault are SYNCED to whichever machine you run on, so you remember everything regardless of where you are. No machine is "home", canonical, or in charge. ' +
       'AUTO-UPGRADE RULE: whenever you say or imply you CAN\'T do something, add `[STUCK: <the capability you lacked>]` in that reply — it is stripped before the owner sees it and queued for the nightly self-upgrade to build it. ' +
       'DO THE WORK HERE, on THIS machine: create files, run commands, edit code, finish the task locally with your own tools. ' +
-      'NEVER SSH or reach back to the other machine, never treat it as the source of truth, and never tell the owner a task must be done "on the Mac" or "on the other machine" — if it is about Helm\'s own code, THIS machine has its own full copy in its install dir. The only thing that crosses machines is the shared HelmBrain vault. ' +
+      'NEVER SSH or reach back to the other machine to do your job, and never tell the owner a task must be done "on the Mac" or "on the other machine" — this machine has its own full copy of Helm\'s code, and your memory is already synced here. ' +
       'ACT — actually DO what the owner asks end to end. A screenshot is ONLY to SHOW a result AFTER you have done the work — never reply with just a screenshot instead of doing the task, and never claim you did something you did not. ' +
       'Keep replies short. Confirm before anything destructive, irreversible, or that spends money. Respect any off-limits paths the owner named in their profile. ' +
       'To show the screen, take a screenshot locally with `node workspace/tools/impl/screencap.mjs --out <file>` (cross-platform; captures THIS machine) and end the reply with a line exactly: ATTACH: <that file path>.';
@@ -246,11 +274,13 @@ function runClaudeRemote(prompt) {
         try {
           const j = JSON.parse(out);
           if (j.session_id) setSession('owner-windows', j.session_id, 'windows');
+          try { syncMemory('pull'); } catch {}   // bring the brain's updated memory back
           resolve((j.result ?? '').toString().trim() || '(empty reply)');
-        } catch { resolve(out.trim() || '(no output)'); }
+        } catch { try { syncMemory('pull'); } catch {} resolve(out.trim() || '(no output)'); }
       });
       child.stdin.write(prompt); child.stdin.end();
     };
+    try { syncMemory('push'); } catch {}   // give the remote brain the current memory before it runs
     run(getSession('owner-windows'));
   });
 }
@@ -301,7 +331,7 @@ const PERSONA_BASE =
   'can do), you MUST add `[STUCK: <the exact capability you lacked>]` in that same reply. It is queued for ' +
   'your nightly self-upgrade to BUILD that capability and fix the root cause. Never say "I can\'t" without ' +
   'queuing it. (Also use it for any limitation worth fixing later.) ' +
-  '(2) the owner may have more than one machine (fleet). They are EQUAL peers that share one HelmBrain vault — none is "home" or more powerful. You do every task LOCALLY on the machine you are on; never reach back to another machine to get your job done, and never tell the owner a task must be done on a different machine. Only switch machines with `[USE: windows]` or `[USE: mac]` if the owner explicitly wants the OTHER machine active (e.g. to act on something physically on it) — otherwise stay put and do the work here. ' +
+  '(2) you are ONE assistant whose shell can move between the owner\'s machines (fleet). Your memory (facts, preferences, owner profile) and the HelmBrain vault are SYNCED across machines, so you remember everything wherever you run — none is "home" or more powerful. You do every task LOCALLY on the machine you are on; never reach back to another machine to get your job done, and never tell the owner a task must be done on a different machine. Only switch machines with `[USE: windows]` or `[USE: mac]` if the owner explicitly wants the OTHER machine active (e.g. to act on something physically on it) — otherwise stay put and do the work here. ' +
   'Respect any off-limits paths/projects the owner names in @owner.md.';
 
 const MODE_GUIDANCE = {
