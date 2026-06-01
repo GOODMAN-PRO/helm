@@ -149,6 +149,7 @@ function tui(sock) {
   const VERBS = ['Cogitating', 'Pondering', 'Thinking', 'Noodling', 'Working', 'Brewing', 'Conjuring', 'Computing', 'Musing', 'Tinkering'];
   let busy = false, spinFrame = 0, busyStart = 0, busyVerb = VERBS[0], spinTimer = null;
   const PLACEHOLDER = 'Ask Helm anything…  ( / for commands )';
+  let pasteBuf = null;   // non-null while a bracketed paste is being received
 
   // The command menu is open whenever the input starts with "/". Filter by what's typed so far.
   const menuOpen = () => input.startsWith('/');
@@ -157,8 +158,8 @@ function tui(sock) {
     return COMMANDS.filter(c => c.cmd.replace(/^\//, '').toLowerCase().startsWith(q));
   };
 
-  const enterAlt = () => out(`${ESC}?1049h${ESC}?25l`);   // alt screen, hide cursor
-  const leaveAlt = () => out(`${ESC}?25h${ESC}?1049l`);   // restore
+  const enterAlt = () => out(`${ESC}?1049h${ESC}?25l${ESC}?2004h`);   // alt screen, hide cursor, bracketed paste on
+  const leaveAlt = () => out(`${ESC}?2004l${ESC}?25h${ESC}?1049l`);   // bracketed paste off, show cursor, restore
   const moveTo = (r, c) => out(`${ESC}${r};${c}H`);
   const clearLine = () => out(`${ESC}2K`);
 
@@ -294,12 +295,23 @@ function tui(sock) {
     moveTo(H - 2, 1); out(`${C.dim}╭${'─'.repeat(iw - 2)}╮${C.x}`);
     moveTo(H - 1, 1); clearLine();
     const inner = iw - PROMPT_COL;
-    const shown = input.length > inner ? '…' + input.slice(input.length - (inner - 1)) : input;
-    const body = input ? shown : `${C.dim}${PLACEHOLDER.slice(0, inner)}${C.x}`;
-    out(`${C.dim}│${C.x} ${C.cyan}>${C.x} ${body}${ESC}K`);
+    // Multi-line input (e.g. a paste) is summarized like Claude Code: "[N lines pasted]" + a preview
+    // of the first line, so the box doesn't blow up. Single-line input shows normally.
+    const nlines = input ? input.split('\n').length : 0;
+    let display, cursorLen;
+    if (nlines > 1) {
+      const first = input.split('\n')[0].slice(0, Math.max(0, inner - 20));
+      const summary = `${C.sky}[${nlines} lines pasted]${C.x} ${C.dim}${first}…${C.x}`;
+      display = summary; cursorLen = stripAnsi(summary).length;
+    } else {
+      const shown = input.length > inner ? '…' + input.slice(input.length - (inner - 1)) : input;
+      display = input ? shown : `${C.dim}${PLACEHOLDER.slice(0, inner)}${C.x}`;
+      cursorLen = input ? stripAnsi(shown).length : 0;
+    }
+    out(`${C.dim}│${C.x} ${C.cyan}>${C.x} ${display}${ESC}K`);
     moveTo(H, 1); out(`${C.dim}╰${'─'.repeat(iw - 2)}╯${C.x}`);
-    // cursor sits right after the typed text (at the prompt position if empty)
-    moveTo(H - 1, PROMPT_COL + (input ? stripAnsi(shown).length : 0));
+    // cursor sits right after the rendered text (at the prompt position if empty)
+    moveTo(H - 1, PROMPT_COL + cursorLen);
   }
 
   // Lightweight redraw of JUST the input line (no full-screen clear) — used while typing so the
@@ -331,6 +343,34 @@ function tui(sock) {
   });
   sock.on('close', () => { connected = false; status = 'Helm disconnected (service stopped?). Press Esc to quit.'; draw(); });
   sock.on('error', () => { connected = false; status = 'connection lost. Press Esc to quit.'; draw(); });
+
+  // ---- bracketed paste: capture a multi-line paste as ONE chunk so it doesn't fire Enter per line.
+  // The terminal wraps pastes in ESC[200~ ... ESC[201~ (we enabled it in enterAlt). We intercept the
+  // raw bytes BEFORE readline turns them into keypress events; anything between the markers becomes
+  // part of `input`, and a multi-line paste shows as "[N lines pasted]" instead of dumping every line.
+  const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~';
+  stdin.on('data', chunk => {
+    const s = chunk.toString('utf8');
+    if (pasteBuf === null && !s.includes(PASTE_START)) return;   // ordinary keys: let keypress handle them
+    // we're inside (or entering) a paste — process markers
+    let rest = s;
+    while (rest.length) {
+      if (pasteBuf === null) {
+        const i = rest.indexOf(PASTE_START);
+        if (i === -1) return;                       // no paste here
+        rest = rest.slice(i + PASTE_START.length);
+        pasteBuf = '';
+      }
+      const e = rest.indexOf(PASTE_END);
+      if (e === -1) { pasteBuf += rest; return; }   // paste continues in a later chunk
+      pasteBuf += rest.slice(0, e);
+      // paste complete → fold into the input buffer
+      input += pasteBuf;
+      pasteBuf = null;
+      rest = rest.slice(e + PASTE_END.length);
+      if (!splashing) drawInput(); else { splashing = false; draw(); }
+    }
+  });
 
   // ---- raw keyboard ----
   readline.emitKeypressEvents(stdin);
@@ -381,6 +421,9 @@ function tui(sock) {
 
   stdin.on('keypress', (ch, key) => {
     if (!key) return;
+    // While a bracketed paste is being captured by the data listener, swallow the keypress events
+    // readline fires for the same bytes (incl. the marker escape chars) so they don't double-insert.
+    if (pasteBuf !== null) return;
     const name = key.name;
     if (key.ctrl && name === 'c') return quit();
     if (name === 'escape') {
