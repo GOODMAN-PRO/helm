@@ -8,7 +8,7 @@
 // brain was on Windows had no local tool and failed. This makes capture work on the machine the
 // brain is actually running on.
 import { spawnSync } from 'node:child_process';
-import { existsSync, statSync, unlinkSync, copyFileSync } from 'node:fs';
+import { existsSync, statSync, unlinkSync, copyFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,12 +60,14 @@ function winDirect(out, timeout) {
 // session and CAN capture. We register a one-shot "HelmShot" task that runs this same tool in
 // --direct mode to a fixed file, trigger it, then read the file back.
 function winViaTask(out, timeout) {
-  const node = process.execPath;
-  const script = path.join(__dirname, 'screencap.mjs');
   const shot = path.join(os.tmpdir(), 'helm-shot-task.png');   // same user → same tmpdir as the task
-  const tr = `"${node}" "${script}" --out "${shot}" --direct`;
-  // (Re)register idempotently so it always points at our script + shot path. /IT = run in the
-  // logged-on user's session; /SC ONCE with a past/placeholder time means it only runs on /Run.
+  // Run the capture as a HIDDEN PowerShell (no console window) so the screenshot doesn't capture a
+  // terminal popping up. Pure PowerShell — no node child — so nothing flashes on screen.
+  const ps1 = path.join(os.tmpdir(), 'helm-shot.ps1');
+  try { writeFileSync(ps1, windowsPsScript(shot)); } catch (e) { return { ok: false, error: 'cannot write capture script: ' + e.message }; }
+  const tr = `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${ps1}"`;
+  // (Re)register idempotently. /IT = run in the logged-on user's session; /SC ONCE + placeholder
+  // time means it only runs on /Run.
   spawnSync('schtasks', ['/Create', '/TN', 'HelmShot', '/TR', tr, '/SC', 'ONCE', '/ST', '00:00', '/RL', 'LIMITED', '/IT', '/F'], { encoding: 'utf8', timeout: 15_000 });
   try { unlinkSync(shot); } catch {}
   const run = spawnSync('schtasks', ['/Run', '/TN', 'HelmShot'], { encoding: 'utf8', timeout: 15_000 });

@@ -79,7 +79,13 @@ export function doInput(action) {
 export function winInput(action, { timeout = 12_000 } = {}) {
   try { writeFileSync(ACTION_FILE, JSON.stringify(action)); } catch (e) { return { ok: false, error: 'cannot write action file: ' + e.message }; }
   try { unlinkSync(DONE_FILE); } catch {}
-  const tr = `"${process.execPath}" "${__filename}" --task-run`;
+  // Launch node HIDDEN (no console window) so input never flashes a terminal or steals focus from the
+  // window we're typing into. A hidden PowerShell starts node with -WindowStyle Hidden and waits.
+  const ps1 = path.join(os.tmpdir(), 'helm-input-run.ps1');
+  const esc = s => s.replace(/'/g, "''");
+  try { writeFileSync(ps1, `Start-Process -WindowStyle Hidden -Wait -FilePath '${esc(process.execPath)}' -ArgumentList '"${esc(__filename)}" --task-run'`); }
+  catch (e) { return { ok: false, error: 'cannot write input runner: ' + e.message }; }
+  const tr = `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${ps1}"`;
   spawnSync('schtasks', ['/Create', '/TN', 'HelmInput', '/TR', tr, '/SC', 'ONCE', '/ST', '00:00', '/RL', 'LIMITED', '/IT', '/F'], { encoding: 'utf8', timeout: 15_000 });
   const run = spawnSync('schtasks', ['/Run', '/TN', 'HelmInput'], { encoding: 'utf8', timeout: 15_000 });
   if (run.status !== 0) return { ok: false, error: 'could not run HelmInput task: ' + (run.stderr || '').trim().slice(0, 160) };
