@@ -171,9 +171,13 @@ Your memory is structured, not a scratchpad. Use it constantly.
 
 ## Screen & GUI control
 You can see and physically drive the screen of the machine you're running on — use it when a task needs
-the GUI, not just shell. Screenshots are cross-platform (below). The mouse/keyboard helpers
-(`bin/guicontrol`, `bin/guiclick`) are **macOS-only**; on Windows/Linux, screenshots still work but
-driving the cursor needs platform-native tooling.
+the GUI, not just shell. Screenshots AND mouse/keyboard control work on **both macOS and Windows**
+(`gui.click` / `gui.type` / `gui.key` via the tool registry). macOS uses `bin/guicontrol`/`guiclick`
+(Quartz); Windows uses `workspace/tools/impl/win-input.mjs` (.NET SendKeys + mouse_event). When driven
+over SSH (`use windows`), both screenshots and input run via a one-shot scheduled task in the logged-on
+user's interactive session — so **the Windows screen must be unlocked** for capture/click/type to land.
+Linux: screenshots work; cursor/keyboard driving isn't wired. On Windows, `gui.key`'s `--code` is a key
+NAME (enter, esc, tab, up, f5…), not a macOS keycode.
 
 - **See the screen (cross-platform — captures the machine you're running on):** prefer
   `node workspace/tools/impl/screencap.mjs --out <file>` (or the `screencap` registry tool / the
@@ -315,13 +319,12 @@ memory.remember, memory.recall, scheduler.add, scheduler.list.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 
 **Cross-platform vs macOS-only.** Most tools (memory, scheduler, planning, skills, mind, reverse,
-templates, secrets, web/browser, screenshots via `screencap`, vision describe/verify) work on macOS,
-Windows and Linux. A few are inherently **macOS-only** and are marked `"platform": "darwin"` in the
-registry — the dispatcher refuses them on other OSes (exit 4): mouse/keyboard control
-(`gui.click/type/key`), iMessage (`imessage.*`), Apple Calendar (`calendar.*`), Finder (`finder.*`),
-Messages/Mail notifications (`notify.unread`), and Vision OCR. On Windows/Linux, don't attempt these —
-use the cross-platform path (shell, files, web, screenshot) instead. You can SEE the screen everywhere;
-you can only DRIVE the cursor/keyboard on macOS.
+templates, secrets, web/browser, screenshots via `screencap`, vision describe/verify, AND mouse/keyboard
+`gui.click/type/key`) work on **macOS and Windows**. A few remain **macOS-only** and are marked
+`"platform": "darwin"` in the registry — the dispatcher refuses them on other OSes (exit 4): iMessage
+(`imessage.*`), Apple Calendar (`calendar.*`), Finder (`finder.*`), Messages/Mail notifications
+(`notify.unread`), and Vision OCR. On Windows those use the interactive-session task path (screen must
+be unlocked); on Linux, screen capture works but cursor/keyboard driving isn't wired.
 
 ### Structured memory
 DB at `workspace/memory/memory.db`. Tables: facts, episodes, links.

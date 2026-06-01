@@ -17,7 +17,6 @@
   },
   {
     "name": "gui.click",
-    "platform": "darwin",
     "summary": "Click at point coordinates on screen (points, not pixels).",
     "exec": "node tools/impl/gui.click.mjs",
     "args_schema": {
@@ -47,7 +46,6 @@
   },
   {
     "name": "gui.type",
-    "platform": "darwin",
     "summary": "Type text into the currently focused element.",
     "exec": "node tools/impl/gui.type.mjs",
     "args_schema": {
@@ -64,7 +62,6 @@
   },
   {
     "name": "gui.key",
-    "platform": "darwin",
     "summary": "Press a key by macOS key code with optional modifiers.",
     "exec": "node tools/impl/gui.key.mjs",
     "args_schema": {
