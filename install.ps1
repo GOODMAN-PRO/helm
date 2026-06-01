@@ -61,7 +61,18 @@ if ($Src) {
   robocopy $Src $Dir /MIR /XD .git node_modules .swarm /XF .env *.log *.db | Out-Null
 } elseif (Test-Path (Join-Path $Dir ".git")) {
   Write-Host "Updating existing install at $Dir"
+  # Normal path is a fast-forward. If upstream history was rewritten (e.g. a force-push to scrub
+  # data), --ff-only fails; recover by resetting to the remote. Safe: .env/memory/vault/state are
+  # all gitignored, so a hard reset leaves them untouched.
   git -C $Dir pull --ff-only
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "fast-forward not possible (upstream history changed) - re-syncing to the remote..." -ForegroundColor Yellow
+    $br = (git -C $Dir remote show origin 2>$null | Select-String 'HEAD branch:\s*(\S+)').Matches.Groups[1].Value
+    if (-not $br) { $br = "main" }
+    git -C $Dir fetch origin
+    git -C $Dir reset --hard "origin/$br"
+    if ($LASTEXITCODE -ne 0) { Write-Host "couldn't auto-resync - your .env is safe; run: git -C `"$Dir`" fetch origin; git -C `"$Dir`" reset --hard origin/$br" -ForegroundColor Yellow }
+  }
 } elseif (Test-Path (Join-Path $Dir "index.js")) {
   # existing non-git install (came from a zip) -> refresh the code via zip, keep .env
   Write-Host "Updating existing install at $Dir (zip)"

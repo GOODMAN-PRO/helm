@@ -91,7 +91,15 @@ else
   }
   if [ -d "$TARGET/.git" ]; then
     say "Updating existing install at $TARGET"
-    git -C "$TARGET" pull --ff-only && ok "updated"
+    # Normal path is a fast-forward. If upstream history was rewritten (e.g. a force-push to scrub
+    # data), --ff-only fails; recover by resetting to the remote. Safe: .env/memory/vault/state are
+    # all gitignored, so a hard reset leaves them untouched.
+    if git -C "$TARGET" pull --ff-only; then ok "updated"; else
+      say "fast-forward not possible (upstream history changed) - re-syncing to the remote..."
+      _br="$(git -C "$TARGET" remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')"; : "${_br:=main}"
+      git -C "$TARGET" fetch origin && git -C "$TARGET" reset --hard "origin/$_br" && ok "re-synced to the latest published version" \
+        || warn "couldn't auto-resync - your .env is safe; run: git -C \"$TARGET\" fetch origin && git -C \"$TARGET\" reset --hard origin/$_br"
+    fi
   elif [ -f "$TARGET/index.js" ]; then
     say "Updating existing install at $TARGET (download)"
     fetch_tarball; ok "updated"

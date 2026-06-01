@@ -40,7 +40,17 @@ if (path.resolve(PKG_ROOT) === path.resolve(TARGET)) {
   ok(`installing in place at ${TARGET}`);
 } else if (existsSync(path.join(TARGET, '.git')) && has('git')) {
   say(`Updating existing install at ${TARGET}`);
-  spawnSync('git', ['-C', TARGET, 'pull', '--ff-only'], { stdio: 'inherit' });
+  // Normal case: fast-forward. But if upstream history was rewritten (e.g. a force-push to scrub
+  // data), --ff-only fails because the local clone has diverged. Recover by hard-resetting to the
+  // remote — safe because .env, memory, vault and all owner state are gitignored (untouched).
+  if (spawnSync('git', ['-C', TARGET, 'pull', '--ff-only'], { stdio: 'inherit' }).status !== 0) {
+    say('  fast-forward not possible (upstream history changed) — re-syncing to the remote...');
+    const branch = (spawnSync('git', ['-C', TARGET, 'remote', 'show', 'origin'], { encoding: 'utf8' }).stdout || '')
+      .match(/HEAD branch:\s*(\S+)/)?.[1] || 'main';
+    spawnSync('git', ['-C', TARGET, 'fetch', 'origin'], { stdio: 'inherit' });
+    if (spawnSync('git', ['-C', TARGET, 'reset', '--hard', `origin/${branch}`], { stdio: 'inherit' }).status === 0) ok('re-synced to the latest published version');
+    else say(`  ${c.y}!!${c.x}  couldn't auto-resync — your .env is safe; run:  git -C "${TARGET}" fetch origin && git -C "${TARGET}" reset --hard origin/${branch}`);
+  }
 } else if (existsSync(path.join(PKG_ROOT, 'index.js'))) {
   // we already have the source (npx cache / a clone) — copy it, skipping secrets/state/deps
   say(`Copying Helm -> ${TARGET}`);
