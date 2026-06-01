@@ -318,6 +318,19 @@ Built-in tools: image.generate, screencap, gui.click, gui.type, gui.key, imessag
 discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 
+**Browse real sites & grab images — no APIs.** You drive a real Chromium (Playwright) with a persistent
+profile, so you can read pages and pull images straight off them without any site API or key:
+- `browser.open --url <url>` / `browser.read` — navigate and get page text.
+- `browser.images --url <url> [--count N] [--scroll N] [--out <dir>]` — scroll to load lazy images, then
+  download the page's images (ranked biggest-first) into `workspace/downloads/<host>-<ts>/`. Show one by
+  ending the reply with `ATTACH: <path>`.
+- `browser.login --url <url>` — opens a VISIBLE window so the owner signs in ONCE; the cookies persist in
+  `workspace/browser-profile/`, so afterwards `browser.open`/`browser.images` are already authenticated.
+  This is how you handle login-walled sites like Facebook/Instagram/X: run `browser.login` first, then
+  `browser.images`. The profile holds the owner's live sessions — it's private (gitignored); never commit
+  or expose it. Be a polite client: reasonable volume, respect that this acts as the owner on their own
+  accounts.
+
 **Reading images:** you're multimodal — use your **Read** tool on any image file (attachments land in
 `workspace/inbox/`) to see it directly. For a careful pass — full text transcription, diagram/chart/
 table interpretation, or answering a specific question — use `image.read --path <file> [--question ...]`.

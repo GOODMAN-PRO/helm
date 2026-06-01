@@ -18,6 +18,12 @@ async function main() {
     selector: get('selector'),
     text:     get('text'),
     out:      get('out'),
+    count:    get('count'),
+    min:      get('min'),
+    scroll:   get('scroll'),
+    seconds:  get('seconds'),
+    headful:  get('headful'),
+    full:     get('full'),
   };
 
   const result = await runBrowser(verb, params);

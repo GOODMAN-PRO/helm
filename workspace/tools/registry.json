@@ -336,6 +336,40 @@
     "confirm": false
   },
   {
+    "name": "browser.images",
+    "summary": "Navigate to a URL in Chromium (reusing any saved login), scroll to load lazy images, and download the page's images — ranked biggest-first — to a folder. No site API needed.",
+    "exec": "node tools/impl/browser.mjs images",
+    "args_schema": {
+      "url": { "type": "string", "required": true, "description": "Page to pull images from, e.g. https://www.facebook.com/<page>/photos" },
+      "count": { "type": "number", "default": 20, "description": "Max images to download (1-200)" },
+      "min": { "type": "number", "default": 3000, "description": "Skip images smaller than this many bytes (drops tracking pixels / tiny icons)" },
+      "scroll": { "type": "number", "default": 8, "description": "Scroll passes to trigger lazy / infinite-scroll loading (0-60)" },
+      "out": { "type": "string", "description": "Output folder. Default: workspace/downloads/<host>-<timestamp>/" },
+      "headful": { "type": "boolean", "default": false, "description": "Show the browser window while scraping (default: invisible/headless)" }
+    },
+    "requires": [
+      "Playwright Chromium — auto-installed on first use",
+      "For login-walled sites (Facebook, Instagram, X): run browser.login once first"
+    ],
+    "side_effects": "writes image files under workspace/downloads/; outbound requests to the page and its image hosts. To show one in chat, end the reply with `ATTACH: <path>`",
+    "confirm": false
+  },
+  {
+    "name": "browser.login",
+    "summary": "Open a URL in a VISIBLE browser window so the owner can sign in once. The session cookies persist in the browser profile, so later browser.open / browser.images calls are already logged in. Use for Facebook, Instagram, X, etc.",
+    "exec": "node tools/impl/browser.mjs login",
+    "args_schema": {
+      "url": { "type": "string", "required": true, "description": "Login page, e.g. https://www.facebook.com/" },
+      "seconds": { "type": "number", "default": 180, "description": "How long to keep the window open for sign-in (10-900). Closing the window finishes early." }
+    },
+    "requires": [
+      "Playwright Chromium — auto-installed on first use",
+      "A visible/unlocked desktop (the owner needs to interact with the window)"
+    ],
+    "side_effects": "opens a real browser window; saves login cookies into workspace/browser-profile/ (gitignored, private)",
+    "confirm": false
+  },
+  {
     "name": "imessage.send_to",
     "platform": "darwin",
     "summary": "Send an iMessage to any handle (phone or email). First-class proactive send \u2014 not a reply.",
