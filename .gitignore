@@ -82,6 +82,8 @@ workspace/owner.local.md
 workspace/business/
 workspace/companies/
 workspace/status.md
+# personal study material (exam drills / question banks the agent generates)
+workspace/drills/
 # personal scheduler jobs (the scheduler engine stays tracked; jobs are per-owner)
 workspace/scheduler/exam-countdown.mjs
 # generated upgrade/sweep reports, prompts and logs (code in this dir stays tracked)
