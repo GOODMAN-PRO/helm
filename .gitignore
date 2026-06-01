@@ -115,3 +115,5 @@ workspace/diag/*.out
 
 # liveness marker (written on Discord connect; read by the nightly upgrade health-check)
 workspace/.online
+# restart hand-off marker (written by the Discord `restart` command, cleared on next boot)
+workspace/.restarting

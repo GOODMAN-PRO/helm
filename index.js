@@ -5,7 +5,7 @@
 // No framework, no plugins, no gateway service. Read it top to bottom.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
@@ -629,6 +629,16 @@ client.once(Events.ClientReady, c => {
   // Probe MCP servers only AFTER we're connected — running it before login meant a failed login
   // (bad token) raced spawning/killing probe children, which trips a libuv assertion on Windows.
   runHealthChecks().catch(() => {});
+  // If we just came back from a Discord `restart`, post "back online" to the channel that asked, then
+  // clear the marker so a normal (non-restart) startup never announces itself.
+  try {
+    const marker = path.join(WORKSPACE, '.restarting');
+    if (existsSync(marker)) {
+      const chId = readFileSync(marker, 'utf8').trim();
+      try { unlinkSync(marker); } catch {}
+      if (chId) c.channels.fetch(chId).then(ch => ch?.send('✅ Back online.')).catch(() => {});
+    }
+  } catch {}
 });
 
 client.on(Events.MessageCreate, async msg => {
@@ -651,6 +661,20 @@ client.on(Events.MessageCreate, async msg => {
     if (n) parts.push(`killed ${n} running task(s)`);
     if (hasPending) parts.push('cancelled pending autopilot plan');
     await msg.reply(parts.length ? `Stopped — ${parts.join(' + ')}.` : 'Nothing was running.');
+    return;
+  }
+
+  // ---- restart/reboot: relaunch the brain from Discord (loads new code/env — what you'd otherwise do
+  // with `helm stop; helm`). A detached relauncher waits for THIS process to exit (freeing the
+  // single-instance lock), then starts a fresh brain, which DMs "back online" here once it's ready.
+  if (/^\s*\/?(restart|reboot)\s*$/i.test(text)) {
+    try { writeFileSync(path.join(WORKSPACE, '.restarting'), String(msg.channel.id)); } catch {}
+    await msg.reply('♻️ Restarting — back in ~10s. (If I don\'t check back in, run `helm` in a terminal.)');
+    try {
+      spawn(process.execPath, [path.join(__dirname, 'scripts', 'relaunch.mjs')],
+        { cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true, env: process.env }).unref();
+    } catch (e) { try { unlinkSync(path.join(WORKSPACE, '.restarting')); } catch {} await msg.reply('Restart failed (couldn\'t spawn relauncher): ' + String(e.message || e).slice(0, 200)); return; }
+    setTimeout(() => process.exit(0), 1500);   // let Discord flush the reply, then exit so the lock frees
     return;
   }
 
