@@ -37,7 +37,7 @@ function brainUp(timeout = 600) {
 // Start the brain detached (background) and wait until its bridge is reachable.
 async function startBrainBackground() {
   process.stderr.write('Helm isn\'t running — starting it…\n');
-  const child = spawn(node, [path.join(ROOT, 'index.js')], { cwd: ROOT, detached: true, stdio: 'ignore' });
+  const child = spawn(node, [path.join(ROOT, 'index.js')], { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true });
   child.unref();
   try { writeFileSync(PIDFILE, String(child.pid)); } catch {}
   for (let i = 0; i < 40; i++) {            // up to ~20s for Discord login + bridge listen

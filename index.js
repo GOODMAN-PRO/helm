@@ -424,7 +424,7 @@ function killAll() {
 function runClaude(args, prompt) {
   return new Promise((resolve, reject) => {
     const cb = resolveClaude();
-    const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell });
+    const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell, windowsHide: true });
     running.add(child);
     let out = '', err = '';
     const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000); // 10-min cap
@@ -473,7 +473,7 @@ function eventLabel(evt) {
 function runClaudeStream(args, prompt, onEvent) {
   return new Promise((resolve, reject) => {
     const cb = resolveClaude();
-    const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell });
+    const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell, windowsHide: true });
     running.add(child);
     let buf = '', err = '', result = null, sid = null, lastText = '';
     const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000);

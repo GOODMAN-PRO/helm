@@ -162,9 +162,12 @@ function tui(sock) {
 
   function draw() {
     if (splashing) return splash();
+    const prevW = W, prevH = H;
     W = process.stdout.columns || 80;
     H = process.stdout.rows || 24;
-    out(`${ESC}H${ESC}J`);   // home + clear
+    // Only hard-clear the whole screen when the terminal was resized; otherwise just home the cursor
+    // and let each row clear itself as it's rewritten — avoids the full-screen blank flash (flicker).
+    out(prevW !== W || prevH !== H ? `${ESC}H${ESC}J` : `${ESC}H`);
 
     // header
     const dot = connected ? `${C.grn}●${C.x}` : `${C.red}●${C.x}`;
@@ -200,6 +203,17 @@ function tui(sock) {
     out(`${C.dim}│${C.x} ${C.cyan}›${C.x} ${shown}${ESC}K${' '.repeat(0)}`);
     moveTo(H, 1); out(`${C.dim}└${'─'.repeat(iw - 2)}┘${C.x}`);
     // park cursor after the input text (visible while typing)
+    moveTo(H - 1, 5 + stripAnsi(shown).length);
+  }
+
+  // Lightweight redraw of JUST the input line (no full-screen clear) — used while typing so the
+  // screen doesn't flicker on every keystroke.
+  function drawInput() {
+    if (splashing) return draw();
+    const iw = W - 2;
+    const shown = input.length > iw - 5 ? '…' + input.slice(input.length - (iw - 6)) : input;
+    moveTo(H - 1, 1); clearLine();
+    out(`${C.dim}│${C.x} ${C.cyan}›${C.x} ${shown}`);
     moveTo(H - 1, 5 + stripAnsi(shown).length);
   }
 
@@ -253,13 +267,14 @@ function tui(sock) {
     // first keypress on the splash dismisses it into the chat (without also typing that char)
     if (splashing) { splashing = false; draw(); if (name === 'return' || name === 'enter') return; }
     if (name === 'return' || name === 'enter') return submit();
-    if (name === 'backspace') { input = input.slice(0, -1); return draw(); }
+    // typing + backspace only repaint the input line (no full clear) → no flicker
+    if (name === 'backspace') { input = input.slice(0, -1); return drawInput(); }
     if (name === 'pageup')   { scroll += Math.max(1, bodyH() - 1); return draw(); }
     if (name === 'pagedown') { scroll = Math.max(0, scroll - Math.max(1, bodyH() - 1)); return draw(); }
     if (name === 'up')   { scroll += 1; return draw(); }
     if (name === 'down') { scroll = Math.max(0, scroll - 1); return draw(); }
-    if (key.ctrl && name === 'u') { input = ''; return draw(); }   // clear line
-    if (ch && !key.ctrl && !key.meta && ch >= ' ') { input += ch; return draw(); }
+    if (key.ctrl && name === 'u') { input = ''; return drawInput(); }   // clear line
+    if (ch && !key.ctrl && !key.meta && ch >= ' ') { input += ch; return drawInput(); }
   });
 
   process.stdout.on('resize', draw);
