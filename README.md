@@ -20,12 +20,6 @@
   <a href="#compared-to-other-agents">Compare</a>
 </p>
 
-Helm is a personal AI agent that lives on **your** hardware. You message it from **Discord** (or
-**iMessage** on a Mac); it runs Claude with full tools right on your machine — shell, files, web,
-screen, memory — and actually does the work, then reports back. Owner-locked and private: only you can
-command it, and nothing leaves hardware you own. Power it with your Claude subscription, an API key, or
-a **free / local model**.
-
 ## Install
 
 One command — checks prerequisites, fetches the code, installs deps, and walks you through setup.
@@ -74,6 +68,12 @@ cd ~/helm && npm start
 ```
 Keep it running 24/7 — `bash ~/helm/scripts/install-service.sh` (launchd / systemd) or, on Windows,
 `powershell -File scripts\install-service.ps1` (Task Scheduler).
+
+Helm is a personal AI agent that lives on **your** hardware. You message it from **Discord** (or
+**iMessage** on a Mac); it runs Claude with full tools right on your machine — shell, files, web,
+screen, memory — and actually does the work, then reports back. Owner-locked and private: only you can
+command it, and nothing leaves hardware you own. Power it with your Claude subscription, an API key, or
+a **free / local model**.
 
 ## What it does
 
