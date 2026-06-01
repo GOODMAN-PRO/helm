@@ -301,6 +301,15 @@ Built-in tools: screencap, gui.click, gui.type, gui.key, imessage.send, discord.
 memory.remember, memory.recall, scheduler.add, scheduler.list.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 
+**Cross-platform vs macOS-only.** Most tools (memory, scheduler, planning, skills, mind, reverse,
+templates, secrets, web/browser, screenshots via `screencap`, vision describe/verify) work on macOS,
+Windows and Linux. A few are inherently **macOS-only** and are marked `"platform": "darwin"` in the
+registry — the dispatcher refuses them on other OSes (exit 4): mouse/keyboard control
+(`gui.click/type/key`), iMessage (`imessage.*`), Apple Calendar (`calendar.*`), Finder (`finder.*`),
+Messages/Mail notifications (`notify.unread`), and Vision OCR. On Windows/Linux, don't attempt these —
+use the cross-platform path (shell, files, web, screenshot) instead. You can SEE the screen everywhere;
+you can only DRIVE the cursor/keyboard on macOS.
+
 ### Structured memory
 DB at `workspace/memory/memory.db`. Tables: facts, episodes, links.
 CLI: `node workspace/memory/memory.mjs <verb>`

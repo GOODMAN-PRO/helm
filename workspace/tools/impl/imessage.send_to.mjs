@@ -3,7 +3,9 @@
 // confirm: true in registry — dispatcher enforces owner approval before calling.
 
 import { spawnSync } from 'node:child_process';
+import { macOnlyOrExit } from './mac-only.mjs';
 
+macOnlyOrExit('imessage.send_to');   // iMessage is macOS/iOS-only
 const args   = process.argv.slice(2);
 const get    = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 const handle = get('handle');

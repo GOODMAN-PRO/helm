@@ -13,11 +13,13 @@
 // --once      capture one frame and exit (useful for testing)
 
 import { execSync, execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync, truncateSync, unlinkSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, truncateSync, unlinkSync, renameSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import sharp from 'sharp';
+import { captureScreen } from '../../tools/impl/capture-screen.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRAMES_DIR  = path.join(__dirname, 'frames');
@@ -112,14 +114,15 @@ async function tick() {
   const ts     = Date.now();
   const fname  = `${ts}-helm-screen.png`;
   const dest   = path.join(FRAMES_DIR, fname);
-  const tmp    = `/tmp/helm-screen-${ts}.png`;
+  const tmp    = path.join(os.tmpdir(), `helm-screen-${ts}.png`);
 
-  // Capture
-  try {
-    execFileSync('screencapture', ['-x', '-t', 'png', tmp], { timeout: 10000 });
-  } catch (e) {
-    process.stderr.write(`[screen] capture failed: ${e.message}\n`);
-    return;
+  // Capture (cross-platform: macOS/Windows/Linux)
+  {
+    const r = captureScreen(tmp, { timeout: 10000 });
+    if (!r.ok) {
+      process.stderr.write(`[screen] capture failed: ${r.error}\n`);
+      return;
+    }
   }
 
   // Hash
@@ -140,11 +143,11 @@ async function tick() {
     return;
   }
 
-  // Move to frames ring
+  // Move to frames ring (renameSync is cross-platform; `mv` doesn't exist on Windows)
   try {
-    execFileSync('mv', [tmp, dest]);
+    renameSync(tmp, dest);
   } catch {
-    // mv failed; just continue with tmp path recorded
+    // rename failed (e.g. cross-device); just continue with tmp path recorded
   }
   const storedPath = existsSync(dest) ? dest : tmp;
 

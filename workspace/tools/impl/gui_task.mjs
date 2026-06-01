@@ -12,15 +12,16 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
+import { captureScreen } from './capture-screen.mjs';
 
 const FAILURE_CLASSES = ['WRONG_ELEMENT', 'NOT_FOUND', 'PAGE_NOT_LOADED', 'AUTH_WALL'];
 
 function screenshot(imgPath) {
-  const r = spawnSync('/usr/sbin/screencapture', ['-x', imgPath], { encoding: 'utf8' });
-  if (r.status !== 0 || !existsSync(imgPath) || statSync(imgPath).size < 100) {
+  const r = captureScreen(imgPath);   // cross-platform (macOS/Windows/Linux)
+  if (!r.ok || !existsSync(imgPath) || statSync(imgPath).size < 100) {
     throw new Error(
-      'screencapture failed — ensure Screen Recording permission is granted ' +
-      '(System Settings → Privacy & Security → Screen Recording)'
+      (r.error || 'screen capture failed') +
+      ' — on macOS grant Screen Recording permission; a black/empty image often means the screen is locked.'
     );
   }
 }

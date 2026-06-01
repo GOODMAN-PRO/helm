@@ -4,7 +4,9 @@
 //        finder.mjs reveal --path <p>
 
 import { spawnSync } from 'node:child_process';
+import { macOnlyOrExit } from './mac-only.mjs';
 
+macOnlyOrExit('finder');   // Finder via AppleScript is macOS-only
 const verb    = process.argv[2];
 const rawArgs = process.argv.slice(3);
 const get     = k => { const i = rawArgs.indexOf(`--${k}`); return i !== -1 ? rawArgs[i + 1] : null; };

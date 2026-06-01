@@ -152,7 +152,7 @@ function mcpConfigArg() {
     const filtered = {};
     for (const [name, entry] of Object.entries(raw.mcpServers || {})) {
       if (entry.enabled === false) continue;
-      const { healthCheck: _h, enabled: _e, ...mcpEntry } = entry;
+      const { healthCheck: _h, enabled: _e, comment: _c, ...mcpEntry } = entry;
       // Expand the install-root token so server paths are correct on any machine (Mac/Windows).
       if (Array.isArray(mcpEntry.args)) mcpEntry.args = mcpEntry.args.map(a => typeof a === 'string' ? a.split('__HELM_ROOT__').join(__dirname) : a);
       // On Windows, `npx` is npx.cmd and can't be spawned directly — wrap it as `cmd /c npx ...`
@@ -432,6 +432,9 @@ client.once(Events.ClientReady, c => {
   console.log(`✅ Helm online as ${c.user.tag}  ·  model=${pref || 'auto-route'}  ·  owner=${OWNER_ID}`);
   const cb = resolveClaude();
   console.log(`   engine: ${cb.cmd}${cb.shell ? ' (via shell)' : ''}`);
+  // Probe MCP servers only AFTER we're connected — running it before login meant a failed login
+  // (bad token) raced spawning/killing probe children, which trips a libuv assertion on Windows.
+  runHealthChecks().catch(() => {});
 });
 
 client.on(Events.MessageCreate, async msg => {
@@ -747,8 +750,7 @@ client.on('error', err => console.error('Discord client error:', err));
 // Prevent any stray unhandled async rejection from killing the process.
 process.on('unhandledRejection', reason => console.error('Unhandled rejection:', reason));
 
-// Fire-and-forget MCP health check at startup — bot starts regardless of results.
-runHealthChecks().catch(() => {});
+// (MCP health check runs in the ClientReady handler, after a successful login.)
 
 // Free online model: start the Anthropic->OpenAI translation proxy and keep it alive.
 // Claude Code talks to it (ANTHROPIC_BASE_URL), it forwards to OPENAI_BASE_URL (Groq/OpenRouter/...).

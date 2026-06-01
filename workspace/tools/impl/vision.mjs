@@ -12,18 +12,20 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { captureScreen } from './capture-screen.mjs';
 
-const SCALE_DEFAULT = 2;
+// Retina Macs capture at 2x pixel density; other platforms are 1:1. (Click coords only matter on
+// macOS, where the cursor can actually be driven.)
+const SCALE_DEFAULT = process.platform === 'darwin' ? 2 : 1;
 
 function screenshot(imgPath) {
-  const r = spawnSync('/usr/sbin/screencapture', ['-x', imgPath], { encoding: 'utf8' });
-  if (r.status !== 0) throw new Error(r.stderr || 'screencapture failed');
-  // screencapture returns exit 0 even when Screen Recording permission is denied;
-  // detect the silent failure by verifying the output file has content.
+  // Cross-platform capture (macOS/Windows/Linux) so describe/verify work on every machine.
+  const r = captureScreen(imgPath);
+  if (!r.ok) throw new Error(r.error || 'screen capture failed');
   if (!existsSync(imgPath) || statSync(imgPath).size < 100) {
     throw new Error(
-      'screencapture produced no output — ensure this process has Screen Recording permission ' +
-      '(System Settings → Privacy & Security → Screen Recording)'
+      'screen capture produced no output — on macOS grant Screen Recording permission ' +
+      '(System Settings → Privacy & Security → Screen Recording); a black/empty image often means the screen is locked.'
     );
   }
 }

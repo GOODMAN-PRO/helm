@@ -44,6 +44,13 @@ if (verb === 'call') {
   const tool = registry.find(t => t.name === name);
   if (!tool) die(`unknown tool: ${name}`);
 
+  // Platform gate: tools marked `"platform": "darwin"` (mouse/keyboard, iMessage, AppleScript apps,
+  // Vision OCR) only work on macOS. On other OSes, refuse cleanly so the brain picks another path.
+  if (tool.platform && tool.platform !== process.platform) {
+    console.error(`${name} is ${tool.platform}-only and this machine is ${process.platform}. Not available here — use a cross-platform tool (shell, files, web, screenshot) instead.`);
+    process.exit(4);
+  }
+
   // Parse --json arg
   let args = {};
   const jsonIdx = rest.indexOf('--json');

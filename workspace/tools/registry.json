@@ -17,6 +17,7 @@
   },
   {
     "name": "gui.click",
+    "platform": "darwin",
     "summary": "Click at point coordinates on screen (points, not pixels).",
     "exec": "node tools/impl/gui.click.mjs",
     "args_schema": {
@@ -46,6 +47,7 @@
   },
   {
     "name": "gui.type",
+    "platform": "darwin",
     "summary": "Type text into the currently focused element.",
     "exec": "node tools/impl/gui.type.mjs",
     "args_schema": {
@@ -62,6 +64,7 @@
   },
   {
     "name": "gui.key",
+    "platform": "darwin",
     "summary": "Press a key by macOS key code with optional modifiers.",
     "exec": "node tools/impl/gui.key.mjs",
     "args_schema": {
@@ -83,6 +86,7 @@
   },
   {
     "name": "imessage.send",
+    "platform": "darwin",
     "summary": "Send an iMessage to a handle (phone number or email).",
     "exec": "node tools/impl/imessage.send.mjs",
     "args_schema": {
@@ -296,6 +300,7 @@
   },
   {
     "name": "imessage.send_to",
+    "platform": "darwin",
     "summary": "Send an iMessage to any handle (phone or email). First-class proactive send \u2014 not a reply.",
     "exec": "node tools/impl/imessage.send_to.mjs",
     "args_schema": {
@@ -318,6 +323,7 @@
   },
   {
     "name": "calendar.list",
+    "platform": "darwin",
     "summary": "List upcoming calendar events via Calendar.app (JXA). Falls back gracefully if Calendar is inaccessible.",
     "exec": "node tools/impl/calendar.mjs list",
     "args_schema": {
@@ -335,6 +341,7 @@
   },
   {
     "name": "calendar.add",
+    "platform": "darwin",
     "summary": "Add an event to the first writable calendar via Calendar.app.",
     "exec": "node tools/impl/calendar.mjs add",
     "args_schema": {
@@ -361,6 +368,7 @@
   },
   {
     "name": "finder.search",
+    "platform": "darwin",
     "summary": "Search for files by name or content using mdfind (Spotlight).",
     "exec": "node tools/impl/finder.mjs search",
     "args_schema": {
@@ -381,6 +389,7 @@
   },
   {
     "name": "finder.reveal",
+    "platform": "darwin",
     "summary": "Reveal a file or folder in Finder (brings Finder to front).",
     "exec": "node tools/impl/finder.mjs reveal",
     "args_schema": {
@@ -507,6 +516,7 @@
   },
   {
     "name": "notify.unread",
+    "platform": "darwin",
     "summary": "Return current unread totals: { messages, calendar, mail }. Queries live; poller not required.",
     "exec": "node tools/impl/notify.unread.mjs",
     "args_schema": {},

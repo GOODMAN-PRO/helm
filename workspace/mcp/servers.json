@@ -10,7 +10,8 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-fetch"],
       "healthCheck": "initialize",
-      "enabled": true
+      "comment": "Disabled: that npm package does not exist (the official fetch server is Python-only); Claude Code's built-in WebFetch already covers this.",
+      "enabled": false
     },
     "playwright": {
       "command": "npx",

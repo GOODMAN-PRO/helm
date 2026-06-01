@@ -2,7 +2,9 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { macOnlyOrExit } from './mac-only.mjs';
 
+macOnlyOrExit('gui.type');   // keyboard control is macOS-only (Quartz)
 const args = process.argv.slice(2);
 const textIdx = args.indexOf('--text');
 const text = textIdx !== -1 ? args[textIdx + 1] : null;

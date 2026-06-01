@@ -8,7 +8,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
+import { macOnlyOrExit } from './mac-only.mjs';
 
+macOnlyOrExit('notify.unread');   // reads macOS Messages/Mail via AppleScript + chat.db
 const CHAT_DB = `${process.env.HOME}/Library/Messages/chat.db`;
 
 function getMessagesUnread() {

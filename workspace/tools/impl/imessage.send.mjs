@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { macOnlyOrExit } from './mac-only.mjs';
 
+macOnlyOrExit('imessage.send');   // iMessage is macOS/iOS-only
 const args = process.argv.slice(2);
 const get = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i+1] : null; };
 
