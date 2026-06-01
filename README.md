@@ -90,6 +90,19 @@ macOS, Windows and Linux.
 Reconfigure anytime with `npm run wizard`. Switch the brain between your Mac and Windows box from chat
 with `use windows` / `use mac`.
 
+### Create your Discord bot (~2 minutes)
+
+This is the one part nobody can do for you — Discord requires a bot that's yours. Exact steps:
+
+1. Go to the **[Developer Portal](https://discord.com/developers/applications)** → **New Application** → name it (e.g. "Helm") → **Create**.
+2. Left sidebar → **Bot** → **Reset Token** → **Yes, do it!** → **Copy**. That long string is your `DISCORD_TOKEN` (treat it like a password). *(No other Bot toggles are required — Helm uses non-privileged intents.)*
+3. Get **your own** user ID: Discord app → **Settings (gear)** → **Advanced** → turn on **Developer Mode**. Then right-click your name anywhere → **Copy User ID**. That number is your `OWNER_ID` (it locks the bot to only you).
+4. Let the bot DM you: easiest is **OAuth2 → URL Generator** → tick **bot** scope → open the generated URL → add it to any server you're in. Now DM the bot (or @mention it in that server).
+5. Paste the **token** and **user ID** into `npm run wizard` when prompted.
+
+> One token = one running bot. Don't run two copies on the same token.
+<!-- TODO: drop a short screen-recording here (assets/discord-bot-setup.gif) — the steps above are the script. -->
+
 Helm is a personal AI agent that lives on **your** hardware. You message it from **Discord** (or
 **iMessage** on a Mac); it runs Claude with full tools right on your machine — shell, files, web,
 screen, memory — and actually does the work, then reports back. Owner-locked and private: only you can
@@ -158,11 +171,28 @@ one synced brain across your fleet, 24/7 self-improvement, and a parallel build 
 | `CLAUDE_BIN` | path to the `claude` CLI |
 | `WORKSPACE` | the agent's working dir + memory location |
 
-## Security
+## Safety & permissions — read this
 
-Owner-locked to a single Discord ID. `bypassPermissions` gives the agent full tool access on the
-machine you run it on — appropriate for a personal assistant you own, which is exactly why only you can
-talk to it. Secrets live in an encrypted vault, never in chat or git.
+Helm is a **real agent on your real machine**, not a sandboxed chatbot. Be clear-eyed about what that means:
+
+**What it can do:** run shell commands, read/write/delete files anywhere in your home directory, browse
+the web, see your screen and move your mouse/keyboard, run on a schedule unprompted, and **edit and
+re-deploy its own code** (a nightly self-upgrade, gated by tests). In `bypassPermissions` mode it does
+all of this **without asking**.
+
+**How to run it safely:**
+- **Owner-locked.** Only your Discord ID can command it (set at install). Treat your bot **token** like
+  a password — anyone with it can talk to your agent.
+- **Permission mode.** Start in **`default`** (Helm asks before each tool action) — the wizard now
+  recommends this. Switch to **`bypassPermissions`** (full autonomy) only once you trust it on that
+  machine. Set via `PERMISSION_MODE` in `.env`.
+- **It's still an LLM.** It can be wrong or be talked into things via content it reads (prompt
+  injection). Don't point it at untrusted data and walk away in autonomous mode. It confirms before
+  destructive/irreversible/money-spending actions, but that's a guardrail, not a guarantee.
+- **Secrets** live in an encrypted vault (macOS Keychain-backed), never in chat, logs, or git. Hand it
+  credentials with the vault command, not by pasting them in chat.
+- **Cost.** It runs on **your** Claude account; background cognition + nightly upgrades use quota.
+- **Run it on hardware you own and are comfortable giving an assistant full control of.**
 
 ## License
 

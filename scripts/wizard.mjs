@@ -341,7 +341,8 @@ async function runPlain() {
   }
   let model = 'sonnet';
   if (authMode !== 'custom') model = (await ask('Claude model — 1) opus  2) sonnet', '1')) === '2' ? 'sonnet' : 'opus';
-  const perm = (await ask('Tool permissions — 1) bypassPermissions  2) default', '1')) === '2' ? 'default' : 'bypassPermissions';
+  // Safer "ask first" mode is the default; full autonomy is an explicit opt-in.
+  const perm = (await ask('Tool permissions — 1) default: ask before each action (safer)  2) bypassPermissions: full autonomy', '1')) === '2' ? 'bypassPermissions' : 'default';
   const svc = (await ask('Run 24/7 in the background? (y/n)', 'y')).toLowerCase().startsWith('y');
   const fleet = (await ask('Run Helm on more than one device? (y/n)', 'n')).toLowerCase().startsWith('y');
   let peerHost = '';
@@ -422,10 +423,10 @@ async function main() {
     ])];
   }
 
-  // 4) permissions
-  const perm = ['bypassPermissions', 'default'][await select('Tool permissions', [
-    { label: 'bypassPermissions', hint: 'autonomous — runs tools without asking (recommended)' },
-    { label: 'default', hint: 'asks before each tool action' },
+  // 4) permissions — default to the SAFER "ask first" mode for newcomers; autonomy is an opt-in.
+  const perm = ['default', 'bypassPermissions'][await select('Tool permissions — how much can Helm do on its own?', [
+    { label: 'default — ask before each action', hint: 'safer; recommended when starting out. Helm asks before running tools.' },
+    { label: 'bypassPermissions — full autonomy', hint: 'Helm acts without asking (shell, files, screen). Powerful; only if you trust it on this machine.' },
   ])];
 
   // 5) service

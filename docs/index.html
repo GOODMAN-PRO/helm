@@ -348,6 +348,18 @@
         <div class="opt"><h3>Any model — including free</h3><p>Claude (subscription or API key), or pick a free local model from a list — the setup downloads it for you (via Ollama, $0, no account). Hosted models (OpenAI, Gemini, Groq, OpenRouter) work too.</p></div>
         <div class="opt"><h3>Run it 24/7</h3><p>Optionally install it as a background service so it's always there.</p></div>
       </div>
+
+      <h3 class="setup-h">Create your Discord bot (~2 min)</h3>
+      <p class="term-note">The one part that's yours to do — Discord requires a bot you own:</p>
+      <div class="flow">
+        <div class="step"><div class="n">1</div><h3>New Application</h3><p><a href="https://discord.com/developers/applications">Developer Portal</a> → <b>New Application</b> → name it → <b>Create</b>.</p></div>
+        <div class="step"><div class="n">2</div><h3>Get the token</h3><p><b>Bot</b> → <b>Reset Token</b> → <b>Copy</b>. That's your <code>DISCORD_TOKEN</code> — keep it secret. No special intents needed.</p></div>
+        <div class="step"><div class="n">3</div><h3>Your user ID</h3><p>Discord <b>Settings → Advanced → Developer Mode</b> on, then right-click your name → <b>Copy User ID</b>. That's <code>OWNER_ID</code> — it locks the bot to you.</p></div>
+        <div class="step"><div class="n">4</div><h3>Add &amp; DM it</h3><p><b>OAuth2 → URL Generator</b> → scope <b>bot</b> → open the URL → add to a server. Then DM the bot. Paste both values into the wizard.</p></div>
+      </div>
+
+      <h3 class="setup-h">Safety &amp; permissions</h3>
+      <p class="term-note">Helm is a real agent on your machine — shell, files, web, screen, mouse/keyboard, scheduled actions, and a tested nightly self-upgrade. It's <b>owner-locked</b> to your Discord ID, secrets live in an encrypted vault, and it confirms before anything destructive. Start in <b>“ask before each action”</b> mode (the wizard's recommended default) and switch to full autonomy only once you trust it on that machine. Run it on hardware you own. It uses your own Claude account.</p>
     </div>
   </section>
 </div>
