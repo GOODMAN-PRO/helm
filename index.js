@@ -586,7 +586,25 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message],
 });
 
-const chunks = s => s.match(/[\s\S]{1,1900}/g) ?? ['(empty)']; // Discord caps messages at 2000 chars
+// Discord caps messages at 2000 chars, so long replies get split. Break on paragraph/line/word
+// boundaries — never mid-word — so a split never slices a word in half (e.g. "…optimized f" | "or
+// autonomous agents"). Only a single token longer than the window is hard-cut.
+const chunks = (s, max = 1900) => {
+  s = String(s ?? '');
+  if (!s.trim()) return ['(empty)'];
+  const out = [];
+  let rest = s;
+  while (rest.length > max) {
+    const win = rest.slice(0, max);
+    let cut = win.lastIndexOf('\n');                                 // prefer a line break
+    if (cut < max * 0.6) cut = Math.max(cut, win.lastIndexOf(' '));  // else a word break
+    if (cut <= 0) cut = max;                                         // oversized token: hard split
+    out.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest.length) out.push(rest);
+  return out.length ? out : ['(empty)'];
+};
 
 // Agent can attach files by ending lines with "ATTACH: /abs/path" (e.g. screenshots).
 function splitAttachments(s) {
