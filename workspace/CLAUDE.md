@@ -331,6 +331,13 @@ profile, so you can read pages and pull images straight off them without any sit
   or expose it. Be a polite client: reasonable volume, respect that this acts as the owner on their own
   accounts.
 
+**Deploying a site — verify it's actually live before you say "live".** GitHub Pages' FIRST build takes
+~1 minute, during which the URL returns 404. So after you push + enable Pages (`gh api -X POST
+repos/<owner>/<repo>/pages -f source[branch]=main -f source[path]=/`), DO NOT immediately tell the owner
+"it's live" — run `pages.wait --url <site-url>` and report the URL only once it returns `{live:true}`.
+If it times out, say "deploying, give it a minute" — never claim a 404'ing URL is live. (This is the
+"never claim you did something you didn't" rule applied to deploys.)
+
 **Reading images:** you're multimodal — use your **Read** tool on any image file (attachments land in
 `workspace/inbox/`) to see it directly. For a careful pass — full text transcription, diagram/chart/
 table interpretation, or answering a specific question — use `image.read --path <file> [--question ...]`.

@@ -515,6 +515,20 @@
     "confirm": false
   },
   {
+    "name": "pages.wait",
+    "summary": "Poll a URL until it actually serves HTTP 200 — so you only tell the owner a site is 'live' once it truly is. GitHub Pages' first build takes ~1 min (the URL 404s until then). Call this AFTER deploying, before saying it's live.",
+    "exec": "node tools/impl/pages.wait.mjs",
+    "args_schema": {
+      "url": { "type": "string", "required": true, "description": "The site URL to wait for, e.g. https://goodman-pro.github.io/muniqe/" },
+      "timeout": { "type": "number", "default": 180, "description": "Max seconds to wait (5-600)" }
+    },
+    "requires": [
+      "outbound HTTPS"
+    ],
+    "side_effects": "none (polls the URL). Returns {live:true,...} once it serves 200, else {live:false,...} on timeout",
+    "confirm": false
+  },
+  {
     "name": "screen.recent",
     "summary": "Return last N screen-change events (timestamp, hash, path). Requires screen watcher daemon running.",
     "exec": "node tools/impl/screen.recent.mjs",
