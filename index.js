@@ -443,16 +443,82 @@ function runClaude(args, prompt) {
   });
 }
 
-async function ask(prompt, onHeartbeat, target = LOCAL_MACHINE, mode = 'copilot') {
+// Turn a stream-json event into a short, human progress label (or null to keep the current one).
+function eventLabel(evt) {
+  if (!evt || !evt.type) return null;
+  if (evt.type === 'system' && evt.subtype === 'init') return 'thinking…';
+  if (evt.type === 'system' && evt.subtype === 'post_turn_summary' && evt.status_detail) return evt.status_detail;
+  if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
+    for (const b of evt.message.content) {
+      if (b.type === 'tool_use') {
+        const i = b.input || {}, name = b.name || 'tool';
+        if (name === 'Bash') return `running: ${String(i.command || '').replace(/\s+/g, ' ').slice(0, 80)}`;
+        if (name === 'Edit' || name === 'Write' || name === 'NotebookEdit') return `editing ${path.basename(i.file_path || i.path || 'a file')}`;
+        if (name === 'Read') return `reading ${path.basename(i.file_path || 'a file')}`;
+        if (name === 'WebFetch') return `fetching ${String(i.url || '').slice(0, 60)}`;
+        if (name === 'WebSearch') return `searching the web: ${String(i.query || '').slice(0, 50)}`;
+        if (name === 'Glob' || name === 'Grep') return 'searching files';
+        if (name === 'Task') return 'running a subtask';
+        if (/image/i.test(name)) return 'generating an image';
+        return `using ${name}`;
+      }
+    }
+    if (evt.message.content.some(b => b.type === 'text' && (b.text || '').trim())) return 'writing reply…';
+  }
+  return null;
+}
+
+// Run claude in stream-json mode, calling onEvent for each event. Resolves { result, session_id }.
+function runClaudeStream(args, prompt, onEvent) {
+  return new Promise((resolve, reject) => {
+    const cb = resolveClaude();
+    const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell });
+    running.add(child);
+    let buf = '', err = '', result = null, sid = null, lastText = '';
+    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000);
+    child.stdout.on('data', d => {
+      buf += d;
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let evt; try { evt = JSON.parse(line); } catch { continue; }
+        if (evt.type === 'result') { result = evt.result; sid = evt.session_id || sid; }
+        else if (evt.type === 'assistant' && evt.message && Array.isArray(evt.message.content)) {
+          for (const b of evt.message.content) if (b.type === 'text' && b.text) lastText = b.text;
+          if (evt.session_id) sid = evt.session_id;
+        }
+        try { onEvent && onEvent(evt); } catch {}
+      }
+    });
+    child.stderr.on('data', d => { err += d; });
+    child.on('error', e => { clearTimeout(kill); running.delete(child); reject(e); });
+    child.on('close', code => {
+      clearTimeout(kill); running.delete(child);
+      if (child._stopped) return reject(Object.assign(new Error('stopped by owner'), { stopped: true }));
+      if (child._timedOut) return reject(Object.assign(new Error('hit 10-min cap'), { timedOut: true }));
+      if (code === 0 || result != null) return resolve({ result: (result != null ? result : lastText) || '', session_id: sid });
+      reject(new Error(err.trim() || `claude exited ${code}`));
+    });
+    child.stdin.on('error', () => {});
+    child.stdin.write(prompt);
+    child.stdin.end();
+  });
+}
+
+async function ask(prompt, onProgress, target = LOCAL_MACHINE, mode = 'copilot') {
   // Only hop to the other peer when one is ACTUALLY reachable (a host is configured). On a
   // single-device install — or a fleet still mid-setup — a stale or mismatched active-target
   // (e.g. "mac" left over on a Windows-only box) falls through to local instead of stranding the
   // bot in an SSH attempt to a machine that doesn't exist.
-  if (target !== LOCAL_MACHINE && PEER_REACHABLE) return runClaudeRemote(prompt);   // other peer → run there over SSH
+  if (target !== LOCAL_MACHINE && PEER_REACHABLE) {
+    onProgress?.(`⚙️ working on **${target}**…`);
+    return runClaudeRemote(prompt);   // other peer → run there over SSH (returns final reply)
+  }
   const model = pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [
-    '-p', '--output-format', 'json',
+    '-p', '--output-format', 'stream-json', '--verbose',   // stream events so we can show live progress
     '--model', model,
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', buildPersona(mode),
@@ -462,38 +528,38 @@ async function ask(prompt, onHeartbeat, target = LOCAL_MACHINE, mode = 'copilot'
   ];
   const sid = getSession('owner');
   const args = sid ? [...base, '--resume', sid] : base;
-  let out;
-  let hbStart, hbInterval, pings = 0;
+
+  // Live status: surface what the engine is actually doing, with elapsed time, so it never looks
+  // frozen. Updates on each meaningful event + a steady tick; throttled so we don't spam Discord.
+  const startTs = Date.now();
+  let lastStatus = 'thinking…', lastPush = 0;
+  const elapsed = () => Math.round((Date.now() - startTs) / 1000);
+  const push = (force = false) => {
+    if (!onProgress) return;
+    const now = Date.now();
+    if (!force && now - lastPush < 1800) return;
+    lastPush = now;
+    onProgress(`⚙️ ${lastStatus} · ${elapsed()}s`);
+  };
+  const onEvent = evt => { const l = eventLabel(evt); if (l) { lastStatus = l; push(); } };
+  const ticker = setInterval(() => push(true), 5000);
+  push(true);
+
+  let r;
   try {
-    // Heartbeat: after 30s, ping every 60s — but at most 5 times, so a stuck run can't spam forever.
-    hbStart = setTimeout(() => {
-      onHeartbeat?.('still working...');
-      hbInterval = setInterval(() => {
-        if (++pings >= 5) { clearInterval(hbInterval); return; }
-        onHeartbeat?.('still working...');
-      }, 60_000);
-    }, 30_000);
-
-    out = await runClaude(args, prompt);
-
-    clearTimeout(hbStart);
-    clearInterval(hbInterval);
+    r = await runClaudeStream(args, prompt, onEvent);
   } catch (e) {
-    clearTimeout(hbStart);
-    clearInterval(hbInterval);
-    if (e.stopped || e.timedOut || !sid) throw e;  // never retry a cancel/timeout (that's what caused the hour-long loop)
+    if (e.stopped || e.timedOut || !sid) { clearInterval(ticker); throw e; }  // never retry a cancel/timeout
     deleteSession('owner');      // stale/expired session -> retry fresh once
-    out = await runClaude(base, prompt);
+    lastStatus = 'retrying…'; push(true);
+    r = await runClaudeStream(base, prompt, onEvent);
+  } finally {
+    clearInterval(ticker);
   }
-  try {
-    const j = JSON.parse(out);
-    if (j.session_id) setSession('owner', j.session_id, 'discord');
-    const reply = (j.result ?? '').toString().trim() || '(empty reply)';
-    try { appendCost(MODEL, prompt.length, reply.length); } catch {}
-    return reply;
-  } catch {
-    return out.trim() || '(no output)';
-  }
+  if (r.session_id) setSession('owner', r.session_id, 'discord');
+  const reply = (r.result ?? '').toString().trim() || '(empty reply)';
+  try { appendCost(MODEL, prompt.length, reply.length); } catch {}
+  return reply;
 }
 
 // ---- Discord ----
@@ -763,9 +829,20 @@ client.on(Events.MessageCreate, async msg => {
   console.log(`📩 [${target}][${mode}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
+  // Live status: one message that gets edited as Helm works, so you can see what it's doing
+  // (running a command, editing a file, …) and the elapsed time — not just an endless typing dot.
+  let statusMsg = null, creating = false, lastEdit = 0;
+  const onProgress = txt => {
+    const now = Date.now();
+    if (!statusMsg) { if (creating) return; creating = true; msg.channel.send(txt).then(m => { statusMsg = m; }).catch(() => { creating = false; }); lastEdit = now; return; }
+    if (now - lastEdit < 1500) return;
+    lastEdit = now; statusMsg.edit(txt).catch(() => {});
+  };
+  const clearStatus = () => { if (statusMsg) { const m = statusMsg; statusMsg = null; m.delete().catch(() => {}); } };
   try {
-    const reply = await ask(prompt, heartbeat => msg.channel.send(heartbeat).catch(() => {}), target, mode);
+    const reply = await ask(prompt, onProgress, target, mode);
     clearInterval(typing);
+    clearStatus();
     let { text: rawBody, files } = splitAttachments(reply);
     rawBody = handleDirectives(rawBody, text);   // [STUCK: ...] -> queue · [USE: mac|windows] -> switch
 
@@ -818,6 +895,7 @@ client.on(Events.MessageCreate, async msg => {
     } catch {}
   } catch (e) {
     clearInterval(typing);
+    clearStatus();
     if (e.stopped) return;  // the stop command already acknowledged
     console.error(e);
     // Helm got stuck — remember it for the overnight self-upgrade to fix the root cause.
