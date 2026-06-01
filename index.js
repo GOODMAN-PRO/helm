@@ -41,14 +41,27 @@ const WORKSPACE = path.resolve(__dirname, process.env.WORKSPACE || './workspace'
 // shell var can't override the OAuth login; in apikey mode we keep it (Claude Code auto-uses it).
 // Resolve a runnable `claude` on this OS. On Windows, CLAUDE_BIN is often the extension-less npm
 // shim (e.g. ...\npm\claude) which Node can't spawn — prefer claude.exe, else claude.cmd (needs a shell).
+// An npm `.cmd` shim just wraps the real claude.exe (it literally calls
+// node_modules\@anthropic-ai\claude-code\bin\claude.exe). Spawning that .cmd THROUGH A SHELL ENOENTs on
+// some Windows setups ("The system cannot find the file specified"), so prefer the wrapped .exe — it
+// runs directly (shell:false), which is more reliable and also avoids the shell-escaping deprecation.
+function preferExe(p) {
+  if (/\.exe$/i.test(p)) return { cmd: p, shell: false };
+  if (/\.cmd$/i.test(p)) {
+    const exe = path.join(path.dirname(p), 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+    if (existsSync(exe)) return { cmd: exe, shell: false };
+    return { cmd: p, shell: true };
+  }
+  return { cmd: p, shell: true };
+}
 function resolveClaude() {
   const bin = CLAUDE_BIN || 'claude';
   if (process.platform !== 'win32') return { cmd: bin, shell: false };
   if (/\.(exe)$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: false };
-  if (/\.(cmd|bat|ps1)$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: true };
+  if (/\.(cmd|bat|ps1)$/i.test(bin) && existsSync(bin)) return preferExe(bin);
   // CLAUDE_BIN points at the extension-less npm shim (...\npm\claude) — use the sibling .cmd/.exe.
   if (existsSync(bin + '.exe')) return { cmd: bin + '.exe', shell: false };
-  if (existsSync(bin + '.cmd')) return { cmd: bin + '.cmd', shell: true };
+  if (existsSync(bin + '.cmd')) return preferExe(bin + '.cmd');
   // Stale/wrong CLAUDE_BIN with no runnable sibling: ask Windows where claude actually is.
   try {
     const r = spawnSync('where', ['claude'], { encoding: 'utf8' });
@@ -57,7 +70,7 @@ function resolveClaude() {
       const exe = hits.find(h => /\.exe$/i.test(h));
       const cmd = hits.find(h => /\.cmd$/i.test(h));
       if (exe) return { cmd: exe, shell: false };
-      if (cmd) return { cmd: cmd, shell: true };
+      if (cmd) return preferExe(cmd);
     }
   } catch {}
   // `where` failed — the engine may be installed but just not on THIS process's PATH (common when the
@@ -68,8 +81,10 @@ function resolveClaude() {
     process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
     process.env.APPDATA && path.join(process.env.APPDATA, 'Claude', 'claude.exe'),
     process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs', 'claude', 'claude.exe'),
+    // prefer the package's claude.exe over the npm shims
+    process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
   ].filter(Boolean);
-  for (const g of guesses) if (existsSync(g)) return { cmd: g, shell: /\.cmd$/i.test(g) };
+  for (const g of guesses) if (existsSync(g)) return preferExe(g);
   return { cmd: bin, shell: true };   // last resort: let the shell resolve via PATHEXT
 }
 
