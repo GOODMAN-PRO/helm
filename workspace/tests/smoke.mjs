@@ -219,13 +219,16 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 11. BUG-3: confirm gate — imessage.send without --force exits non-zero ----
+// ---- 11. BUG-3: confirm gate — a confirm:true tool without --force exits non-zero with CONFIRM ----
 {
-  const label = 'BUG-3: tools.mjs imessage.send without --force exits non-zero with CONFIRM in stderr';
+  const label = 'BUG-3: tools.mjs confirm-gated tool without --force exits non-zero with CONFIRM in stderr';
+  // imessage.send is darwin-only, so off-macOS the platform gate (exit 4) fires before the confirm
+  // gate and the test would wrongly fail. Pick a confirm:true tool that exists on THIS platform.
+  const tool = process.platform === 'darwin' ? 'imessage.send' : 'mic.record';
+  const json = process.platform === 'darwin' ? '{"handle":"+1555000000","text":"test"}' : '{"seconds":1}';
   try {
     const r = spawnSync('node', [
-      path.join(WORKSPACE, 'tools/tools.mjs'), 'call', 'imessage.send',
-      '--json', '{"handle":"+1555000000","text":"test"}',
+      path.join(WORKSPACE, 'tools/tools.mjs'), 'call', tool, '--json', json,
     ], { encoding: 'utf8', timeout: 10_000 });
     if (r.status === 0) throw new Error('expected non-zero exit, got 0');
     if (!r.stderr.includes('CONFIRM')) throw new Error(`"CONFIRM" missing from stderr: ${r.stderr.slice(0, 200)}`);
