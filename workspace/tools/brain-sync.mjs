@@ -65,7 +65,7 @@ function sh(cmd, args, timeout = 180_000) {
 }
 // run a command on the Windows box (cmd.exe shell)
 function win(cmdline, timeout = 180_000) {
-  return sh('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', WIN_HOST, cmdline], timeout);
+  return sh('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'LogLevel=ERROR', WIN_HOST, cmdline], timeout);
 }
 const inWinVault = g => `cd /d ${WIN_VAULT} && git ${g}`;
 

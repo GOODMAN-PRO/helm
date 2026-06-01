@@ -238,7 +238,11 @@ function handleDirectives(replyText, userText = '') {
 // before running on the other machine we PUSH the current memory there, and after, we PULL the updated
 // memory back. memory.db is plain SQLite (no WAL at rest) so a file copy is a consistent snapshot.
 // Only one machine runs the brain at a time (the active target), so last-writer-wins is correct.
-const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10'];
+// LogLevel=ERROR silences OpenSSH 10's "not using a post-quantum key exchange" INFO warning (and other
+// chatter) that otherwise pollutes captured stderr — genuine errors (auth/host-key/refused) still show.
+const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'LogLevel=ERROR'];
+// Strip any post-quantum warning lines that still leak through, so they never masquerade as the error.
+const sshClean = s => (s || '').split('\n').filter(l => !/post-quantum|store now|decrypt later|vulnerable to|may need to be upgraded|openssh\.com\/pq/i.test(l)).join('\n').trim();
 const MEM_FILES = ['memory/memory.db', 'owner.md', 'memory/INDEX.md'];   // relative to workspace/
 function syncMemory(direction) {   // 'push' = local->remote (before run), 'pull' = remote->local (after)
   if (!HELM_WIN_HOST) return;
@@ -283,7 +287,7 @@ function runClaudeRemote(prompt) {
       // Run INSIDE the remote peer's OWN full Helm install so Claude loads its CLAUDE.md (+ memory) and
       // has the real code and tools — full parity with the local peer, no dependence on this machine.
       const remoteCmd = `cd ${HELM_WIN_DIR} && ${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(pickModel(prompt))} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
-      const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
+      const child = spawn('ssh', [...SSH_OPTS, HELM_WIN_HOST, remoteCmd]);
       let out = '', err = '';
       const kill = setTimeout(() => child.kill(), 30 * 60_000);
       child.stdout.on('data', d => { out += d; });
@@ -293,7 +297,10 @@ function runClaudeRemote(prompt) {
         clearTimeout(kill);
         if (code !== 0) {
           if (sid) { deleteSession('owner-windows'); return run(null); }   // stale session -> retry fresh
-          return resolve(`Windows exec failed (exit ${code}): ${(err || '').trim().slice(0, 500)}`);
+          const e2 = sshClean(err);   // drop the post-quantum warning so the real cause is visible
+          return resolve(e2
+            ? `Peer exec failed (exit ${code}): ${e2.slice(0, 500)}`
+            : `Peer exec failed (exit ${code}) — SSH connected but the remote command returned an error (often: the peer is offline, SSH keys aren't set up, or claude/the Helm dir isn't found there). Test it: \`ssh ${HELM_WIN_HOST} echo ok\`.`);
         }
         try {
           const j = JSON.parse(out);
@@ -316,7 +323,7 @@ function scpFromWin(winPath) {
   mkdirSync(INBOX, { recursive: true });
   const fwd = winPath.replace(/\\/g, '/');   // scp needs forward slashes; backslash paths fail
   const local = path.join(INBOX, `win-${Date.now()}-${path.basename(fwd) || 'file'}`);
-  const r = spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', `${HELM_WIN_HOST}:${fwd}`, local], { encoding: 'utf8' });
+  const r = spawnSync('scp', [...SSH_OPTS, `${HELM_WIN_HOST}:${fwd}`, local], { encoding: 'utf8' });
   return r.status === 0 ? local : null;
 }
 
@@ -325,8 +332,8 @@ function scpFromWin(winPath) {
 function scpToWin(localPath) {
   if (!HELM_WIN_HOST) return null;
   const base = path.basename(localPath).replace(/[^\w.\-]/g, '_');
-  spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, 'if not exist helm-inbox mkdir helm-inbox'], { encoding: 'utf8' });
-  const r = spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', localPath, `${HELM_WIN_HOST}:helm-inbox/${base}`], { encoding: 'utf8' });
+  spawnSync('ssh', [...SSH_OPTS, HELM_WIN_HOST, 'if not exist helm-inbox mkdir helm-inbox'], { encoding: 'utf8' });
+  const r = spawnSync('scp', [...SSH_OPTS, localPath, `${HELM_WIN_HOST}:helm-inbox/${base}`], { encoding: 'utf8' });
   return r.status === 0 ? `helm-inbox/${base}` : null;  // relative to the windows home (where the ssh brain runs)
 }
 
