@@ -62,26 +62,34 @@ node bin/helm-install.mjs
 ```
 </details>
 
-Run it once in the foreground:
+Run it once in the foreground (`cd` first, then start — in PowerShell use `;` not `&&`):
 ```bash
-cd ~/helm && npm start
+cd ~/helm
+npm start
 ```
 Keep it running 24/7 — `bash ~/helm/scripts/install-service.sh` (launchd / systemd) or, on Windows,
 `powershell -File scripts\install-service.ps1` (Task Scheduler).
 
-**Talk to it from your terminal with one command.** Register `helm` on your PATH once:
+## Terminal — one command: `helm`
+
+Don't want to open Discord? Talk to Helm straight from your shell. The terminal is a live window into
+the **same** running agent — one brain, one memory, one conversation, shared with Discord and iMessage.
+Type in the terminal and your phone sees it; reply on Discord and the terminal shows it.
+
+Register the `helm` command once (works in PowerShell, bash and zsh — note `;`, not `&&`):
 ```bash
-cd ~/helm && npm link
+cd ~/helm
+npm link
 ```
 Then, from anywhere:
 ```bash
-helm                 # open the terminal chat (starts Helm if it isn't running)
-helm "summarize my downloads folder"   # one-shot: send a message, print the reply
+helm                                  # open the chat (starts Helm if it isn't running)
+helm "summarize my downloads folder"  # one-shot: send a message, print the reply
 echo "what changed in this repo?" | helm
 ```
-The terminal is a live client of the one running Helm — the same brain, memory and conversation it
-uses on Discord and iMessage. (`helm start` runs the service in the foreground, `helm setup` the
-wizard, `helm stop` a background instance, `helm --help` for all of it.)
+It connects to the agent you're already running, so nothing is duplicated. Other commands: `helm start`
+(run the service in the foreground), `helm setup` (wizard), `helm stop` (a background instance),
+`helm --help`.
 
 ### Setup, step by step
 

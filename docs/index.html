@@ -178,6 +178,7 @@
     <div class="nav-links">
       <a href="#features">What it does</a>
       <a href="#how">How it works</a>
+      <a href="#terminal">Terminal</a>
       <a href="#compare">Compare</a>
       <a href="#install">Install</a>
     </div>
@@ -238,6 +239,35 @@
       <div class="step"><div class="n">02</div><h3>Helm acts on your machine</h3><p>It runs Claude with full tools right on your hardware: shell, files, web, screen, memory.</p></div>
       <div class="step"><div class="n">03</div><h3>It reports back</h3><p>You get the result (files built, problems fixed, a screenshot) straight back in the chat.</p></div>
     </div>
+  </section>
+
+  <section id="terminal">
+    <p class="eyebrow">From your terminal too</p>
+    <h2>One command: <span class="grad">helm</span>.</h2>
+    <p class="lead">Don't want to open Discord? Talk to Helm straight from your shell. The terminal is a live
+      window into the <em>same</em> running agent: one brain, one memory, one conversation, shared with
+      Discord and iMessage. Type in the terminal and your phone sees it; reply on Discord and the
+      terminal shows it.</p>
+    <div class="term">
+      <div class="term-bar">
+        <span class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></span>
+        <span class="oslab" style="margin:0">terminal</span>
+        <span class="beta">macOS · Windows · Linux</span>
+      </div>
+      <div class="term-body">
+        <div class="comment"># register the `helm` command once (works in PowerShell, bash and zsh)</div>
+        <div class="cmdline"><span class="prompt">$</span><code>cd ~/helm; npm link</code></div>
+        <div class="comment" style="margin-top:14px"># then, from anywhere</div>
+        <div class="cmdline"><span class="prompt">$</span><code>helm</code> <span style="color:var(--faint)">&nbsp;&nbsp;# open the chat (starts Helm if it isn't running)</span></div>
+        <div class="cmdline" style="margin-top:6px"><span class="prompt">$</span><code>helm "what changed in this repo today?"</code></div>
+        <div class="cmdline" style="margin-top:6px"><span class="prompt">$</span><code>echo "summarize my downloads" | helm</code></div>
+      </div>
+    </div>
+    <p class="term-note">Run <code>helm</code> with no arguments for an interactive chat, or pass a message for a
+      one-shot reply. It connects to the agent you're already running, so nothing is duplicated. Other commands:
+      <code>helm start</code> (run the service), <code>helm setup</code> (wizard), <code>helm --help</code>.</p>
+    <p class="term-note"><b>Windows tip:</b> in PowerShell, join two commands with <code>;</code> not <code>&amp;&amp;</code> —
+      e.g. <code>cd ~/helm; npm link</code>.</p>
   </section>
 
   <section id="compare">
@@ -319,8 +349,8 @@
             <button class="tab active" data-cmd="npx github:GOODMAN-PRO/helm">npx · any OS</button>
             <button class="tab" data-cmd="curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh">macOS / Linux</button>
             <button class="tab" data-cmd="irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex">Windows</button>
-            <button class="tab" data-cmd="git clone https://github.com/GOODMAN-PRO/helm.git helm && cd helm && npm install && npm run wizard">Manual</button>
-            <button class="tab" data-cmd="mkdir helm && curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main | tar -xz -C helm --strip-components=1 && cd helm && npm install && npm run wizard">No git</button>
+            <button class="tab" data-cmd="git clone https://github.com/GOODMAN-PRO/helm.git helm; cd helm; npm install; npm run wizard">Manual</button>
+            <button class="tab" data-cmd="mkdir helm; curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main | tar -xz -C helm --strip-components=1; cd helm; npm install; npm run wizard">No git</button>
           </div>
           <span class="beta">BETA</span>
         </div>
