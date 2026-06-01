@@ -107,6 +107,22 @@ mkdirSync(WORKSPACE, { recursive: true });
   } catch {}
 })();
 
+// First-run FLEET setup: if the owner said "more than one device" in the wizard (HELM_FLEET=1) but
+// the second peer isn't connected yet, seed a private fleet.md "NOT STARTED" marker. The persona
+// then tells Helm to get the second machine connected (verify SSH/Tailscale, test the link) BEFORE
+// the owner interview. Single-device installs (HELM_FLEET=0/unset) skip this entirely.
+(() => {
+  try {
+    if (process.env.HELM_FLEET !== '1') return;
+    const fleetFile = path.join(WORKSPACE, 'fleet.md');
+    const tmpl = path.join(WORKSPACE, 'fleet.example.md');
+    if (!existsSync(fleetFile) && existsSync(tmpl)) {
+      writeFileSync(fleetFile, readFileSync(tmpl, 'utf8'));
+      console.log('🛰  Fleet mode: created workspace/fleet.md — Helm will connect your second device on first message.');
+    }
+  } catch {}
+})();
+
 // ---- autonomy mode (suggest / copilot / autopilot) ----
 // Stored as preference 'helm.autonomy_mode' in memory.db.
 const MEMORY_DB = path.join(WORKSPACE, 'memory/memory.db');
@@ -182,6 +198,13 @@ const HELM_WIN_CLAUDE = process.env.HELM_WIN_CLAUDE || 'claude';
 // Run the remote peer inside its OWN full Helm install (default ~/helm) so it has the same code,
 // tools and powers as the local peer — not a stripped, mac-fed brain dir.
 const HELM_WIN_DIR = process.env.HELM_WIN_DIR || 'helm';
+// Did the owner say they run multiple devices? (wizard sets HELM_FLEET=1.) This only drives the
+// first-boot "connect your second device" onboarding — NOT routing.
+const FLEET_INTENT = process.env.HELM_FLEET === '1';
+// Can we ACTUALLY reach another peer right now? Routing to the other machine requires a real host.
+// Until one is configured we run everything locally — so neither a single-device box nor a
+// fleet-in-setup (intent on, peer not connected yet) can strand the bot SSHing to nowhere.
+const PEER_REACHABLE = !!HELM_WIN_HOST;
 // The machine THIS bot runs on. Whatever it is, it's a first-class peer — the default active target.
 const LOCAL_MACHINE = process.platform === 'win32' ? 'windows' : 'mac';
 const TARGET_FILE = path.join(WORKSPACE, 'active-target');
@@ -349,9 +372,31 @@ const MODE_GUIDANCE = {
     '"go" after 60 seconds. For simple 1-2 command tasks, execute immediately without the plan marker.',
 };
 
+// If the owner picked multi-device but the second peer isn't connected yet, prepend a directive so
+// Helm sets the fleet up FIRST (verify SSH/Tailscale reachability, then record it) before onboarding.
+// Reads the marker fresh each turn so the directive disappears once fleet.md is marked CONNECTED.
+function fleetOnboardingDirective() {
+  try {
+    if (process.env.HELM_FLEET !== '1') return '';
+    const p = path.join(WORKSPACE, 'fleet.md');
+    if (!existsSync(p)) return '';
+    const s = readFileSync(p, 'utf8');
+    if (!/NOT STARTED/i.test(s)) return '';   // already connected — stay quiet
+    const host = HELM_WIN_HOST || '(not set yet — ask the owner for the other machine\'s SSH host or Tailscale name)';
+    return '\n\nFLEET SETUP (do this BEFORE the owner interview): the owner runs Helm on MORE THAN ONE ' +
+      'device and the second peer is not connected yet. First, get the two machines linked: confirm the ' +
+      `other peer's reachable address (current HELM_WIN_HOST=${host}), test it with a non-interactive SSH ` +
+      '(`ssh -o BatchMode=yes -o ConnectTimeout=10 <host> echo ok`), and if SSH/Tailscale or keys are ' +
+      'missing, walk the owner through installing them (Tailscale is easiest: same tailnet on both). When ' +
+      'the link works, confirm the other peer has its own full Helm install, then write what you set up ' +
+      'into workspace/fleet.md and change its status line to "CONNECTED". THEN proceed to the owner ' +
+      'interview. If the owner says "skip" or "later", mark fleet.md "DEFERRED" and move on. Keep it short.';
+  } catch { return ''; }
+}
+
 function buildPersona(mode = 'copilot') {
   const guidance = MODE_GUIDANCE[mode] ?? MODE_GUIDANCE.copilot;
-  return `${PERSONA_BASE}${ownerPersonaOverride()}\n${guidance}`;
+  return `${PERSONA_BASE}${fleetOnboardingDirective()}${ownerPersonaOverride()}\n${guidance}`;
 }
 // Optional persona/style override applied by an imported Helm template.
 function ownerPersonaOverride() {
@@ -398,8 +443,12 @@ function runClaude(args, prompt) {
   });
 }
 
-async function ask(prompt, onHeartbeat, target = 'mac', mode = 'copilot') {
-  if (target !== LOCAL_MACHINE) return runClaudeRemote(prompt);   // other peer → run there over SSH
+async function ask(prompt, onHeartbeat, target = LOCAL_MACHINE, mode = 'copilot') {
+  // Only hop to the other peer when one is ACTUALLY reachable (a host is configured). On a
+  // single-device install — or a fleet still mid-setup — a stale or mismatched active-target
+  // (e.g. "mac" left over on a Windows-only box) falls through to local instead of stranding the
+  // bot in an SSH attempt to a machine that doesn't exist.
+  if (target !== LOCAL_MACHINE && PEER_REACHABLE) return runClaudeRemote(prompt);   // other peer → run there over SSH
   const model = pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [

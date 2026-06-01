@@ -78,6 +78,8 @@ workspace/mind/mind.log
 # Helm's onboarding writes the owner's profile here; keep it private.
 workspace/owner.md
 workspace/owner.local.md
+# fleet setup notes (the other machine's SSH host / Tailscale name — private)
+workspace/fleet.md
 # personal projects, plans and status the agent generates while working
 workspace/business/
 workspace/companies/

@@ -240,7 +240,8 @@ const rawOk = !process.env.HELM_PLAIN && isTTY && typeof input.setRawMode === 'f
 // fleet/sync, custom vars) is PRESERVED so re-running setup never resets your fleet or sync config.
 const MANAGED = new Set(['DISCORD_TOKEN', 'OWNER_ID', 'GATEWAYS', 'AUTH_MODE', 'MODEL', 'PERMISSION_MODE',
   'CLAUDE_BIN', 'WORKSPACE', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'ANTHROPIC_AUTH_TOKEN',
-  'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'PROXY_PORT']);
+  'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'PROXY_PORT',
+  'HELM_FLEET', 'HELM_WIN_HOST', 'HELM_WIN_CLAUDE', 'HELM_WIN_DIR']);
 function readEnvMap(p) {
   const m = {};
   try { for (const line of fs.readFileSync(p, 'utf8').split('\n')) { const s = line.trim(); if (!s || s.startsWith('#')) continue; const i = s.indexOf('='); if (i < 0) continue; m[s.slice(0, i).trim()] = s.slice(i + 1); } } catch {}
@@ -266,6 +267,11 @@ function buildEnv(cfg) {
     `PERMISSION_MODE=${cfg.perm}`,
     `CLAUDE_BIN=${cfg.claudeBin}`,
     `WORKSPACE=./workspace`,
+    // Fleet: 1 = owner runs Helm on more than one device, 0 = single device. On a single-device
+    // install Helm never tries to route work to another machine. If they gave the other peer's
+    // host now, write it; otherwise Helm connects the second device on first boot (fleet.md).
+    `HELM_FLEET=${cfg.fleet ? '1' : '0'}`,
+    ...(cfg.fleet && cfg.peerHost ? [`HELM_WIN_HOST=${cfg.peerHost}`] : []),
   ];
   if (preserved.length) { lines.push('', '# preserved from your previous config (fleet, sync, custom vars)'); for (const [k, v] of preserved) lines.push(`${k}=${v}`); }
   lines.push('');
@@ -337,8 +343,11 @@ async function runPlain() {
   if (authMode !== 'custom') model = (await ask('Claude model — 1) opus  2) sonnet', '1')) === '2' ? 'sonnet' : 'opus';
   const perm = (await ask('Tool permissions — 1) bypassPermissions  2) default', '1')) === '2' ? 'default' : 'bypassPermissions';
   const svc = (await ask('Run 24/7 in the background? (y/n)', 'y')).toLowerCase().startsWith('y');
+  const fleet = (await ask('Run Helm on more than one device? (y/n)', 'n')).toLowerCase().startsWith('y');
+  let peerHost = '';
+  if (fleet) peerHost = await ask('Other device address (SSH host / Tailscale name, blank to set up later)', '');
   rl.close();
-  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin: which('claude'), ollamaModel, online, openaiBase, openaiModel, openaiKey });
+  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin: which('claude'), ollamaModel, online, openaiBase, openaiModel, openaiKey, fleet, peerHost });
 }
 
 async function main() {
@@ -422,6 +431,15 @@ async function main() {
   // 5) service
   const svc = await confirm(`Run 24/7 in the background? (${IS_MAC ? 'launchd' : IS_LINUX ? 'systemd --user' : 'service'})`, true);
 
+  // 5.5) fleet — one device or several? (single-device is the default; multi makes the peers equal)
+  const fleet = await confirm('Will you run Helm on more than one device? (e.g. this plus another computer)', false);
+  let peerHost = '';
+  if (fleet) {
+    peerHost = await text('Other device address (optional — Enter to set up later)', {
+      hint: 'SSH target or Tailscale name of the OTHER machine, e.g. you@my-laptop. Leave blank and Helm will connect it on first message.',
+    });
+  }
+
   // 6) review + confirm
   const claudeBin = which('claude');
   header();
@@ -437,9 +455,10 @@ async function main() {
   if (authMode !== 'custom') row('Model', model);
   row('Permissions', perm);
   row('Service', svc ? 'yes' : 'no');
+  row('Devices', fleet ? `${C.teal}fleet${C.reset}${peerHost ? ` → ${peerHost}` : ' (connect 2nd on first boot)'}` : 'single device');
   out.write('\n');
   if (!(await confirm('Write this config?', true))) { cleanup(); console.log('\nCancelled. Nothing written.'); process.exit(1); }
-  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin, ollamaModel, online, openaiBase, openaiModel, openaiKey });
+  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin, ollamaModel, online, openaiBase, openaiModel, openaiKey, fleet, peerHost });
 }
 
 // If the fancy UI is unavailable or errors out, fall back to the plain Q&A rather than show nothing.
