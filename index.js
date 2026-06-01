@@ -93,6 +93,20 @@ if (!DISCORD_TOKEN || !OWNER_ID) {
 }
 mkdirSync(WORKSPACE, { recursive: true });
 
+// First-run onboarding: ensure a private owner.md exists (CLAUDE.md imports @owner.md). On a fresh
+// install there's none (it's gitignored), so seed it from the committed template — its "NOT STARTED"
+// status tells Helm to interview the owner on their first message. Never overwrites an existing one.
+(() => {
+  try {
+    const ownerFile = path.join(WORKSPACE, 'owner.md');
+    const tmpl = path.join(WORKSPACE, 'owner.example.md');
+    if (!existsSync(ownerFile) && existsSync(tmpl)) {
+      writeFileSync(ownerFile, readFileSync(tmpl, 'utf8'));
+      console.log('🆕 First run: created workspace/owner.md — Helm will onboard you on your first message.');
+    }
+  } catch {}
+})();
+
 // ---- autonomy mode (suggest / copilot / autopilot) ----
 // Stored as preference 'helm.autonomy_mode' in memory.db.
 const MEMORY_DB = path.join(WORKSPACE, 'memory/memory.db');

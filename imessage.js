@@ -47,6 +47,13 @@ function isOwner(h) {
 }
 mkdirSync(WORKSPACE, { recursive: true });
 
+// First-run onboarding: seed the private owner.md from the template if absent (CLAUDE.md imports it).
+try {
+  const ownerFile = path.join(WORKSPACE, 'owner.md');
+  const tmpl = path.join(WORKSPACE, 'owner.example.md');
+  if (!existsSync(ownerFile) && existsSync(tmpl)) copyFileSync(tmpl, ownerFile);
+} catch {}
+
 // Pick --model for this turn: fixed pref overrides the complexity classifier.
 function pickModel(prompt) {
   return getModelPref() ?? classifyComplexity(prompt);
