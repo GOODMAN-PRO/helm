@@ -63,6 +63,25 @@ const ESC = '\x1b[';
 const out = s => process.stdout.write(s);
 const stripAnsi = s => s.replace(/\x1b\[[0-9;]*m/g, '');
 
+// Brand logo: the ship's-wheel mark + HELM wordmark, in the cyan→sky gradient. Drawn on startup.
+const WHEEL = [   // a ship's-wheel mark in box-drawing chars; 6 uniform-width rows to match the wordmark
+  '   ╭─┼─╮   ',
+  '  ╭┤ │ ├╮  ',
+  '  ├┼─●─┼┤  ',
+  '  ╰┤ │ ├╯  ',
+  '   ╰─┼─╯   ',
+  '     ┼     ',
+];
+const WORD = [
+  '██╗  ██╗███████╗██╗     ███╗   ███╗',
+  '██║  ██║██╔════╝██║     ████╗ ████║',
+  '███████║█████╗  ██║     ██╔████╔██║',
+  '██╔══██║██╔══╝  ██║     ██║╚██╔╝██║',
+  '██║  ██║███████╗███████╗██║ ╚═╝ ██║',
+  '╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝',
+];
+const GRAD = [C.teal, C.teal, C.cyan, C.cyan, C.sky, C.sky];   // per-row gradient for the wordmark
+
 // word-wrap a plain string to width, preserving explicit newlines
 function wrap(text, width) {
   const lines = [];
@@ -95,6 +114,7 @@ function tui(sock) {
   let input = '';
   let status = '';
   let connected = true;
+  let splashing = true; // show the brand logo until the first keypress / message
 
   const enterAlt = () => out(`${ESC}?1049h${ESC}?25l`);   // alt screen, hide cursor
   const leaveAlt = () => out(`${ESC}?25h${ESC}?1049l`);   // restore
@@ -121,7 +141,27 @@ function tui(sock) {
     return lines;
   }
 
+  // Brand splash: ship's-wheel mark beside the HELM wordmark, gradient-colored, centered.
+  function splash() {
+    W = process.stdout.columns || 80;
+    H = process.stdout.rows || 24;
+    out(`${ESC}H${ESC}J`);
+    const block = [];
+    for (let i = 0; i < WORD.length; i++) {
+      const wheel = WHEEL[i + (WHEEL.length > WORD.length ? 0 : 0)] || ' '.repeat(17);
+      block.push(`${C.cyan}${wheel}${C.x}   ${GRAD[i]}${C.b}${WORD[i]}${C.x}`);
+    }
+    block.push('');
+    block.push(`${C.gray}your own AI agent — one brain, shared with Discord & iMessage${C.x}`);
+    const blkW = Math.max(...block.map(l => stripAnsi(l).length));
+    const top = Math.max(1, Math.floor((H - block.length) / 2));
+    const left = Math.max(1, Math.floor((W - blkW) / 2) + 1);
+    block.forEach((ln, i) => { moveTo(top + i, left); out(ln); });
+    moveTo(H - 1, 1); out(`${C.dim}${' '.repeat(Math.max(0, Math.floor((W - 34) / 2)))}press any key to start chatting…${C.x}`);
+  }
+
   function draw() {
+    if (splashing) return splash();
     W = process.stdout.columns || 80;
     H = process.stdout.rows || 24;
     out(`${ESC}H${ESC}J`);   // home + clear
@@ -163,7 +203,7 @@ function tui(sock) {
     moveTo(H - 1, 5 + stripAnsi(shown).length);
   }
 
-  function add(role, text, label) { history.push({ role, text, label }); scroll = 0; draw(); }
+  function add(role, text, label) { splashing = false; history.push({ role, text, label }); scroll = 0; draw(); }
 
   // ---- socket -> history ----
   let buf = '';
@@ -178,8 +218,8 @@ function tui(sock) {
         if (/terminal/i.test(m.from || '')) continue;
         add('other', m.text, m.from || 'other');
       }
-      else if (m.type === 'status') { status = m.text; draw(); }
-      else if (m.type === 'info')   { add('sys', m.text); }
+      else if (m.type === 'status') { status = m.text; if (!splashing) draw(); }
+      else if (m.type === 'info')   { history.push({ role: 'sys', text: m.text }); scroll = 0; if (!splashing) draw(); }   // queue under the splash, don't dismiss it
     }
   });
   sock.on('close', () => { connected = false; status = 'Helm disconnected (service stopped?). Press Esc to quit.'; draw(); });
@@ -209,7 +249,9 @@ function tui(sock) {
     if (!key) return;
     const name = key.name;
     if (key.ctrl && name === 'c') return quit();
-    if (name === 'escape') return quit();
+    if (name === 'escape') { if (splashing) { splashing = false; return draw(); } return quit(); }
+    // first keypress on the splash dismisses it into the chat (without also typing that char)
+    if (splashing) { splashing = false; draw(); if (name === 'return' || name === 'enter') return; }
     if (name === 'return' || name === 'enter') return submit();
     if (name === 'backspace') { input = input.slice(0, -1); return draw(); }
     if (name === 'pageup')   { scroll += Math.max(1, bodyH() - 1); return draw(); }
@@ -222,7 +264,9 @@ function tui(sock) {
 
   process.stdout.on('resize', draw);
   sock.write(JSON.stringify({ type: 'hello' }) + '\n');
-  add('sys', "connected. Type a message — Helm, Discord and iMessage all share this conversation.");
+  // queue the greeting WITHOUT dismissing the splash — the logo stays until the user acts, then this
+  // message is already there underneath it.
+  history.push({ role: 'sys', text: "connected. Type a message — Helm, Discord and iMessage all share this conversation." });
 }
 
 // ---- plain fallback (no TTY / NO_COLOR-style minimal): the old line REPL ----
