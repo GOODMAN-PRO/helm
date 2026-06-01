@@ -147,18 +147,26 @@ function mcpConfigArg() {
   } catch { return '{"mcpServers":{}}'; }
 }
 
-// ---- fleet: swap which machine runs the brain ("use mac" / "use windows") ----
-// mac = run claude locally (this Mac). windows = run claude over SSH on the Windows box.
-// Free, no cloud, doesn't touch the Helm project. Configure Windows in .env:
+// ---- fleet: EQUAL PEERS that share one knowledge vault ("use mac" / "use windows") ----
+// The Mac and the Windows box are equal peers — neither is "home" or in charge. Each runs a FULL,
+// independent Helm with full local powers; they share exactly one thing: the HelmBrain vault, synced
+// both ways by workspace/tools/brain-sync.mjs. "use <machine>" just picks which peer is active; the
+// active peer does all the work LOCALLY and never reaches back to the other to get its job done.
+// This bot process runs on ONE machine (the local peer); the other is reached over SSH on demand.
+// Configure the OTHER peer in .env:
 //   HELM_WIN_HOST=you@windows-host   (LAN IP or Tailscale name; key-based SSH)
-//   HELM_WIN_CLAUDE=claude           (path to claude on Windows, optional)
-//   HELM_WIN_DIR=C:/path/to/dir      (remote working dir, optional)
+//   HELM_WIN_CLAUDE=claude           (path to claude on the other peer, optional)
+//   HELM_WIN_DIR=helm                (the OTHER peer's Helm install dir — full code+tools, for parity)
 const HELM_WIN_HOST = process.env.HELM_WIN_HOST || '';
 const HELM_WIN_CLAUDE = process.env.HELM_WIN_CLAUDE || 'claude';
-const HELM_WIN_DIR = process.env.HELM_WIN_DIR || '';
+// Run the remote peer inside its OWN full Helm install (default ~/helm) so it has the same code,
+// tools and powers as the local peer — not a stripped, mac-fed brain dir.
+const HELM_WIN_DIR = process.env.HELM_WIN_DIR || 'helm';
+// The machine THIS bot runs on. Whatever it is, it's a first-class peer — the default active target.
+const LOCAL_MACHINE = process.platform === 'win32' ? 'windows' : 'mac';
 const TARGET_FILE = path.join(WORKSPACE, 'active-target');
 const VALID_TARGETS = ['mac', 'windows'];
-const getTarget = () => { try { const t = readFileSync(TARGET_FILE, 'utf8').trim(); return VALID_TARGETS.includes(t) ? t : 'mac'; } catch { return 'mac'; } };
+const getTarget = () => { try { const t = readFileSync(TARGET_FILE, 'utf8').trim(); return VALID_TARGETS.includes(t) ? t : LOCAL_MACHINE; } catch { return LOCAL_MACHINE; } };
 const setTarget = t => writeFileSync(TARGET_FILE, t);
 
 // Process inline directives the brain can emit in a reply:
@@ -181,24 +189,22 @@ function handleDirectives(replyText, userText = '') {
 // Resumes the windows session ('owner-windows') so multi-step tasks stay coherent across messages.
 function runClaudeRemote(prompt) {
   return new Promise(resolve => {
-    if (!HELM_WIN_HOST) return resolve('Windows node not configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Claude on Windows, then say "use windows" again.');
+    if (!HELM_WIN_HOST) return resolve('The other peer machine isn\'t configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Helm on that machine, then say "use windows" (or "use mac") again.');
     const q = s => `"${s.replace(/"/g, '\\"')}"`;   // shell-quote for the remote shell
-    const REMOTE_PERSONA = "You are Helm on the owner's Windows PC over SSH, with full shell and file access. " +
-      'ACT — actually DO what the owner asks end to end: create the files, build the thing, run the commands, accomplish the task. ' +
-      'A screenshot is ONLY to SHOW a result AFTER you have done the work — NEVER reply with just a screenshot instead of doing the task, and never claim you did something you did not. ' +
+    // Peer persona: the remote machine is a FULL, equal Helm — it does everything locally and never
+    // reaches back to the other peer to get its job done.
+    const REMOTE_PERSONA = 'You are Helm running on the owner\'s other machine — a FULL, independent peer with full shell, file, code and tool access, exactly as capable as the Helm on any other machine. ' +
+      'Neither machine is "home", canonical, or in charge — the peers are EQUALS that share exactly one thing: the HelmBrain vault, synced both ways automatically. ' +
+      'DO THE WORK HERE, on THIS machine: create files, run commands, edit code, finish the task locally with your own tools. ' +
+      'NEVER SSH or reach back to the other machine, never treat it as the source of truth, and never tell the owner a task must be done "on the Mac" or "on the other machine" — if it is about Helm\'s own code, THIS machine has its own full copy in its install dir. The only thing that crosses machines is the shared HelmBrain vault. ' +
+      'ACT — actually DO what the owner asks end to end. A screenshot is ONLY to SHOW a result AFTER you have done the work — never reply with just a screenshot instead of doing the task, and never claim you did something you did not. ' +
       'Keep replies short. Confirm before anything destructive, irreversible, or that spends money. Respect any off-limits paths the owner named in their profile. ' +
-      'To screenshot the Windows desktop (SSH cannot capture it directly): run  schtasks /run /tn HelmShot  then wait ~3s (powershell Start-Sleep 3); it saves to C:\\\\Users\\\\User\\\\helm-shot.png. End that reply with a line exactly: ATTACH: C:\\\\Users\\\\User\\\\helm-shot.png';
-    // SYNC: push the Mac's live brain (CLAUDE.md + memory index) to the PC so windows-Helm shares it.
-    const WIN_BRAIN = 'helm-brain';   // relative to the windows home (C:\Users\User\helm-brain)
-    try {
-      spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, 'if not exist helm-brain\\memory mkdir helm-brain\\memory'], { encoding: 'utf8' });
-      spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', path.join(WORKSPACE, 'CLAUDE.md'), `${HELM_WIN_HOST}:${WIN_BRAIN}/CLAUDE.md`], { encoding: 'utf8' });
-      spawnSync('scp', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', path.join(WORKSPACE, 'memory/INDEX.md'), `${HELM_WIN_HOST}:${WIN_BRAIN}/memory/INDEX.md`], { encoding: 'utf8' });
-    } catch {}
+      'To show the screen, take a screenshot locally with `node workspace/tools/impl/screencap.mjs --out <file>` (cross-platform; captures THIS machine) and end the reply with a line exactly: ATTACH: <that file path>.';
     const run = sid => {
       const resumeFlag = sid ? `--resume ${q(sid)} ` : '';
-      // run INSIDE the synced brain dir so Claude auto-loads CLAUDE.md (+ @memory/INDEX.md)
-      const remoteCmd = `cd ${WIN_BRAIN} && ${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(pickModel(prompt))} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
+      // Run INSIDE the remote peer's OWN full Helm install so Claude loads its CLAUDE.md (+ memory) and
+      // has the real code and tools — full parity with the local peer, no dependence on this machine.
+      const remoteCmd = `cd ${HELM_WIN_DIR} && ${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(pickModel(prompt))} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
       const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', HELM_WIN_HOST, remoteCmd]);
       let out = '', err = '';
       const kill = setTimeout(() => child.kill(), 30 * 60_000);
@@ -262,7 +268,7 @@ const PERSONA_BASE =
   'When asked to build or create something, actually BUILD it (make the files, write the code, run the commands, finish the task) — a screenshot or a description is NEVER a substitute for doing the work. "Show me" means produce the real artifact first, THEN optionally screenshot it to display the result. ' +
   'Two directives you may emit anywhere in a reply (they are stripped before the owner sees them): ' +
   '(1) when you get genuinely stuck or hit a limitation worth fixing later, add `[STUCK: one line on what blocked you]` — it is queued for your nightly self-upgrade to fix the root cause; ' +
-  '(2) when a task is better run on another machine in the fleet, switch yourself at will with `[USE: windows]` or `[USE: mac]`. ' +
+  '(2) the owner may have more than one machine (fleet). They are EQUAL peers that share one HelmBrain vault — none is "home" or more powerful. You do every task LOCALLY on the machine you are on; never reach back to another machine to get your job done, and never tell the owner a task must be done on a different machine. Only switch machines with `[USE: windows]` or `[USE: mac]` if the owner explicitly wants the OTHER machine active (e.g. to act on something physically on it) — otherwise stay put and do the work here. ' +
   'Respect any off-limits paths/projects the owner names in @owner.md.';
 
 const MODE_GUIDANCE = {
@@ -330,7 +336,7 @@ function runClaude(args, prompt) {
 }
 
 async function ask(prompt, onHeartbeat, target = 'mac', mode = 'copilot') {
-  if (target === 'windows') return runClaudeRemote(prompt);
+  if (target !== LOCAL_MACHINE) return runClaudeRemote(prompt);   // other peer → run there over SSH
   const model = pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [
