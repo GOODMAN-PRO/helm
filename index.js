@@ -8,6 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { DatabaseSync } from 'node:sqlite';
@@ -998,6 +999,25 @@ startProxy();
 for (const sig of ['SIGINT', 'SIGTERM', 'exit']) {
   process.on(sig, () => { try { proxyChild?.kill(); } catch {} });
 }
+
+// ---- single-instance lock (prevents DUPLICATE replies) ----
+// One Discord token = one bot. If two `index.js` run at once (e.g. a stray old brain plus a freshly
+// started one), BOTH log into Discord and BOTH answer every message — you see each reply twice. Hold a
+// loopback lock port: if it's already taken, another Helm brain owns this machine, so exit cleanly and
+// let it keep serving. The OS releases the port the instant a process dies, so there's no stale lock.
+const LOCK_PORT = parseInt(process.env.HELM_LOCK_PORT || '4624', 10);
+await new Promise(resolve => {
+  const lock = net.createServer();
+  lock.once('error', e => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`✋ Another Helm brain is already running on this machine (lock ${LOCK_PORT} held). Not starting a second one — that would double every reply. Run \`helm stop\` first, or kill the stray \`node index.js\`.`);
+      process.exit(0);   // the existing brain keeps serving; this duplicate bows out before touching Discord
+    }
+    console.error(`[lock] couldn't bind lock port ${LOCK_PORT} (${e.code}); continuing without the single-instance guard.`);
+    resolve();
+  });
+  lock.listen(LOCK_PORT, '127.0.0.1', () => { lock.unref(); resolve(); });   // unref'd so it never blocks a clean exit
+});
 
 // Terminal bridge: let `node cli.js` talk to THIS running brain (one conversation shared across
 // terminal/Discord/iMessage), instead of spawning a second brain. A terminal line runs through the
