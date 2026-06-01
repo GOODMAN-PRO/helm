@@ -18,6 +18,7 @@ import { classifyComplexity, getModelPref, setModelPref } from './workspace/mode
 import { recordStuck, processStuckMarkers, autoCaptureCant } from './workspace/upgrades/stuck.mjs';
 import { exportTemplate, importTemplate, listTemplates } from './workspace/templates/templates.mjs';
 import { runHealthChecks } from './workspace/mcp/check.mjs';
+import { startCliBridge, mirrorReply, mirrorEcho, mirrorStatus } from './workspace/cli-bridge.mjs';
 import { listSkills, runSkillCommand } from './workspace/skills/loader.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
@@ -607,6 +608,7 @@ client.on(Events.MessageCreate, async msg => {
 
   const text = msg.content.replace(`<@${client.user.id}>`, '').trim();
   if (!text && !msg.attachments.size) return;   // allow image-only messages
+  try { mirrorEcho(text || '(attachment)', 'you (Discord)'); } catch {}   // show Discord input in any open terminal
 
   // ---- stop/cancel: kill in-flight runs AND cancel any pending autopilot timer ----
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) {
@@ -893,6 +895,7 @@ client.on(Events.MessageCreate, async msg => {
         try { await msg.reply({ files: [lf] }); }
         catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
       }
+      try { mirrorReply(body || '(see attachment)'); } catch {}   // show Discord replies in any open terminal
     }
     console.log(`📤 replied (${body.length} chars, ${files.length} files, mode=${mode}, planPending=${hasPlanPending})`);
     // durable transcript so nothing is ever lost (the brain distills these into memory)
@@ -957,6 +960,35 @@ startProxy();
 for (const sig of ['SIGINT', 'SIGTERM', 'exit']) {
   process.on(sig, () => { try { proxyChild?.kill(); } catch {} });
 }
+
+// Terminal bridge: let `node cli.js` talk to THIS running brain (one conversation shared across
+// terminal/Discord/iMessage), instead of spawning a second brain. A terminal line runs through the
+// same ask() + 'owner' session; the reply is mirrored to every channel.
+let cliBusy = false;
+startCliBridge(async (text, reply) => {
+  try { mirrorEcho(text, 'you (terminal)'); } catch {}
+  if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); const m = n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'; reply(m); try { mirrorReply(m); } catch {} return; }
+  if (cliBusy) { reply('(still working on the previous message — try again in a moment)'); return; }
+  cliBusy = true;
+  try {
+    const mode = getAutonomyMode();
+    const target = getTarget();
+    const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, target, mode);
+    const { text: rawBody } = splitAttachments(raw);
+    const body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
+    reply(body);
+    try { mirrorReply(body); } catch {}
+    try {
+      const conv = path.join(WORKSPACE, 'conversations');
+      mkdirSync(conv, { recursive: true });
+      appendFileSync(path.join(conv, new Date().toISOString().slice(0, 10) + '.md'),
+        `\n**[${new Date().toISOString().slice(11, 16)}] owner (terminal):** ${text}\n**helm:** ${body}\n`);
+    } catch {}
+  } catch (e) {
+    const m = e?.timedOut ? 'hit the 30-min cap' : `error: ${String(e?.message || e).slice(0, 300)}`;
+    reply(m);
+  } finally { cliBusy = false; }
+});
 
 // Connect to Discord, with a clear reason if it can't (so "offline" isn't a mystery).
 if (/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
