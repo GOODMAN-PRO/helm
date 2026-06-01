@@ -430,55 +430,73 @@ function tui(sock) {
     if (ch && !ctrl) { input += ch; return (input === '/' ? draw() : drawInput()); }
   }
 
-  // A pasted block lands as one chunk → append to input (multi-line shows as "[N lines pasted]"),
-  // never firing Enter per line. The full text is sent when you press Enter.
-  function handlePaste(text) {
+  // A pasted block is appended to the input as ONE chunk (multi-line shows as "[N lines pasted]") and
+  // is sent only when you press Enter — exactly like Claude Code. It never fires Enter per line.
+  function pasteInto(text) {
+    text = text.replace(/\r\n?/g, '\n').replace(/\n$/, '');   // normalize CRLF, drop one trailing NL
+    if (!text) return;
+    const wasSplash = splashing;
     if (splashing) splashing = false;
     input += text;
-    if (!splashing) drawInput(); else draw();
+    if (wasSplash) draw(); else drawInput();
   }
 
-  // ---- single raw-input parser: keys + bracketed paste, one consumer (no race) ----
-  const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~';
-  let dataBuf = '';        // carries an unfinished escape seq / paste across chunks
-  stdin.on('data', chunk => {
-    dataBuf += chunk.toString('utf8');
-    for (;;) {
-      // inside a paste: consume until the end marker (may span chunks)
-      if (pasteBuf !== null) {
-        const e = dataBuf.indexOf(PASTE_END);
-        if (e === -1) { pasteBuf += dataBuf; dataBuf = ''; return; }
-        pasteBuf += dataBuf.slice(0, e); dataBuf = dataBuf.slice(e + PASTE_END.length);
-        handlePaste(pasteBuf); pasteBuf = null; continue;
+  // Walk a run of raw bytes that contains NO paste: arrows/keys, Enter, backspace, ctrl keys, chars.
+  const KEYSEQ = { '\x1b[A':'up','\x1b[B':'down','\x1b[C':'right','\x1b[D':'left',
+    '\x1b[5~':'pageup','\x1b[6~':'pagedown','\x1b[H':'home','\x1b[F':'end','\x1b[3~':'delete',
+    '\x1bOA':'up','\x1bOB':'down','\x1bOC':'right','\x1bOD':'left' };
+  function feedKeys(s) {
+    while (s.length) {
+      if (s[0] === '\x1b') {
+        let m = null;
+        for (const k of Object.keys(KEYSEQ)) if (s.startsWith(k)) { m = k; break; }
+        if (m) { s = s.slice(m.length); handleKey(KEYSEQ[m], null, false); continue; }
+        if (/^\x1b(\[[0-9;]*|O)$/.test(s)) { keyCarry = s; return; }   // incomplete escape seq — wait for more
+        s = s.slice(1); handleKey('escape', null, false); continue;     // a bare Esc
       }
-      if (!dataBuf) return;
-      // paste start?
-      if (dataBuf.startsWith(PASTE_START)) { dataBuf = dataBuf.slice(PASTE_START.length); pasteBuf = ''; continue; }
-      // could a paste/escape marker be starting but split across chunks? wait for more bytes.
-      if (PASTE_START.startsWith(dataBuf) || (dataBuf === '\x1b' || dataBuf === '\x1b[')) return;
-
-      const c = dataBuf[0];
-      if (c === '\x1b') {
-        // escape sequence: arrows, etc. Match the common CSI codes; otherwise treat as a bare Esc.
-        const seqs = { '\x1b[A': 'up', '\x1b[B': 'down', '\x1b[C': 'right', '\x1b[D': 'left',
-          '\x1b[5~': 'pageup', '\x1b[6~': 'pagedown', '\x1b[H': 'home', '\x1b[F': 'end' };
-        let matched = null;
-        for (const s of Object.keys(seqs)) if (dataBuf.startsWith(s)) { matched = s; break; }
-        if (matched) { dataBuf = dataBuf.slice(matched.length); handleKey(seqs[matched], null, false); continue; }
-        // an incomplete CSI that might still grow — if the buffer is just ESC[ + partial, wait
-        if (/^\x1b\[[0-9;]*$/.test(dataBuf)) return;
-        dataBuf = dataBuf.slice(1); handleKey('escape', null, false); continue;
-      }
-      // control chars
-      if (c === '\r' || c === '\n') { dataBuf = dataBuf.slice(1); handleKey('return', null, false); continue; }
-      if (c === '\t') { dataBuf = dataBuf.slice(1); handleKey('tab', null, false); continue; }
-      if (c === '\x7f' || c === '\b') { dataBuf = dataBuf.slice(1); handleKey('backspace', null, false); continue; }
-      if (c === '\x03') { dataBuf = dataBuf.slice(1); handleKey('c', 'c', true); continue; }   // ctrl-c
-      if (c === '\x15') { dataBuf = dataBuf.slice(1); handleKey('u', 'u', true); continue; }   // ctrl-u
-      if (c < ' ') { dataBuf = dataBuf.slice(1); continue; }   // ignore other control bytes
-      // printable character
-      dataBuf = dataBuf.slice(1); handleKey(null, c, false);
+      const c = s[0];
+      if (c === '\r' || c === '\n') { s = s.slice(1); handleKey('return', null, false); continue; }
+      if (c === '\t') { s = s.slice(1); handleKey('tab', null, false); continue; }
+      if (c === '\x7f' || c === '\b') { s = s.slice(1); handleKey('backspace', null, false); continue; }
+      if (c === '\x03') { s = s.slice(1); handleKey('c', 'c', true); continue; }   // ctrl-c
+      if (c === '\x15') { s = s.slice(1); handleKey('u', 'u', true); continue; }   // ctrl-u
+      if (c < ' ') { s = s.slice(1); continue; }                                   // ignore other control bytes
+      s = s.slice(1); handleKey(null, c, false);                                   // printable
     }
+  }
+
+  // ---- single raw-input consumer (no readline keypress stream → no race) ----
+  // A paste is recognized two ways so it works on EVERY terminal:
+  //   1. Bracketed paste — terminals that support it wrap the block in ESC[200~ … ESC[201~.
+  //   2. Heuristic — a chunk that carries a newline (and isn't a lone Enter) or is a long blob is a
+  //      paste too. Windows terminals often DON'T send bracketed markers; without this the block
+  //      byte-walks and every newline fires Enter, splitting it into many messages and clearing the
+  //      box (looks like "nothing pasted"). Treat it as one block instead.
+  const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~';
+  let keyCarry = '';   // partial escape sequence carried to the next data chunk
+  stdin.on('data', chunk => {
+    let s = keyCarry + chunk.toString('utf8'); keyCarry = '';
+
+    // bracketed paste, in progress or starting in this chunk
+    if (pasteBuf !== null || s.includes(PASTE_START)) {
+      if (pasteBuf === null) {
+        const i = s.indexOf(PASTE_START);
+        if (i > 0) feedKeys(s.slice(0, i));          // keys typed just before the paste
+        s = s.slice(i + PASTE_START.length); pasteBuf = '';
+      }
+      const e = s.indexOf(PASTE_END);
+      if (e === -1) { pasteBuf += s; return; }        // paste continues in a later chunk
+      const body = pasteBuf + s.slice(0, e); pasteBuf = null;
+      pasteInto(body);
+      feedKeys(s.slice(e + PASTE_END.length));        // anything after the end marker
+      return;
+    }
+
+    // heuristic paste (no bracketed markers): a multi-line block, or a long blob, pasted at once
+    const loneEnter = s === '\r' || s === '\n' || s === '\r\n';
+    if (!loneEnter && s[0] !== '\x1b' && (/[\r\n]/.test(s) || s.length > 24)) { pasteInto(s); return; }
+
+    feedKeys(s);   // ordinary keystrokes
   });
 
   process.stdout.on('resize', draw);
