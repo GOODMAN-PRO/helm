@@ -543,7 +543,7 @@ async function ask(prompt, onProgress, target = LOCAL_MACHINE, mode = 'copilot')
     onProgress(`⚙️ ${lastStatus} · ${elapsed()}s`);
   };
   const onEvent = evt => { const l = eventLabel(evt); if (l) { lastStatus = l; push(); } };
-  const ticker = setInterval(() => push(true), 5000);
+  const ticker = setInterval(() => push(true), 1000);   // tick the elapsed-time status every second
   push(true);
 
   let r;
@@ -967,7 +967,7 @@ for (const sig of ['SIGINT', 'SIGTERM', 'exit']) {
 let cliBusy = false;
 startCliBridge(async (text, reply) => {
   try { mirrorEcho(text, 'you (terminal)'); } catch {}
-  if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); const m = n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'; reply(m); try { mirrorReply(m); } catch {} return; }
+  if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); reply(n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'); return; }
   if (cliBusy) { reply('(still working on the previous message — try again in a moment)'); return; }
   cliBusy = true;
   try {
@@ -976,8 +976,7 @@ startCliBridge(async (text, reply) => {
     const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, target, mode);
     const { text: rawBody } = splitAttachments(raw);
     const body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
-    reply(body);
-    try { mirrorReply(body); } catch {}
+    reply(body);   // broadcasts to every terminal once (no separate mirrorReply, or it'd double-send)
     try {
       const conv = path.join(WORKSPACE, 'conversations');
       mkdirSync(conv, { recursive: true });

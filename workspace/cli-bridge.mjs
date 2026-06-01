@@ -54,7 +54,9 @@ export function startCliBridge(onMessage) {
         if (msg.type === 'msg' && typeof msg.text === 'string' && msg.text.trim()) {
           // mirror the owner's terminal line to OTHER terminals, then hand it to the brain
           for (const s of clients) if (s !== sock) send(s, { type: 'echo', text: msg.text, from: 'you (terminal)' });
-          try { onMessage(msg.text.trim(), reply => send(sock, { type: 'reply', text: reply, from: 'helm' })); } catch (e) {
+          // reply() broadcasts to EVERY terminal (so all mirror it) exactly once — the brain must NOT
+          // also call mirrorReply for the same answer, or the originating terminal would see it twice.
+          try { onMessage(msg.text.trim(), reply => broadcast({ type: 'reply', text: reply, from: 'helm' })); } catch (e) {
             send(sock, { type: 'info', text: 'error: ' + (e?.message || e) });
           }
         }
