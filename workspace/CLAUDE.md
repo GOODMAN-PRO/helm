@@ -314,9 +314,14 @@ Servers are passed with `--strict-mcp-config` so the user's global MCP config is
 ### Tool registry
 Declarative list of Helm's callable verbs lives in `workspace/tools/registry.json`.
 Dispatcher: `node workspace/tools/tools.mjs list` or `tools.mjs call <name> --json '{...}'`.
-Built-in tools: screencap, gui.click, gui.type, gui.key, imessage.send, discord.attach,
-memory.remember, memory.recall, scheduler.add, scheduler.list.
+Built-in tools: image.generate, screencap, gui.click, gui.type, gui.key, imessage.send,
+discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
+
+**Image generation:** to make a picture, call `image.generate` (free, no key — works on any OS):
+`node workspace/tools/tools.mjs call image.generate --json '{"prompt":"..."}'`. It saves an image file
+and prints its path; **show it by ending your reply with `ATTACH: <that path>`** so the gateway
+attaches it to the chat. Override size with width/height; pass a seed for a repeatable result.
 
 **Cross-platform vs macOS-only.** Most tools (memory, scheduler, planning, skills, mind, reverse,
 templates, secrets, web/browser, screenshots via `screencap`, vision describe/verify, AND mouse/keyboard

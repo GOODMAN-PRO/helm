@@ -1,5 +1,30 @@
 [
   {
+    "name": "image.generate",
+    "summary": "Generate an image from a text prompt (free, no API key) and save it to a file.",
+    "exec": "node tools/impl/image.generate.mjs",
+    "args_schema": {
+      "prompt": {
+        "type": "string",
+        "required": true,
+        "description": "What to draw, e.g. 'a watercolor fox in a snowy forest'"
+      },
+      "out": {
+        "type": "string",
+        "description": "Output path (must be under the OS temp dir or workspace). Default: temp/helm-image-<ts>.jpg"
+      },
+      "width": { "type": "number", "description": "Pixels, 64-2048. Default 1024" },
+      "height": { "type": "number", "description": "Pixels, 64-2048. Default 1024" },
+      "model": { "type": "string", "description": "Provider model, default 'flux'" },
+      "seed": { "type": "number", "description": "Optional seed for reproducibility" }
+    },
+    "requires": [
+      "internet access"
+    ],
+    "side_effects": "writes a generated image file; to show it, end the reply with `ATTACH: <path>`",
+    "confirm": false
+  },
+  {
     "name": "screencap",
     "summary": "Capture a screenshot of the Mac screen to a temp file.",
     "exec": "node tools/impl/screencap.mjs",
