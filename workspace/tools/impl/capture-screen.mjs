@@ -45,7 +45,8 @@ function windowsPsScript(outPath, hideTerminals = true) {
   ];
   const hideStart = hideTerminals ? [
     // Minimize visible terminal/console windows so they don\'t block the screenshot.
-    "$names=@('WindowsTerminal','OpenConsole','cmd','conhost','powershell','pwsh')",
+    // Common hosts a Claude Code / terminal session runs in (any of these blocking a monitor).
+    "$names=@('WindowsTerminal','OpenConsole','cmd','conhost','powershell','pwsh','mintty','bash','ConEmu64','ConEmu','Cmder','Hyper','alacritty','wezterm-gui','Tabby','Code','Cursor','claude')",
     '$minimized=@()',
     'foreach($p in Get-Process -Name $names -ErrorAction SilentlyContinue){ $h=$p.MainWindowHandle; if($h -ne [IntPtr]::Zero -and [WHelm]::IsWindowVisible($h)){ [WHelm]::ShowWindowAsync($h,6) | Out-Null; $minimized+=$h } }',
     'if($minimized.Count -gt 0){ Start-Sleep -Milliseconds 350 }',
