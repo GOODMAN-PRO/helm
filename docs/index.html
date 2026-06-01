@@ -145,6 +145,7 @@
   .code{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#06090f;border:1px solid #1b2740;border-radius:12px;padding:14px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:#cfeaf2;overflow-x:auto}
   .code button{flex:none;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
   .code button:hover{border-color:var(--cyan)}
+  .setup-h{margin:30px 0 10px;font-size:18px}
   .opts{display:flex;gap:14px;flex-wrap:wrap;margin-top:18px}
   .opt{flex:1;min-width:200px;background:#0c1726;border:1px solid var(--line);border-radius:12px;padding:16px}
   .opt h3{margin:0 0 4px;font-size:15px}
@@ -222,7 +223,7 @@
       <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></div><h3>Owner-locked &amp; private</h3><p>Only your ID can command it. Your data, keys and conversations never leave hardware you own.</p></div>
       <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/><path d="M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6"/></svg></div><h3>Real long-term memory</h3><p>A structured memory store plus a synced Markdown knowledge base that learns your preferences and stays consistent across your machines.</p></div>
       <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="8" height="6" rx="1"/><rect x="13.5" y="13" width="8" height="6" rx="1"/><path d="M10.5 8H14a2 2 0 0 1 2 2v3"/><path d="M14 11l2 2 2-2"/></svg></div><h3>Your whole fleet</h3><p>Swap between your Mac and Windows box mid-conversation over Tailscale. One agent, every machine.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></div><h3>Sees and drives your screen</h3><p>Takes screenshots, clicks and types. It can operate apps that have no API when it has to.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></div><h3>Sees and drives your screen</h3><p>Takes screenshots, clicks and types — and captures whichever machine the brain is on, your Mac or your Windows box. It operates apps that have no API when it has to.</p></div>
       <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><path d="M20 20v-4h-4"/></svg></div><h3>Thinks 24/7, upgrades itself</h3><p>Background cognition during the day; nightly self-improvement gated by tests that auto-revert on failure.</p></div>
       <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 7.5l9 4.5 9-4.5L12 3Z"/><path d="M3 12l9 4.5L21 12"/><path d="M3 16.5 12 21l9-4.5"/></svg></div><h3>Runs on any model</h3><p>Claude (subscription or API key), or any other model — local (Ollama, $0, no account) or hosted (OpenAI, Gemini, Groq, OpenRouter). Your choice at install.</p></div>
       <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5L12 3Z"/><circle cx="12" cy="10" r="1.5"/><path d="M12 11.5v2.5"/></svg></div><h3>Encrypted secrets vault</h3><p>Hand it credentials safely — encrypted at rest, never echoed into chat, logs or git.</p></div>
@@ -331,6 +332,17 @@
       </div>
       <p class="term-note">Brings everything it needs — Node, Claude Code (the engine) and dependencies are installed for you. Then pick any model in the wizard; the free/local path (Ollama) needs no Anthropic account at all. macOS, Windows and Linux.</p>
       <p class="term-note"><b>Windows tip:</b> the PowerShell line works even when scripts are "Restricted". If a bare <code>npx</code> says <em>"running scripts is disabled"</em>, use the PowerShell line above, or run <code>npx.cmd github:GOODMAN-PRO/helm</code>.</p>
+
+      <h3 class="setup-h">Setup, step by step</h3>
+      <p class="term-note">The command above handles 1–2; the wizard walks you through 3–5. Same on macOS, Windows and Linux.</p>
+      <div class="flow">
+        <div class="step"><div class="n">01</div><h3>Prerequisites</h3><p>The installer auto-installs Node 18+ and Claude Code (the engine) if they're missing. Nothing to set up by hand.</p></div>
+        <div class="step"><div class="n">02</div><h3>Fetch &amp; install</h3><p>Downloads Helm and runs <code>npm install</code> for you.</p></div>
+        <div class="step"><div class="n">03</div><h3>Make a Discord bot</h3><p><a href="https://discord.com/developers/applications">Developer Portal</a> → New Application → Bot → Reset Token. Copy the token.</p></div>
+        <div class="step"><div class="n">04</div><h3>Run the wizard</h3><p>Paste the token + your Discord user ID, then pick your gateway, your model (incl. free), and whether to run 24/7.</p></div>
+        <div class="step"><div class="n">05</div><h3>Message it</h3><p>DM your bot on Discord (or iMessage on a Mac). It acts on your machine and reports back.</p></div>
+      </div>
+
       <div class="opts">
         <div class="opt"><h3>Multiple gateways</h3><p>A guided setup screen turns on Discord, iMessage, or both — more on the way.</p></div>
         <div class="opt"><h3>Any model — including free</h3><p>Claude (subscription or API key), or pick a free local model from a list — the setup downloads it for you (via Ollama, $0, no account). Hosted models (OpenAI, Gemini, Groq, OpenRouter) work too.</p></div>

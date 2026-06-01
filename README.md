@@ -69,6 +69,27 @@ cd ~/helm && npm start
 Keep it running 24/7 — `bash ~/helm/scripts/install-service.sh` (launchd / systemd) or, on Windows,
 `powershell -File scripts\install-service.ps1` (Task Scheduler).
 
+### Setup, step by step
+
+The install command above does steps 1–2 for you, then the wizard walks you through 3–5. Same on
+macOS, Windows and Linux.
+
+1. **Get prerequisites** — the installer auto-installs Node 18+ and Claude Code (the engine) if missing.
+2. **Fetch + install** — downloads Helm and runs `npm install`.
+3. **Make a Discord bot** — open the [Developer Portal](https://discord.com/developers/applications) →
+   **New Application** → **Bot** → **Reset Token** and copy the token. Invite it to a server, or just DM it.
+4. **Run the wizard** — paste the **bot token** and your **Discord user ID** (turn on Developer Mode,
+   right-click your name → *Copy User ID*), then pick:
+   - **Gateway** — Discord (any OS) and/or iMessage (Mac).
+   - **Brain** — Claude subscription · Anthropic API key · or a **free model** (a local one that
+     auto-downloads, or a free online provider like Groq/OpenRouter — Helm wires it up for you).
+   - **Run 24/7?** — installs a background service if you say yes.
+5. **Message it** — DM your bot on Discord (or text the Mac on iMessage). It runs on your machine and
+   reports back.
+
+Reconfigure anytime with `npm run wizard`. Switch the brain between your Mac and Windows box from chat
+with `use windows` / `use mac`.
+
 Helm is a personal AI agent that lives on **your** hardware. You message it from **Discord** (or
 **iMessage** on a Mac); it runs Claude with full tools right on your machine — shell, files, web,
 screen, memory — and actually does the work, then reports back. Owner-locked and private: only you can
@@ -83,6 +104,8 @@ a **free / local model**.
   synced Markdown knowledge base that rewrites itself as you talk.
 - **Your whole fleet** — switch between Mac and Windows at will over SSH/Tailscale; move files both ways.
 - **Sees and drives your screen** — screenshots, clicks and types; operates apps that have no API.
+  Cross-platform: it captures **whichever machine the brain is running on** — the Mac, or your Windows
+  box when you've switched with `use windows`.
 - **Thinks 24/7 & upgrades itself** — background cognition; nightly self-improvement gated by tests
   that auto-revert on failure. When it gets stuck, it queues the problem to fix overnight.
 - **Encrypted secrets vault** — hand it credentials safely; never echoed into chat, logs or git.
