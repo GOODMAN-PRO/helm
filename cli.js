@@ -131,6 +131,12 @@ function tui(sock) {
   let splashing = true; // show the brand logo until the first keypress / message
   let menuIdx = 0;      // highlighted row in the slash-command menu
 
+  // Claude-Code-style working spinner: a cycling glyph + a rotating verb + elapsed seconds.
+  const SPIN = ['·', '✢', '✳', '∗', '✻', '✽'];
+  const VERBS = ['Cogitating', 'Pondering', 'Thinking', 'Noodling', 'Working', 'Brewing', 'Conjuring', 'Computing', 'Musing', 'Tinkering'];
+  let busy = false, spinFrame = 0, busyStart = 0, busyVerb = VERBS[0], spinTimer = null;
+  const PLACEHOLDER = 'Ask Helm anything…  ( / for commands )';
+
   // The command menu is open whenever the input starts with "/". Filter by what's typed so far.
   const menuOpen = () => input.startsWith('/');
   const menuMatches = () => {
@@ -163,23 +169,39 @@ function tui(sock) {
     return lines;
   }
 
-  // Brand splash: ship's-wheel mark beside the HELM wordmark, gradient-colored, centered.
+  // Splash: a Claude-Code-style rounded welcome box (logo + tips), with a live input box below.
   function splash() {
     W = process.stdout.columns || 80;
     H = process.stdout.rows || 24;
     out(`${ESC}H${ESC}J`);
-    const block = [];
-    for (let i = 0; i < WORD.length; i++) {
-      const wheel = WHEEL[i + (WHEEL.length > WORD.length ? 0 : 0)] || ' '.repeat(17);
-      block.push(`${C.cyan}${wheel}${C.x}   ${GRAD[i]}${C.b}${WORD[i]}${C.x}`);
-    }
-    block.push('');
-    block.push(`${C.gray}your own AI agent — one brain, shared with Discord & iMessage${C.x}`);
-    const blkW = Math.max(...block.map(l => stripAnsi(l).length));
-    const top = Math.max(1, Math.floor((H - block.length) / 2));
-    const left = Math.max(1, Math.floor((W - blkW) / 2) + 1);
-    block.forEach((ln, i) => { moveTo(top + i, left); out(ln); });
-    moveTo(H - 1, 1); out(`${C.dim}${' '.repeat(Math.max(0, Math.floor((W - 34) / 2)))}press any key to start chatting…${C.x}`);
+
+    // logo block (wheel + wordmark in the gradient)
+    const logo = [];
+    for (let i = 0; i < WORD.length; i++) logo.push(`${C.cyan}${WHEEL[i] || ' '.repeat(11)}${C.x}  ${GRAD[i]}${C.b}${WORD[i]}${C.x}`);
+
+    const tips = [
+      '',
+      `${C.gray}Your own AI agent — one brain, shared across${C.x}`,
+      `${C.gray}this terminal, Discord and iMessage.${C.x}`,
+      '',
+      `${C.dim}/${C.x} ${C.gray}for commands   ${C.dim}⏎${C.x} ${C.gray}to send   ${C.dim}esc${C.x} ${C.gray}to quit${C.x}`,
+    ];
+    const block = [...logo, ...tips];
+    const inW = Math.min(W - 6, Math.max(...block.map(l => stripAnsi(l).length)) + 4);
+    const top = Math.max(1, Math.floor((H - (block.length + 2)) / 2) - 1);
+    const left = Math.max(1, Math.floor((W - inW) / 2) + 1);
+
+    // rounded box
+    moveTo(top, left); out(`${C.cyan}╭${'─'.repeat(inW)}╮${C.x}`);
+    block.forEach((ln, i) => {
+      const w = stripAnsi(ln).length;
+      const lp = Math.floor((inW - w) / 2), rp = inW - w - lp;
+      moveTo(top + 1 + i, left); out(`${C.cyan}│${C.x}${' '.repeat(lp)}${ln}${' '.repeat(rp)}${C.cyan}│${C.x}`);
+    });
+    moveTo(top + 1 + block.length, left); out(`${C.cyan}╰${'─'.repeat(inW)}╯${C.x}`);
+
+    // a (non-interactive) input box at the bottom so the first frame already looks like the chat
+    drawInputBox();
   }
 
   function draw() {
@@ -230,32 +252,46 @@ function tui(sock) {
       if (!items.length) { moveTo(3 + view - 1, 2); clearLine(); out(`${C.dim}  (no matching command)${C.x}`); }
     }
 
-    // status line
+    // status line — a Claude-Code-style spinner while Helm works, else hints
     moveTo(H - INPUT_H, 2); clearLine();
-    out(menuOpen()
-      ? `${C.dim}↑/↓ choose · Tab/Enter complete · Esc cancel${C.x}`
-      : (status ? `${C.gray}${status}${C.x}` : `${C.dim}/ commands · PgUp/PgDn scroll · Enter send · /exit quit${C.x}`));
+    out(statusLineText());
 
-    // input box (bordered)
+    // rounded input box (Claude-Code look)
+    drawInputBox();
+  }
+
+  // The text shown on the status line above the input.
+  function statusLineText() {
+    if (menuOpen()) return `${C.dim}↑/↓ choose · Tab/Enter complete · Esc cancel${C.x}`;
+    if (busy) {
+      const g = SPIN[spinFrame % SPIN.length];
+      const secs = Math.round((Date.now() - busyStart) / 1000);
+      const detail = status ? ` ${C.dim}· ${status.replace(/^⚙️\s*/, '')}${C.x}` : '';
+      return `${C.cyan}${g}${C.x} ${C.b}${busyVerb}…${C.x} ${C.gray}${secs}s${C.x}${detail} ${C.dim}· esc to interrupt${C.x}`;
+    }
+    return status ? `${C.gray}${status}${C.x}` : `${C.dim}/ for commands · ⏎ send · PgUp/PgDn scroll · esc to quit${C.x}`;
+  }
+
+  // Render the rounded, full-width input box with a ghost placeholder when empty.
+  function drawInputBox() {
     const iw = W - 2;
-    moveTo(H - 2, 1); out(`${C.dim}┌${'─'.repeat(iw - 2)}┐${C.x}`);
-    moveTo(H - 1, 1);
-    const shown = input.length > iw - 5 ? '…' + input.slice(input.length - (iw - 6)) : input;
-    out(`${C.dim}│${C.x} ${C.cyan}›${C.x} ${shown}${ESC}K${' '.repeat(0)}`);
-    moveTo(H, 1); out(`${C.dim}└${'─'.repeat(iw - 2)}┘${C.x}`);
-    // park cursor after the input text (visible while typing)
-    moveTo(H - 1, 5 + stripAnsi(shown).length);
+    moveTo(H - 2, 1); out(`${C.dim}╭${'─'.repeat(iw - 2)}╮${C.x}`);
+    moveTo(H - 1, 1); clearLine();
+    const inner = iw - 5;
+    const shown = input.length > inner ? '…' + input.slice(input.length - (inner - 1)) : input;
+    const body = input ? shown : `${C.dim}${PLACEHOLDER.slice(0, inner)}${C.x}`;
+    out(`${C.dim}│${C.x} ${C.cyan}❯${C.x} ${body}${ESC}K ${C.dim}│${C.x}`);
+    moveTo(H, 1); out(`${C.dim}╰${'─'.repeat(iw - 2)}╯${C.x}`);
+    // cursor sits right after the typed text (at the prompt if empty)
+    moveTo(H - 1, 5 + (input ? stripAnsi(shown).length : 0));
   }
 
   // Lightweight redraw of JUST the input line (no full-screen clear) — used while typing so the
-  // screen doesn't flicker on every keystroke.
+  // screen doesn't flicker on every keystroke. Also repaints the status line (spinner stays live).
   function drawInput() {
     if (splashing) return draw();
-    const iw = W - 2;
-    const shown = input.length > iw - 5 ? '…' + input.slice(input.length - (iw - 6)) : input;
-    moveTo(H - 1, 1); clearLine();
-    out(`${C.dim}│${C.x} ${C.cyan}›${C.x} ${shown}`);
-    moveTo(H - 1, 5 + stripAnsi(shown).length);
+    moveTo(H - INPUT_H, 2); clearLine(); out(statusLineText());
+    drawInputBox();
   }
 
   function add(role, text, label) { splashing = false; history.push({ role, text, label }); scroll = 0; draw(); }
@@ -267,7 +303,7 @@ function tui(sock) {
     while ((nl = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
       let m; try { m = JSON.parse(line); } catch { continue; }
-      if (m.type === 'reply') { status = ''; add('helm', m.text); }
+      if (m.type === 'reply') { stopSpin(); status = ''; add('helm', m.text); }
       else if (m.type === 'echo') {
         // don't double-show our own terminal lines (we already added them on send)
         if (/terminal/i.test(m.from || '')) continue;
@@ -285,7 +321,16 @@ function tui(sock) {
   if (stdin.isTTY) stdin.setRawMode(true);
   enterAlt(); draw();
 
-  const quit = () => { try { if (stdin.isTTY) stdin.setRawMode(false); } catch {} leaveAlt(); try { sock.end(); } catch {} process.exit(0); };
+  const quit = () => { stopSpin(); try { if (stdin.isTTY) stdin.setRawMode(false); } catch {} leaveAlt(); try { sock.end(); } catch {} process.exit(0); };
+
+  // Spinner: animate the status line ~8x/sec while Helm is working; pick a fresh verb each time.
+  function startSpin() {
+    busy = true; busyStart = Date.now(); spinFrame = 0;
+    busyVerb = VERBS[Math.floor((busyStart / 1000) % VERBS.length)];
+    if (spinTimer) clearInterval(spinTimer);
+    spinTimer = setInterval(() => { spinFrame++; if (!splashing) { moveTo(H - INPUT_H, 2); clearLine(); out(statusLineText()); drawInputBox(); } }, 120);
+  }
+  function stopSpin() { busy = false; if (spinTimer) { clearInterval(spinTimer); spinTimer = null; } }
 
   function submit() {
     const text = input.trim(); input = '';
@@ -300,7 +345,9 @@ function tui(sock) {
     }
     if (!connected) { add('sys', 'not connected — start Helm with `helm start`.'); return; }
     add('you', text);
-    try { sock.write(JSON.stringify({ type: 'msg', text }) + '\n'); } catch { add('sys', 'send failed.'); }
+    // 'stop' cancels; for anything else, show the working spinner until the reply lands.
+    if (!/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) startSpin();
+    try { sock.write(JSON.stringify({ type: 'msg', text }) + '\n'); } catch { stopSpin(); add('sys', 'send failed.'); }
   }
 
   // Complete the highlighted menu command into the input, ready to run (or run instantly if it takes
@@ -323,6 +370,7 @@ function tui(sock) {
     if (name === 'escape') {
       if (splashing) { splashing = false; return draw(); }
       if (menuOpen()) { input = ''; menuIdx = 0; return draw(); }   // close the menu, don't quit
+      if (busy) { stopSpin(); try { sock.write(JSON.stringify({ type: 'msg', text: 'stop' }) + '\n'); } catch {} status = ''; return draw(); }   // esc interrupts the running task
       return quit();
     }
     // first keypress on the splash dismisses it into the chat (without also typing that char)
