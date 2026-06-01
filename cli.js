@@ -158,7 +158,7 @@ function tui(sock) {
     return COMMANDS.filter(c => c.cmd.replace(/^\//, '').toLowerCase().startsWith(q));
   };
 
-  const enterAlt = () => out(`${ESC}?1049h${ESC}?25l${ESC}?2004h`);   // alt screen, hide cursor, bracketed paste on
+  const enterAlt = () => out(`${ESC}?1049h${ESC}?2004h`);   // alt screen + bracketed paste (cursor stays visible)
   const leaveAlt = () => out(`${ESC}?2004l${ESC}?25h${ESC}?1049l`);   // bracketed paste off, show cursor, restore
   const moveTo = (r, c) => out(`${ESC}${r};${c}H`);
   const clearLine = () => out(`${ESC}2K`);
@@ -187,7 +187,7 @@ function tui(sock) {
   function splash() {
     W = process.stdout.columns || 80;
     H = process.stdout.rows || 24;
-    out(`${ESC}H${ESC}J`);
+    out(`${ESC}?25l${ESC}H${ESC}J`);   // hide cursor while painting (avoids streak); shown again by drawInputBox
 
     // logo block (wheel + wordmark in the gradient)
     const logo = [];
@@ -223,9 +223,9 @@ function tui(sock) {
     const prevW = W, prevH = H;
     W = process.stdout.columns || 80;
     H = process.stdout.rows || 24;
-    // Only hard-clear the whole screen when the terminal was resized; otherwise just home the cursor
-    // and let each row clear itself as it's rewritten — avoids the full-screen blank flash (flicker).
-    out(prevW !== W || prevH !== H ? `${ESC}H${ESC}J` : `${ESC}H`);
+    // Hide the cursor while painting so it doesn't streak across the screen; drawInputBox re-shows it
+    // parked at the input. Only hard-clear on resize; otherwise home the cursor (no full blank flash).
+    out(`${ESC}?25l` + (prevW !== W || prevH !== H ? `${ESC}H${ESC}J` : `${ESC}H`));
 
     // header
     const dot = connected ? `${C.grn}●${C.x}` : `${C.red}●${C.x}`;
@@ -310,8 +310,9 @@ function tui(sock) {
     }
     out(`${C.dim}│${C.x} ${C.cyan}>${C.x} ${display}${ESC}K`);
     moveTo(H, 1); out(`${C.dim}╰${'─'.repeat(iw - 2)}╯${C.x}`);
-    // cursor sits right after the rendered text (at the prompt position if empty)
+    // park the cursor right after the rendered text and SHOW it so you can see where you're typing
     moveTo(H - 1, PROMPT_COL + cursorLen);
+    out(`${ESC}?25h`);
   }
 
   // Lightweight redraw of JUST the input line (no full-screen clear) — used while typing so the
