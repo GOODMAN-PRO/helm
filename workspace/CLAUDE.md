@@ -403,8 +403,10 @@ executing the returned step's `tool_or_cmd`.
 
 ## Reverse-engineering tool
 
-`workspace/tools/impl/reverse.mjs` — analyze a target and write a structured report to
-`workspace/reverse/<slug>-report.md`. Reports include an ethics disclaimer (authorized targets only).
+`workspace/tools/impl/reverse.mjs` — analyze a target and ALWAYS write BOTH a **PDF** and a Markdown
+report to `workspace/reverse/<slug>-report.pdf` (+ `.md`). Cross-platform (macOS / Windows / Linux) —
+uses Node's built-in `fetch` and pure-JS binary inspection, not `/usr/bin/*` tools. Reports include an
+ethics disclaimer (authorized targets only). Show the PDF by ending the reply with `ATTACH: <pdf path>`.
 
 **Three subcommands:**
 
@@ -422,17 +424,15 @@ node workspace/tools/tools.mjs call reverse.file --json '{"path":"/path/to/binar
 ```
 
 **What each subcommand does:**
-- `web` — curl-fetches the page; detects tech stack (React/Vue/Next/etc.), response headers,
-  script sources, and API-like endpoints via static regex. If Playwright is installed it also
-  intercepts live XHR/fetch network calls. Outputs a clone scaffold outline and an OpenAPI 3.0
-  stub for any discovered endpoints.
-- `app` — reads a macOS `.app` bundle (Info.plist, `otool -L`, framework detection, interesting
-  URL/API strings, entitlements) or a plain binary. Uses only pre-installed macOS tools.
-- `file` — identifies format from magic bytes (4-byte signature + lookup table), runs `file`,
-  hexdumps the first 256 bytes, and extracts printable strings.
+- `web` — fetches the page (Node `fetch`); detects tech stack (React/Vue/Next/etc.), response headers,
+  script sources, and API-like endpoints via static regex; launches the bundled headless Chromium to
+  intercept live XHR/fetch network calls. Outputs a clone scaffold outline and an OpenAPI 3.0 stub.
+- `app` — on macOS reads a `.app` bundle (Info.plist, `otool -L`, frameworks, entitlements); on
+  Windows/Linux does generic binary analysis of an `.exe`/`.dll`/ELF (format ID, framework/runtime
+  inference from strings, URL/API hints).
+- `file` — identifies format from magic bytes (4-byte signature + lookup), hexdumps the first 256
+  bytes, and extracts printable strings — all in pure JS (uses external `file` only if it's on PATH).
 
-**Output:** JSON to stdout `{ ok: true, report: "<absolute-path>", slug: "<slug>" }`.
-Report file is Markdown at `workspace/reverse/<slug>-report.md`.
-
-**Heavy tools are lazy:** Playwright is only imported/checked if `playwright` is already installed.
-The module is safe to `import` without any network requests or binary launches.
+**Output:** JSON to stdout `{ ok: true, pdf: "<pdf-path>", report: "<md-path>", pdf_error: null, slug }`.
+A PDF is always produced (rendered from the report via Playwright). If PDF rendering fails, `pdf` is
+null and `pdf_error` explains why, but the `.md` is still written.

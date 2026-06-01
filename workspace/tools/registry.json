@@ -752,7 +752,7 @@
   },
   {
     "name": "reverse.web",
-    "summary": "Reverse-engineer a web URL: detect stack, extract API endpoints + XHR calls, produce a clone scaffold + OpenAPI stub. Report written to workspace/reverse/<slug>-report.md.",
+    "summary": "Reverse-engineer a web URL (cross-platform): detect stack, capture live XHR/fetch via headless Chromium, extract API endpoints, produce a clone scaffold + OpenAPI stub. ALWAYS writes a PDF (and a .md) to workspace/reverse/<slug>-report.pdf.",
     "exec": "node tools/impl/reverse.mjs web",
     "args_schema": {
       "url": {
@@ -767,20 +767,20 @@
     },
     "requires": [
       "outbound HTTPS",
-      "Playwright Chromium (optional — auto-skipped if not installed; enables live XHR capture)"
+      "Playwright Chromium — auto-installed on first use (used for live network capture + PDF rendering)"
     ],
-    "side_effects": "writes workspace/reverse/<slug>-report.md; outbound HTTP request to target",
+    "side_effects": "writes workspace/reverse/<slug>-report.pdf and .md; outbound HTTP request to target. To show it, end the reply with `ATTACH: <pdf path>`",
     "confirm": false
   },
   {
     "name": "reverse.app",
-    "summary": "Reverse-engineer a macOS .app bundle or binary: Info.plist, otool -L, framework detection, interesting strings, entitlements. Report written to workspace/reverse/<slug>-report.md.",
+    "summary": "Reverse-engineer an app/binary (cross-platform). macOS .app: Info.plist, otool -L, frameworks, entitlements. Windows/Linux .exe/.dll/ELF: format ID, framework/runtime inference, URL/API strings. ALWAYS writes a PDF (and .md) to workspace/reverse/<slug>-report.pdf.",
     "exec": "node tools/impl/reverse.mjs app",
     "args_schema": {
       "path": {
         "type": "string",
         "required": true,
-        "description": "Absolute path to a .app bundle or binary (must be a target you own or are authorized to inspect)"
+        "description": "Absolute path to a .app bundle, .exe/.dll, or binary (must be a target you own or are authorized to inspect)"
       },
       "name": {
         "type": "string",
@@ -788,14 +788,15 @@
       }
     },
     "requires": [
-      "macOS tools: file, otool, strings, codesign, plutil (all pre-installed on macOS)"
+      "Playwright Chromium — auto-installed on first use (for PDF rendering)",
+      "macOS-only deep inspection (otool/plutil/codesign) needs macOS; off-macOS falls back to generic binary analysis"
     ],
-    "side_effects": "writes workspace/reverse/<slug>-report.md",
+    "side_effects": "writes workspace/reverse/<slug>-report.pdf and .md",
     "confirm": false
   },
   {
     "name": "reverse.file",
-    "summary": "Reverse-engineer any file: identify format from magic bytes + file command, hexdump first 256 bytes, extract printable strings. Report written to workspace/reverse/<slug>-report.md.",
+    "summary": "Reverse-engineer any file (cross-platform, pure-JS): identify format from magic bytes, hexdump first 256 bytes, extract printable strings. ALWAYS writes a PDF (and .md) to workspace/reverse/<slug>-report.pdf.",
     "exec": "node tools/impl/reverse.mjs file",
     "args_schema": {
       "path": {
@@ -809,9 +810,9 @@
       }
     },
     "requires": [
-      "macOS tools: file, xxd, strings (all pre-installed on macOS)"
+      "Playwright Chromium — auto-installed on first use (for PDF rendering)"
     ],
-    "side_effects": "writes workspace/reverse/<slug>-report.md",
+    "side_effects": "writes workspace/reverse/<slug>-report.pdf and .md",
     "confirm": false
   },
   {
