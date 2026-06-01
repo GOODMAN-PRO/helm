@@ -29,20 +29,39 @@ export function safeRoots(workspace) {
 }
 
 // PowerShell script (run via -EncodedCommand so paths/quotes never need escaping) that grabs the
-// full virtual screen — all monitors — and saves it as PNG.
-function windowsPsScript(outPath) {
+// full virtual screen — all monitors — and saves it as PNG. When hideTerminals is true (default), it
+// first minimizes terminal/console windows (so Helm's own terminal doesn't block the shot), captures,
+// then restores them — non-destructive to the owner's session.
+function windowsPsScript(outPath, hideTerminals = true) {
   const safePath = outPath.replace(/'/g, "''");   // single-quote escape for PowerShell literal
-  return [
+  const head = [
     "$ErrorActionPreference='Stop'",
     'Add-Type -AssemblyName System.Windows.Forms',
     'Add-Type -AssemblyName System.Drawing',
+    'Add-Type @"',
+    'using System;using System.Runtime.InteropServices;',
+    'public class WHelm{ [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h,int n); [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h); }',
+    '"@',
+  ];
+  const hideStart = hideTerminals ? [
+    // Minimize visible terminal/console windows so they don\'t block the screenshot.
+    "$names=@('WindowsTerminal','OpenConsole','cmd','conhost','powershell','pwsh')",
+    '$minimized=@()',
+    'foreach($p in Get-Process -Name $names -ErrorAction SilentlyContinue){ $h=$p.MainWindowHandle; if($h -ne [IntPtr]::Zero -and [WHelm]::IsWindowVisible($h)){ [WHelm]::ShowWindowAsync($h,6) | Out-Null; $minimized+=$h } }',
+    'if($minimized.Count -gt 0){ Start-Sleep -Milliseconds 350 }',
+  ] : [];
+  const capture = [
     '$vs=[System.Windows.Forms.SystemInformation]::VirtualScreen',
     '$bmp=New-Object System.Drawing.Bitmap($vs.Width,$vs.Height)',
     '$g=[System.Drawing.Graphics]::FromImage($bmp)',
     '$g.CopyFromScreen($vs.Left,$vs.Top,0,0,$bmp.Size)',
     `$bmp.Save('${safePath}',[System.Drawing.Imaging.ImageFormat]::Png)`,
     '$g.Dispose();$bmp.Dispose()',
-  ].join('\n');
+  ];
+  const restore = hideTerminals ? [
+    'foreach($h in $minimized){ [WHelm]::ShowWindowAsync($h,9) | Out-Null }',   // 9 = SW_RESTORE
+  ] : [];
+  return [...head, ...hideStart, ...capture, ...restore].join('\n');
 }
 
 // Direct Windows capture (System.Drawing). Works in an interactive desktop session.
