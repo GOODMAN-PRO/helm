@@ -82,6 +82,8 @@ Set-Location $Dir
 
 # 3) dependencies
 Write-Host "Installing dependencies (npm install)..."
+# Skip Playwright's heavy browser download (~hundreds of MB) - installed lazily on first use.
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
 npm.cmd install --no-audit --no-fund | Out-Null
 if ($LASTEXITCODE -ne 0) { Write-Host "xx  npm install failed - run 'npm install' in $Dir to see why." -ForegroundColor Red; exit 1 }
 Write-Host "ok  dependencies installed" -ForegroundColor Green

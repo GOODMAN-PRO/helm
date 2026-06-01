@@ -80,7 +80,9 @@ if (path.resolve(PKG_ROOT) === path.resolve(TARGET)) {
 say('Installing dependencies (npm install)...');
 // run via the shell as a single string: required on Windows (Node won't spawn npm.cmd directly),
 // and avoids the DEP0190 warning that args-array + shell:true triggers. Args are static/safe.
-if (spawnSync('npm install --no-audit --no-fund', { cwd: TARGET, stdio: 'inherit', shell: true }).status !== 0)
+// PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: skip the ~hundreds-of-MB browser download — Playwright is used
+// lazily by the reverse tool and installs browsers on first use. Big speedup.
+if (spawnSync('npm install --no-audit --no-fund', { cwd: TARGET, stdio: 'inherit', shell: true, env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' } }).status !== 0)
   die(`npm install failed — run 'npm install' in ${TARGET}.`);
 ok('dependencies installed');
 

@@ -110,6 +110,9 @@ cd "$TARGET"
 
 # 3) dependencies -----------------------------------------------------------
 say "Installing dependencies (npm install)..."
+# Skip Playwright's heavy browser download (~hundreds of MB) — it's used lazily by the reverse tool
+# and installs browsers on first use. Massively speeds up install.
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 npm install --no-audit --no-fund >/dev/null 2>&1 && ok "dependencies installed" || die "npm install failed — run 'npm install' in $TARGET to see why."
 
 # 4) sanity check -----------------------------------------------------------
