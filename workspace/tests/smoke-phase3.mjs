@@ -4,7 +4,7 @@
 // Exits 0 if all pass, 1 if any fail.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,11 +56,14 @@ run('screen: launchd plist exists', () => {
   if (!existsSync(p)) throw new Error('com.helm.screen.plist not found');
 });
 
-run('screen: launchd plist NOT loaded', () => {
-  const r = spawnSync('launchctl', ['list', 'com.helm.screen'], { encoding: 'utf8' });
-  // launchctl list returns non-zero / error message when label is not loaded
-  if (r.status === 0 && !r.stderr.includes('Could not find')) {
-    throw new Error('com.helm.screen plist is loaded — it should be off by default');
+run('screen: sense is off by default (installer never auto-enables it)', () => {
+  // "Off by default" is a property of the INSTALL PATH, not live state — the owner may opt in and
+  // run it (then it's loaded), which must NOT fail this test. So verify the default installer/wizard
+  // doesn't auto-register the screen sense; it stays opt-in.
+  for (const f of ['scripts/install-service.sh', 'scripts/install-service.ps1', 'scripts/wizard.mjs', 'index.js']) {
+    const p = path.join(ROOT, f); if (!existsSync(p)) continue;
+    if (/com\.helm\.screen|senses[\/\\]screen[\/\\]watcher|HelmScreen/.test(readFileSync(p, 'utf8')))
+      throw new Error(`${f} auto-enables the screen sense — it must stay opt-in (off by default)`);
   }
 });
 
@@ -100,10 +103,11 @@ run('notify: launchd plist exists', () => {
   if (!existsSync(p)) throw new Error('com.helm.notify.plist not found');
 });
 
-run('notify: launchd plist NOT loaded', () => {
-  const r = spawnSync('launchctl', ['list', 'com.helm.notify'], { encoding: 'utf8' });
-  if (r.status === 0 && !r.stderr.includes('Could not find')) {
-    throw new Error('com.helm.notify plist is loaded — it should be off by default');
+run('notify: sense is off by default (installer never auto-enables it)', () => {
+  for (const f of ['scripts/install-service.sh', 'scripts/install-service.ps1', 'scripts/wizard.mjs', 'index.js']) {
+    const p = path.join(ROOT, f); if (!existsSync(p)) continue;
+    if (/com\.helm\.notify|senses[\/\\]notify[\/\\]poller|HelmNotify/.test(readFileSync(p, 'utf8')))
+      throw new Error(`${f} auto-enables the notify sense — it must stay opt-in (off by default)`);
   }
 });
 
