@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node index.js",
     "imessage": "node imessage.js",
+    "cli": "node cli.js",
     "setup": "node bin/helm-install.mjs",
     "wizard": "node scripts/wizard.mjs"
   },
