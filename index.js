@@ -788,9 +788,11 @@ client.login(DISCORD_TOKEN).catch(async e => {
   } else {
     console.error('✋ Could not connect to Discord (network/proxy/firewall?). If git also failed earlier, your network is blocking it. Error: ' + m.slice(0, 200));
   }
-  // Tear down the client's sockets/timers BEFORE exiting. Calling process.exit() while discord.js
-  // handles are mid-close trips a libuv assertion on Windows (UV_HANDLE_CLOSING in async.c).
+  // Tear down the client's sockets/timers, then let the process exit NATURALLY (set exitCode, don't
+  // call process.exit()). Forcing process.exit() while discord.js handles are mid-close trips a libuv
+  // assertion on Windows (UV_HANDLE_CLOSING in async.c). A watchdog force-exits only if something
+  // keeps the loop alive (unref'd so it never blocks a clean exit).
   try { await client.destroy(); } catch {}
   process.exitCode = 1;
-  setTimeout(() => process.exit(1), 50).unref();
+  setTimeout(() => process.exit(1), 3000).unref();
 });
