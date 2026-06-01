@@ -445,6 +445,9 @@ client.once(Events.ClientReady, c => {
   console.log(`✅ Helm online as ${c.user.tag}  ·  model=${pref || 'auto-route'}  ·  owner=${OWNER_ID}`);
   const cb = resolveClaude();
   console.log(`   engine: ${cb.cmd}${cb.shell ? ' (via shell)' : ''}`);
+  // Liveness marker the nightly self-upgrade health-check reads (cross-platform — doesn't depend on
+  // launchd redirecting stdout to agent.log, so it works when Helm runs locally on Windows too).
+  try { writeFileSync(path.join(WORKSPACE, '.online'), new Date().toISOString()); } catch {}
   // Probe MCP servers only AFTER we're connected — running it before login meant a failed login
   // (bad token) raced spawning/killing probe children, which trips a libuv assertion on Windows.
   runHealthChecks().catch(() => {});

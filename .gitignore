@@ -102,3 +102,6 @@ workspace/.playwright-mcp/
 
 # runtime error logs
 *.err
+
+# liveness marker (written on Discord connect; read by the nightly upgrade health-check)
+workspace/.online

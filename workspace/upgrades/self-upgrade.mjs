@@ -10,7 +10,7 @@
 //   HELM_UPGRADE_SKIP_SMOKE=1 skip the smoke gate (plumbing test only)
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, writeFileSync, appendFileSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, writeFileSync, appendFileSync, readFileSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
@@ -35,25 +35,32 @@ const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding:
 const git = (...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', ...a]);
 const notify = msg => { try { sh(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
 
-function restartAndHealth() {
+// Cross-platform sync sleep (no `sleep` binary on Windows).
+function sleepMs(ms) { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} }
+
+// Restart the Discord bot on whatever OS this is (launchd / Task Scheduler / systemd).
+function restartBot() {
   const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
-  // Track how much of the log pre-dates this restart so stale "Helm online" text
-  // from a previous boot isn't accepted as a successful health check.
-  let prevLen = 0;
-  try {
-    writeFileSync(AGENT_LOG, '');
-  } catch {
-    try { prevLen = readFileSync(AGENT_LOG, 'utf8').length; } catch {}
+  if (process.platform === 'win32') {
+    sh('schtasks', ['/End', '/TN', 'HelmDiscord'], { timeout: 15_000 });
+    sh('schtasks', ['/Run', '/TN', 'HelmDiscord'], { timeout: 15_000 });
+  } else if (process.platform === 'darwin') {
+    sh('launchctl', ['kickstart', '-k', `gui/${uid}/com.helm.discord`], { timeout: 15_000 });
+  } else {
+    sh('systemctl', ['--user', 'restart', 'helm-discord'], { timeout: 15_000 });
   }
-  // Cap the launchctl call so a hung daemon doesn't stall the upgrade forever.
-  sh('launchctl', ['kickstart', '-k', `gui/${uid}/com.helm.discord`], { timeout: 15_000 });
+}
+
+function restartAndHealth() {
+  // The bot writes workspace/.online (an ISO timestamp) when it connects to Discord. Restart, then
+  // wait for that marker to be refreshed — cross-platform, no dependence on stdout→agent.log.
+  const ONLINE = path.join(ROOT, 'workspace', '.online');
+  const t0 = Date.now();
+  restartBot();
   const start = Date.now();
-  while (Date.now() - start < 30_000) {
-    try {
-      const content = readFileSync(AGENT_LOG, 'utf8');
-      if (content.slice(prevLen).includes('Helm online')) return true;
-    } catch {}
-    sh('sleep', ['2']);
+  while (Date.now() - start < 45_000) {
+    try { if (statSync(ONLINE).mtimeMs >= t0) return true; } catch {}
+    sleepMs(2000);
   }
   return false;
 }
