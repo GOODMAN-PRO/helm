@@ -90,7 +90,12 @@ ok('index.js syntax valid');
 
 // 5) configure
 const envPath = path.join(TARGET, '.env');
-const claudePath = (spawnSync(process.platform === 'win32' ? 'where' : 'which', ['claude'], { encoding: 'utf8' }).stdout || 'claude').trim().split(/\r?\n/)[0];
+// Resolve a runnable claude path. On Windows `where` lists the extension-less npm shim first, which
+// Node can't spawn (`spawn ...\npm\claude ENOENT`) — prefer a .exe/.cmd/.bat so CLAUDE_BIN is runnable.
+const claudeHits = (spawnSync(process.platform === 'win32' ? 'where' : 'which', ['claude'], { encoding: 'utf8' }).stdout || '').trim().split(/\r?\n/).filter(Boolean);
+const claudePath = (process.platform === 'win32'
+  ? (claudeHits.find(p => /\.(exe|cmd|bat)$/i.test(p)) || claudeHits[0])
+  : claudeHits[0]) || 'claude';
 if (existsSync(envPath)) {
   say(`  ${c.y}!!${c.x}  .env already exists — leaving it. Start with: npm start`);
 } else if (NONINTERACTIVE || !process.stdin.isTTY) {

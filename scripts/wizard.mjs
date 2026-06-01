@@ -149,8 +149,13 @@ const confirm = async (label, def = true) => (await select(label, [{ label: 'Yes
 
 const IS_WIN = process.platform === 'win32';
 function which(bin) {
-  try { return execSync(`${IS_WIN ? 'where' : 'command -v'} ${bin}`, { encoding: 'utf8' }).trim().split(/\r?\n/)[0]; }
-  catch { return bin; }
+  try {
+    const hits = execSync(`${IS_WIN ? 'where' : 'command -v'} ${bin}`, { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
+    // On Windows `where` lists the extension-less npm shim first — Node can't spawn that
+    // (causes `spawn ...\npm\claude ENOENT`). Prefer a runnable .exe/.cmd/.bat.
+    if (IS_WIN) return hits.find(p => /\.(exe|cmd|bat)$/i.test(p)) || hits[0] || bin;
+    return hits[0] || bin;
+  } catch { return bin; }
 }
 const sleep = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} };
 
