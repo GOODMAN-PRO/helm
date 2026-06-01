@@ -9,21 +9,26 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));   // workspace/upgrades
-const QUEUE = path.join(DIR, 'stuck-queue.jsonl');
-const ARCHIVE = path.join(DIR, 'stuck-archive.jsonl');
+// Paths are resolved per-call so tests can redirect via env without re-importing.
+function queuePath()   { return process.env.HELM_STUCK_QUEUE   || path.join(DIR, 'stuck-queue.jsonl'); }
+function archivePath() { return process.env.HELM_STUCK_ARCHIVE || path.join(DIR, 'stuck-archive.jsonl'); }
 const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160);
 
 export function readAll() {
-  if (!existsSync(QUEUE)) return [];
-  return readFileSync(QUEUE, 'utf8').split('\n').filter(Boolean)
+  const q = queuePath();
+  if (!existsSync(q)) return [];
+  return readFileSync(q, 'utf8').split('\n').filter(Boolean)
     .map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 }
-function writeAll(items) { writeFileSync(QUEUE, items.map(i => JSON.stringify(i)).join('\n') + (items.length ? '\n' : '')); }
+function writeAll(items) { writeFileSync(queuePath(), items.map(i => JSON.stringify(i)).join('\n') + (items.length ? '\n' : '')); }
 
 // Record a stuck event. Returns the (new or bumped) entry.
+// Summaries starting with `__smoke` (or `__test`) are dropped without persistence — they are
+// test-only markers and historically polluted stuck-archive.jsonl on every nightly run.
 export function recordStuck(summary, detail = '', source = 'auto') {
   summary = (summary || '').toString().trim().slice(0, 300);
   if (!summary) return null;
+  if (/^__(smoke|test)/i.test(summary)) return null;
   const items = readAll();
   const key = norm(summary);
   const now = new Date().toISOString();
@@ -90,7 +95,7 @@ export function archiveAll() {
   const items = readAll(); if (!items.length) return 0;
   const stamp = new Date().toISOString();
   for (const i of items) { i.status = 'archived'; i.archivedAt = stamp; }
-  try { appendFileSync(ARCHIVE, items.map(i => JSON.stringify(i)).join('\n') + '\n'); } catch {}
+  try { appendFileSync(archivePath(), items.map(i => JSON.stringify(i)).join('\n') + '\n'); } catch {}
   writeAll([]); return items.length;
 }
 

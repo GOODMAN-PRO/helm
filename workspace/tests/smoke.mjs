@@ -5,7 +5,8 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, unlinkSync } from 'node:fs';
+import os from 'node:os';
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE  = path.resolve(__dirname, '..');
@@ -1792,27 +1793,34 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- stuck queue: record dedups + renders + archives (isolated temp queue) ----
+// ---- stuck queue: record dedups + renders + archives (isolated via env paths) ----
 {
   const label = 'stuck.mjs: record/dedup/render/archive + self-upgrade integration';
+  // Redirect queue + archive to tmp files so the test never touches real upgrades/ files.
+  const tmpQ = path.join(os.tmpdir(), `helm-smoke-stuck-q-${process.pid}.jsonl`);
+  const tmpA = path.join(os.tmpdir(), `helm-smoke-stuck-a-${process.pid}.jsonl`);
+  const prevQ = process.env.HELM_STUCK_QUEUE, prevA = process.env.HELM_STUCK_ARCHIVE;
+  process.env.HELM_STUCK_QUEUE = tmpQ;
+  process.env.HELM_STUCK_ARCHIVE = tmpA;
   try {
     const stuckPath = path.join(WORKSPACE, 'upgrades/stuck.mjs');
     if (!existsSync(stuckPath)) throw new Error('workspace/upgrades/stuck.mjs not found');
     if (spawnSync('node', ['--check', stuckPath], { encoding: 'utf8', timeout: 10_000 }).status !== 0)
       throw new Error('stuck.mjs syntax check failed');
     const { recordStuck, listStuck, renderStuckForPrompt, archiveAll, readAll } = await imp(stuckPath);
-    // record two identical-ish summaries -> dedup to one with count 2
+    // record two identical-ish summaries -> dedup to one with count 2 (non-__smoke key so it persists)
+    const PROBE = 'helm dedupe probe entry';
     const before = readAll().length;
-    recordStuck('__smoke_stuck test thing', 'detail a', 'test');
-    recordStuck('__smoke_stuck test thing!', 'detail b', 'test');   // normalizes to same key
-    const mine = listStuck().filter(i => i.summary.startsWith('__smoke_stuck'));
+    recordStuck(PROBE, 'detail a', 'test');
+    recordStuck(PROBE + '!', 'detail b', 'test');   // normalizes to same key
+    const mine = listStuck().filter(i => i.summary.startsWith(PROBE));
     if (mine.length !== 1) throw new Error(`expected 1 deduped entry, got ${mine.length}`);
     if (mine[0].count < 2) throw new Error(`expected count>=2, got ${mine[0].count}`);
     const rendered = renderStuckForPrompt();
-    if (!rendered.includes('__smoke_stuck')) throw new Error('renderStuckForPrompt did not include the entry');
+    if (!rendered.includes(PROBE)) throw new Error('renderStuckForPrompt did not include the entry');
     // archive clears the live queue
     archiveAll();
-    if (listStuck().some(i => i.summary.startsWith('__smoke_stuck'))) throw new Error('archiveAll did not clear the queue');
+    if (listStuck().some(i => i.summary.startsWith(PROBE))) throw new Error('archiveAll did not clear the queue');
     if (readAll().length > before) throw new Error('archiveAll left residue in the live queue');
     // self-upgrade must import + use the stuck queue
     const su = readFileSync(path.join(WORKSPACE, 'upgrades/self-upgrade.mjs'), 'utf8');
@@ -1824,6 +1832,12 @@ function fail(label, reason) {
     if (!idx.includes('[STUCK:') || !idx.includes('[USE:')) throw new Error('index.js missing STUCK/USE directive handling');
     ok(label);
   } catch (e) { fail(label, e.message); }
+  finally {
+    if (prevQ === undefined) delete process.env.HELM_STUCK_QUEUE; else process.env.HELM_STUCK_QUEUE = prevQ;
+    if (prevA === undefined) delete process.env.HELM_STUCK_ARCHIVE; else process.env.HELM_STUCK_ARCHIVE = prevA;
+    try { if (existsSync(tmpQ)) unlinkSync(tmpQ); } catch {}
+    try { if (existsSync(tmpA)) unlinkSync(tmpA); } catch {}
+  }
 }
 
 // ---- templates: export -> import round-trip is lossless + secret-free ----
@@ -1989,6 +2003,38 @@ function fail(label, reason) {
     const r = spawnSync('node', [cap, '--out', '/etc/helm-pwn.png'], { encoding: 'utf8', timeout: 10_000 });
     if (r.status === 0) throw new Error('screencap exited 0 for /etc/ path');
     if (!/safe roots/i.test(r.stderr || '')) throw new Error(`unexpected stderr: ${r.stderr}`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- persona: explicit non-interactive screenshot guarantee in both bots ----
+{
+  const label = 'persona: both bots forbid the "non-interactive session" screenshot excuse';
+  try {
+    const idx = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    const ims = readFileSync(path.join(ROOT, 'imessage.js'), 'utf8');
+    for (const [name, src] of [['index.js', idx], ['imessage.js', ims]]) {
+      if (!/SCREENSHOTS ALWAYS WORK/.test(src))
+        throw new Error(`${name} missing SCREENSHOTS ALWAYS WORK guarantee`);
+      if (!/non-interactive session/.test(src))
+        throw new Error(`${name} missing explicit non-interactive-session refusal ban`);
+      if (!/screencap\.mjs/.test(src))
+        throw new Error(`${name} persona does not point at screencap.mjs`);
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- stuck.mjs: __smoke prefix is never persisted to queue or archive ----
+{
+  const label = 'stuck.mjs: __smoke_ summaries are dropped (no queue / archive pollution)';
+  try {
+    const stuckPath = path.join(WORKSPACE, 'upgrades/stuck.mjs');
+    const { recordStuck, readAll } = await imp(stuckPath);
+    const before = readAll().length;
+    const entry = recordStuck('__smoke_drop_me', 'should never persist', 'test');
+    if (entry !== null) throw new Error(`recordStuck should drop __smoke_, returned: ${JSON.stringify(entry).slice(0,80)}`);
+    if (readAll().length !== before) throw new Error('__smoke_ entry leaked into the live queue');
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
