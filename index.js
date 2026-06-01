@@ -60,8 +60,27 @@ function resolveClaude() {
       if (cmd) return { cmd: cmd, shell: true };
     }
   } catch {}
+  // `where` failed — the engine may be installed but just not on THIS process's PATH (common when the
+  // brain runs detached / from a scheduled task). Probe the usual Windows install locations directly.
+  const guesses = [
+    process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'claude.exe'),
+    process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'claude.cmd'),
+    process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
+    process.env.APPDATA && path.join(process.env.APPDATA, 'Claude', 'claude.exe'),
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs', 'claude', 'claude.exe'),
+  ].filter(Boolean);
+  for (const g of guesses) if (existsSync(g)) return { cmd: g, shell: /\.cmd$/i.test(g) };
   return { cmd: bin, shell: true };   // last resort: let the shell resolve via PATHEXT
 }
+
+// When a spawn fails because the engine binary can't be found, say so usefully instead of leaking the
+// raw OS error ("The system cannot find the file specified." / "is not recognized").
+const ENGINE_HELP = "Helm's engine (Claude Code) isn't installed or isn't on this machine's PATH, so I can't run. Fix it with:  npm install -g @anthropic-ai/claude-code   then `restart`. (A free/local model like Qwen still needs Claude Code as the engine — it runs your model behind a local proxy.) If it IS installed somewhere unusual, set CLAUDE_BIN in .env to its full path.";
+function looksLikeMissingEngine(e) {
+  const s = typeof e === 'string' ? e : `${e?.code || ''} ${e?.message || e}`;
+  return /ENOENT|EINVAL|cannot find the file|is not recognized|no such file/i.test(s);
+}
+const engineOr = msg => (looksLikeMissingEngine(msg) ? ENGINE_HELP : msg);
 // A free ONLINE model (Groq/OpenRouter/Together/Cerebras/...) is configured when these are set.
 // We run a tiny local proxy (workspace/proxy/llm-proxy.mjs) that translates Claude Code's
 // Anthropic API to the provider's OpenAI-compatible API, and point Claude Code at the proxy.
@@ -444,13 +463,13 @@ function runClaude(args, prompt) {
     const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, TASK_CAP_MS); // configurable cap (HELM_TASK_CAP_MIN, default 20)
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
-    child.on('error', e => { clearTimeout(kill); running.delete(child); reject(e); });
+    child.on('error', e => { clearTimeout(kill); running.delete(child); reject(looksLikeMissingEngine(e) ? new Error(ENGINE_HELP) : e); });
     child.on('close', code => {
       clearTimeout(kill); running.delete(child);
       if (child._stopped) return reject(Object.assign(new Error('stopped by owner'), { stopped: true }));
       if (child._timedOut) return reject(Object.assign(new Error(CAP_MSG), { timedOut: true }));
       if (code === 0) resolve(out);
-      else reject(new Error(err.trim() || `claude exited ${code}`));
+      else reject(new Error(engineOr(err.trim() || `claude exited ${code}`)));
     });
     child.stdin.on('error', () => {}); // EPIPE if claude exits before reading stdin
     child.stdin.write(prompt);
@@ -507,13 +526,13 @@ function runClaudeStream(args, prompt, onEvent) {
       }
     });
     child.stderr.on('data', d => { err += d; });
-    child.on('error', e => { clearTimeout(kill); running.delete(child); reject(e); });
+    child.on('error', e => { clearTimeout(kill); running.delete(child); reject(looksLikeMissingEngine(e) ? new Error(ENGINE_HELP) : e); });
     child.on('close', code => {
       clearTimeout(kill); running.delete(child);
       if (child._stopped) return reject(Object.assign(new Error('stopped by owner'), { stopped: true }));
       if (child._timedOut) return reject(Object.assign(new Error(CAP_MSG), { timedOut: true }));
       if (code === 0 || result != null) return resolve({ result: (result != null ? result : lastText) || '', session_id: sid });
-      reject(new Error(err.trim() || `claude exited ${code}`));
+      reject(new Error(engineOr(err.trim() || `claude exited ${code}`)));
     });
     child.stdin.on('error', () => {});
     child.stdin.write(prompt);
@@ -623,6 +642,15 @@ client.once(Events.ClientReady, c => {
   console.log(`✅ Helm online as ${c.user.tag}  ·  model=${pref || 'auto-route'}  ·  owner=${OWNER_ID}`);
   const cb = resolveClaude();
   console.log(`   engine: ${cb.cmd}${cb.shell ? ' (via shell)' : ''}`);
+  // Verify the engine actually launches; if not, tell the owner UP FRONT (don't make them discover it
+  // by sending a message and getting "The system cannot find the file specified").
+  try {
+    const probe = spawnSync(cb.cmd, ['--version'], { encoding: 'utf8', shell: cb.shell, timeout: 8000, windowsHide: true });
+    if (probe.error && looksLikeMissingEngine(probe.error)) {
+      console.error('✋ Engine not launchable: ' + (probe.error.message || probe.error));
+      c.users.fetch(OWNER_ID).then(u => u.send('⚠️ ' + ENGINE_HELP)).catch(() => {});
+    }
+  } catch {}
   // Liveness marker the nightly self-upgrade health-check reads (cross-platform — doesn't depend on
   // launchd redirecting stdout to agent.log, so it works when Helm runs locally on Windows too).
   try { writeFileSync(path.join(WORKSPACE, '.online'), new Date().toISOString()); } catch {}
