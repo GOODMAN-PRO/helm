@@ -345,36 +345,10 @@ function tui(sock) {
   sock.on('close', () => { connected = false; status = 'Helm disconnected (service stopped?). Press Esc to quit.'; draw(); });
   sock.on('error', () => { connected = false; status = 'connection lost. Press Esc to quit.'; draw(); });
 
-  // ---- bracketed paste: capture a multi-line paste as ONE chunk so it doesn't fire Enter per line.
-  // The terminal wraps pastes in ESC[200~ ... ESC[201~ (we enabled it in enterAlt). We intercept the
-  // raw bytes BEFORE readline turns them into keypress events; anything between the markers becomes
-  // part of `input`, and a multi-line paste shows as "[N lines pasted]" instead of dumping every line.
-  const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~';
-  stdin.on('data', chunk => {
-    const s = chunk.toString('utf8');
-    if (pasteBuf === null && !s.includes(PASTE_START)) return;   // ordinary keys: let keypress handle them
-    // we're inside (or entering) a paste — process markers
-    let rest = s;
-    while (rest.length) {
-      if (pasteBuf === null) {
-        const i = rest.indexOf(PASTE_START);
-        if (i === -1) return;                       // no paste here
-        rest = rest.slice(i + PASTE_START.length);
-        pasteBuf = '';
-      }
-      const e = rest.indexOf(PASTE_END);
-      if (e === -1) { pasteBuf += rest; return; }   // paste continues in a later chunk
-      pasteBuf += rest.slice(0, e);
-      // paste complete → fold into the input buffer
-      input += pasteBuf;
-      pasteBuf = null;
-      rest = rest.slice(e + PASTE_END.length);
-      if (!splashing) drawInput(); else { splashing = false; draw(); }
-    }
-  });
-
   // ---- raw keyboard ----
-  readline.emitKeypressEvents(stdin);
+  // ONE input consumer: parse raw stdin ourselves (keys + bracketed paste) so a paste can't race a
+  // separate keypress stream. (Two listeners — data + readline keypress — fired in the wrong order and
+  // let pasted newlines slip through as Enter, splitting a paste into many messages.)
   if (stdin.isTTY) stdin.setRawMode(true);
   enterAlt(); draw();
 
@@ -420,13 +394,10 @@ function tui(sock) {
     draw(); return true;
   }
 
-  stdin.on('keypress', (ch, key) => {
-    if (!key) return;
-    // While a bracketed paste is being captured by the data listener, swallow the keypress events
-    // readline fires for the same bytes (incl. the marker escape chars) so they don't double-insert.
-    if (pasteBuf !== null) return;
-    const name = key.name;
-    if (key.ctrl && name === 'c') return quit();
+  // Handle a single logical key. name = symbolic key ('return','escape','backspace','up',… or null),
+  // ch = the literal character for printable keys, ctrl = control-modifier flag.
+  function handleKey(name, ch, ctrl) {
+    if (ctrl && name === 'c') return quit();
     if (name === 'escape') {
       if (splashing) { splashing = false; return draw(); }
       if (menuOpen()) { input = ''; menuIdx = 0; return draw(); }   // close the menu, don't quit
@@ -434,29 +405,80 @@ function tui(sock) {
       return quit();
     }
     // first keypress on the splash dismisses it into the chat (without also typing that char)
-    if (splashing) { splashing = false; draw(); if (name === 'return' || name === 'enter') return; }
+    if (splashing) { splashing = false; draw(); if (name === 'return') return; }
 
     // ---- slash-command menu navigation (only while input starts with "/") ----
     if (menuOpen()) {
       if (name === 'up')   { menuIdx = Math.max(0, menuIdx - 1); return draw(); }
       if (name === 'down') { menuIdx = Math.min(menuMatches().length - 1, menuIdx + 1); return draw(); }
       if (name === 'tab')  { if (menuComplete()) return; }
-      if (name === 'return' || name === 'enter') { if (menuComplete()) return; }
+      if (name === 'return') { if (menuComplete()) return; }
       if (name === 'backspace') { input = input.slice(0, -1); menuIdx = 0; return draw(); }   // re-filter (full draw)
-      if (ch && !key.ctrl && !key.meta && ch >= ' ') { input += ch; menuIdx = 0; return draw(); }
+      if (ch && !ctrl) { input += ch; menuIdx = 0; return draw(); }
       // fall through for ctrl-u etc.
     }
 
-    if (name === 'return' || name === 'enter') return submit();
+    if (name === 'return') return submit();
     // typing + backspace only repaint the input line (no full clear) → no flicker
     if (name === 'backspace') { input = input.slice(0, -1); return drawInput(); }
     if (name === 'pageup')   { scroll += Math.max(1, bodyH() - 1); return draw(); }
     if (name === 'pagedown') { scroll = Math.max(0, scroll - Math.max(1, bodyH() - 1)); return draw(); }
     if (name === 'up')   { scroll += 1; return draw(); }
     if (name === 'down') { scroll = Math.max(0, scroll - 1); return draw(); }
-    if (key.ctrl && name === 'u') { input = ''; return drawInput(); }   // clear line
+    if (ctrl && name === 'u') { input = ''; return drawInput(); }   // clear line
     // a fresh "/" opens the menu → full draw; other chars just repaint the input line
-    if (ch && !key.ctrl && !key.meta && ch >= ' ') { input += ch; return (input === '/' ? draw() : drawInput()); }
+    if (ch && !ctrl) { input += ch; return (input === '/' ? draw() : drawInput()); }
+  }
+
+  // A pasted block lands as one chunk → append to input (multi-line shows as "[N lines pasted]"),
+  // never firing Enter per line. The full text is sent when you press Enter.
+  function handlePaste(text) {
+    if (splashing) splashing = false;
+    input += text;
+    if (!splashing) drawInput(); else draw();
+  }
+
+  // ---- single raw-input parser: keys + bracketed paste, one consumer (no race) ----
+  const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~';
+  let dataBuf = '';        // carries an unfinished escape seq / paste across chunks
+  stdin.on('data', chunk => {
+    dataBuf += chunk.toString('utf8');
+    for (;;) {
+      // inside a paste: consume until the end marker (may span chunks)
+      if (pasteBuf !== null) {
+        const e = dataBuf.indexOf(PASTE_END);
+        if (e === -1) { pasteBuf += dataBuf; dataBuf = ''; return; }
+        pasteBuf += dataBuf.slice(0, e); dataBuf = dataBuf.slice(e + PASTE_END.length);
+        handlePaste(pasteBuf); pasteBuf = null; continue;
+      }
+      if (!dataBuf) return;
+      // paste start?
+      if (dataBuf.startsWith(PASTE_START)) { dataBuf = dataBuf.slice(PASTE_START.length); pasteBuf = ''; continue; }
+      // could a paste/escape marker be starting but split across chunks? wait for more bytes.
+      if (PASTE_START.startsWith(dataBuf) || (dataBuf === '\x1b' || dataBuf === '\x1b[')) return;
+
+      const c = dataBuf[0];
+      if (c === '\x1b') {
+        // escape sequence: arrows, etc. Match the common CSI codes; otherwise treat as a bare Esc.
+        const seqs = { '\x1b[A': 'up', '\x1b[B': 'down', '\x1b[C': 'right', '\x1b[D': 'left',
+          '\x1b[5~': 'pageup', '\x1b[6~': 'pagedown', '\x1b[H': 'home', '\x1b[F': 'end' };
+        let matched = null;
+        for (const s of Object.keys(seqs)) if (dataBuf.startsWith(s)) { matched = s; break; }
+        if (matched) { dataBuf = dataBuf.slice(matched.length); handleKey(seqs[matched], null, false); continue; }
+        // an incomplete CSI that might still grow — if the buffer is just ESC[ + partial, wait
+        if (/^\x1b\[[0-9;]*$/.test(dataBuf)) return;
+        dataBuf = dataBuf.slice(1); handleKey('escape', null, false); continue;
+      }
+      // control chars
+      if (c === '\r' || c === '\n') { dataBuf = dataBuf.slice(1); handleKey('return', null, false); continue; }
+      if (c === '\t') { dataBuf = dataBuf.slice(1); handleKey('tab', null, false); continue; }
+      if (c === '\x7f' || c === '\b') { dataBuf = dataBuf.slice(1); handleKey('backspace', null, false); continue; }
+      if (c === '\x03') { dataBuf = dataBuf.slice(1); handleKey('c', 'c', true); continue; }   // ctrl-c
+      if (c === '\x15') { dataBuf = dataBuf.slice(1); handleKey('u', 'u', true); continue; }   // ctrl-u
+      if (c < ' ') { dataBuf = dataBuf.slice(1); continue; }   // ignore other control bytes
+      // printable character
+      dataBuf = dataBuf.slice(1); handleKey(null, c, false);
+    }
   });
 
   process.stdout.on('resize', draw);
