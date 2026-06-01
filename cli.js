@@ -101,6 +101,20 @@ function wrap(text, width) {
   return lines;
 }
 
+// Slash commands available in the terminal. Some are handled by this client (/exit, /help, /clear),
+// the rest are sent to Helm as chat commands the brain understands.
+const COMMANDS = [
+  { cmd: '/help',  desc: 'show this command list' },
+  { cmd: '/clear', desc: 'clear the chat history in this window' },
+  { cmd: '/exit',  desc: 'close the terminal (Helm keeps running)' },
+  { cmd: 'stop',   desc: 'cancel whatever Helm is currently doing' },
+  { cmd: '!mode',  desc: 'show or set autonomy: !mode suggest|copilot|autopilot' },
+  { cmd: '!model', desc: 'show or pin the model: !model opus|sonnet|haiku|auto' },
+  { cmd: 'vault',  desc: 'store a secret: vault <NAME> <value>  ·  vault list' },
+  { cmd: 'where',  desc: 'show which machine (peer) is active' },
+  { cmd: 'use',    desc: 'switch active machine: use mac | use windows' },
+];
+
 function tui(sock) {
   const stdin = process.stdin;
   let W = process.stdout.columns || 80;
@@ -115,6 +129,14 @@ function tui(sock) {
   let status = '';
   let connected = true;
   let splashing = true; // show the brand logo until the first keypress / message
+  let menuIdx = 0;      // highlighted row in the slash-command menu
+
+  // The command menu is open whenever the input starts with "/". Filter by what's typed so far.
+  const menuOpen = () => input.startsWith('/');
+  const menuMatches = () => {
+    const q = input.slice(1).toLowerCase();   // text after the leading "/"
+    return COMMANDS.filter(c => c.cmd.replace(/^\//, '').toLowerCase().startsWith(q));
+  };
 
   const enterAlt = () => out(`${ESC}?1049h${ESC}?25l`);   // alt screen, hide cursor
   const leaveAlt = () => out(`${ESC}?25h${ESC}?1049l`);   // restore
@@ -191,9 +213,28 @@ function tui(sock) {
     // scroll indicator
     if (scroll > 0) { moveTo(3, W - 4); out(`${C.dim}↑${scroll}${C.x}`); }
 
+    // slash-command menu: floats over the bottom of the body pane, just above the input box
+    if (menuOpen()) {
+      const items = menuMatches();
+      if (menuIdx >= items.length) menuIdx = Math.max(0, items.length - 1);
+      const rows = Math.min(items.length, Math.max(1, view - 1));
+      const firstRow = 3 + view - rows;   // bottom-align within the body pane
+      for (let i = 0; i < rows; i++) {
+        const it = items[i]; const sel = i === menuIdx;
+        moveTo(firstRow + i, 2); clearLine();
+        const name = it.cmd.padEnd(8);
+        out(sel
+          ? `${C.teal}${C.b}❯ ${name}${C.x} ${C.gray}${it.desc}${C.x}`
+          : `  ${C.cyan}${name}${C.x} ${C.dim}${it.desc}${C.x}`);
+      }
+      if (!items.length) { moveTo(3 + view - 1, 2); clearLine(); out(`${C.dim}  (no matching command)${C.x}`); }
+    }
+
     // status line
     moveTo(H - INPUT_H, 2); clearLine();
-    out(status ? `${C.gray}${status}${C.x}` : `${C.dim}PgUp/PgDn scroll · Enter send · /exit quit${C.x}`);
+    out(menuOpen()
+      ? `${C.dim}↑/↓ choose · Tab/Enter complete · Esc cancel${C.x}`
+      : (status ? `${C.gray}${status}${C.x}` : `${C.dim}/ commands · PgUp/PgDn scroll · Enter send · /exit quit${C.x}`));
 
     // input box (bordered)
     const iw = W - 2;
@@ -250,8 +291,11 @@ function tui(sock) {
     const text = input.trim(); input = '';
     if (!text) { draw(); return; }
     if (text === '/exit' || text === '/quit') return quit();
+    if (text === '/clear') { history.length = 0; scroll = 0; add('sys', 'history cleared (this window only).'); return; }
     if (text === '/help') {
-      add('sys', 'This terminal is a live client of the one running Helm — shared with Discord & iMessage.\n  type + Enter   send a message (all channels see it)\n  stop           cancel an in-flight task (a Helm chat command)\n  !mode ...       change autonomy (a Helm chat command)\n  PgUp / PgDn    scroll the history\n  /exit or Esc   close this terminal (Helm keeps running)');
+      add('sys', 'Commands (type / to pick from a menu):\n' +
+        COMMANDS.map(c => `  ${c.cmd.padEnd(8)} ${c.desc}`).join('\n') +
+        '\n\nAnything else is sent to Helm. PgUp/PgDn scroll · Esc closes this window (Helm keeps running).');
       return;
     }
     if (!connected) { add('sys', 'not connected — start Helm with `helm start`.'); return; }
@@ -259,13 +303,42 @@ function tui(sock) {
     try { sock.write(JSON.stringify({ type: 'msg', text }) + '\n'); } catch { add('sys', 'send failed.'); }
   }
 
+  // Complete the highlighted menu command into the input, ready to run (or run instantly if it takes
+  // no arguments). Returns true if it consumed the key.
+  function menuComplete() {
+    const items = menuMatches();
+    if (!items.length) return false;
+    const chosen = items[menuIdx] || items[0];
+    // commands that take args get the name + a space so you can keep typing; bare ones are ready to send
+    const takesArgs = /!mode|!model|vault|use|^\/?(pull|push|mind)/.test(chosen.cmd);
+    input = chosen.cmd + (takesArgs ? ' ' : '');
+    if (!takesArgs) return submit(), true;   // run /help, /exit, stop, where immediately
+    draw(); return true;
+  }
+
   stdin.on('keypress', (ch, key) => {
     if (!key) return;
     const name = key.name;
     if (key.ctrl && name === 'c') return quit();
-    if (name === 'escape') { if (splashing) { splashing = false; return draw(); } return quit(); }
+    if (name === 'escape') {
+      if (splashing) { splashing = false; return draw(); }
+      if (menuOpen()) { input = ''; menuIdx = 0; return draw(); }   // close the menu, don't quit
+      return quit();
+    }
     // first keypress on the splash dismisses it into the chat (without also typing that char)
     if (splashing) { splashing = false; draw(); if (name === 'return' || name === 'enter') return; }
+
+    // ---- slash-command menu navigation (only while input starts with "/") ----
+    if (menuOpen()) {
+      if (name === 'up')   { menuIdx = Math.max(0, menuIdx - 1); return draw(); }
+      if (name === 'down') { menuIdx = Math.min(menuMatches().length - 1, menuIdx + 1); return draw(); }
+      if (name === 'tab')  { if (menuComplete()) return; }
+      if (name === 'return' || name === 'enter') { if (menuComplete()) return; }
+      if (name === 'backspace') { input = input.slice(0, -1); menuIdx = 0; return draw(); }   // re-filter (full draw)
+      if (ch && !key.ctrl && !key.meta && ch >= ' ') { input += ch; menuIdx = 0; return draw(); }
+      // fall through for ctrl-u etc.
+    }
+
     if (name === 'return' || name === 'enter') return submit();
     // typing + backspace only repaint the input line (no full clear) → no flicker
     if (name === 'backspace') { input = input.slice(0, -1); return drawInput(); }
@@ -274,7 +347,8 @@ function tui(sock) {
     if (name === 'up')   { scroll += 1; return draw(); }
     if (name === 'down') { scroll = Math.max(0, scroll - 1); return draw(); }
     if (key.ctrl && name === 'u') { input = ''; return drawInput(); }   // clear line
-    if (ch && !key.ctrl && !key.meta && ch >= ' ') { input += ch; return drawInput(); }
+    // a fresh "/" opens the menu → full draw; other chars just repaint the input line
+    if (ch && !key.ctrl && !key.meta && ch >= ' ') { input += ch; return (input === '/' ? draw() : drawInput()); }
   });
 
   process.stdout.on('resize', draw);
