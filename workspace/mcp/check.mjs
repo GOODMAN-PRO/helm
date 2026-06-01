@@ -44,9 +44,11 @@ function probeServer(name, entry) {
 
     let child;
     try {
+      // On Windows, `npx` is npx.cmd — Node can't spawn it without a shell (ENOENT). Use a shell there
+      // so cmd resolves the .cmd via PATHEXT, matching how Claude Code launches these servers.
       child = spawn(entry.command, entry.args || [], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: false,
+        shell: process.platform === 'win32',
       });
     } catch (e) {
       return settle({ name, status: 'DOWN', error: String(e.message || e) });

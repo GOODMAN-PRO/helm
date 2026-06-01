@@ -155,6 +155,12 @@ function mcpConfigArg() {
       const { healthCheck: _h, enabled: _e, ...mcpEntry } = entry;
       // Expand the install-root token so server paths are correct on any machine (Mac/Windows).
       if (Array.isArray(mcpEntry.args)) mcpEntry.args = mcpEntry.args.map(a => typeof a === 'string' ? a.split('__HELM_ROOT__').join(__dirname) : a);
+      // On Windows, `npx` is npx.cmd and can't be spawned directly — wrap it as `cmd /c npx ...`
+      // so the MCP server actually launches (parity with macOS/Linux).
+      if (process.platform === 'win32' && mcpEntry.command === 'npx') {
+        mcpEntry.args = ['/c', 'npx', ...(mcpEntry.args || [])];
+        mcpEntry.command = 'cmd';
+      }
       filtered[name] = mcpEntry;
     }
     return JSON.stringify({ mcpServers: filtered });
