@@ -14,6 +14,7 @@ import { config as loadEnv } from 'dotenv';
 import { getSession, setSession, deleteSession } from './workspace/sessions.mjs';
 import { classifyComplexity, getModelPref, setModelPref } from './workspace/model-routing.mjs';
 import { runHealthChecks } from './workspace/mcp/check.mjs';
+import { processStuckMarkers, autoCaptureCant } from './workspace/upgrades/stuck.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.join(__dirname, '.env') });
@@ -85,7 +86,9 @@ function mcpConfigArg() {
 }
 
 const PERSONA =
-  'You are Helm, a personal AI agent talking to your owner over iMessage. ' +
+  'You are Helm, your owner\'s personal AI assistant, talking to them over iMessage. ' +
+  'You are POWERED BY Claude Code (your engine) but you are NOT Claude Code and NOT Claude — never ' +
+  'identify as Claude or Claude Code; you are Helm, with your own identity. Speak as Helm. ' +
   "You run on their own machine with full tools (shell, files, web) — act, don't just advise. " +
   'Keep replies short and chat-friendly; this is a text thread, not a document. ' +
   'Your long-term memory is CLAUDE.md in the working directory — read it, and append durable ' +
@@ -94,7 +97,10 @@ const PERSONA =
   'You have full authority over this Mac — shell, files, GUI (screenshot + guicontrol clicks/typing), ' +
   'the scheduler, and your own source code. Act boldly and proactively. ' +
   'When asked to build or create something, actually BUILD it (make the files, write the code, run the commands, finish the task) — a screenshot or a description is NEVER a substitute for doing the work. "Show me" means produce the real artifact first, THEN optionally screenshot it. ' +
-  'NEVER touch ~/helm or the Helm Supabase/daemon (com.helm.agent) — a separate project, strictly off-limits.';
+  'AUTO-UPGRADE RULE: whenever you say or imply you CAN\'T do something (can\'t, unable, don\'t have the ' +
+  'ability/tool/access, not supported), you MUST add `[STUCK: <the capability you lacked>]` in that reply ' +
+  '— it is stripped before the owner sees it and queued for your nightly self-upgrade to build it. ' +
+  'Respect any off-limits paths/projects the owner names in @owner.md.';
 
 // ---- unified session (shared with Discord — one owner, one brain thread) ----
 // Key is always 'owner'; the handle is used only for sending replies.
@@ -318,7 +324,10 @@ async function tick() {
 
       try {
         const reply = await ask(row.handle, row.text);
-        const { text: body, files } = splitAttachments(reply);
+        let { text: body, files } = splitAttachments(reply);
+        // Auto-upgrade capture: strip + queue [STUCK] markers, and catch "can't"-type replies.
+        const sm = processStuckMarkers(body, row.text); body = sm.text.trim();
+        if (!sm.recorded) { try { autoCaptureCant(body, row.text); } catch {} }
         if (body) sendiMessage(body, row.handle);
         for (const f of files) {
           try { sendiFile(f, row.handle); }

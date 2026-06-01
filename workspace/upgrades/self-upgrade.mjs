@@ -118,8 +118,11 @@ try {
       '2. Implement pending items in workspace/upgrades/QUEUE.md; mark each done as you finish it.',
       '3. Fix bugs (see workspace/upgrades/BUGS_REPORT.md).',
       '4. Small, safe, high-value improvements aligned with workspace/upgrades/PLAN.md. Prefer finishing started work over starting new.',
+      '5. OPTIMISE & VERIFY: re-check everything you touched still works, tighten/clean up what you added (no dead code, no half-done edges), and confirm `node --check` + the smoke suite pass before you finish.',
       '',
-      'Keep changes focused and reversible. Output a concise summary (<400 words) of what you changed and why. No emojis, no preamble.',
+      'Keep changes focused and reversible. Then WRITE A SMALL REPORT (<200 words, no emojis, no preamble): ' +
+      'which stuck-queue/can\'t-do items you resolved, what you optimised, and anything still open for next time. ' +
+      'This report is saved to workspace/upgrades/UPGRADE_LOG.md and sent to the owner.',
       '',
       '--- STUCK QUEUE (things Helm got stuck on; fix root causes) ---',
       stuck || '(empty — nothing got stuck recently)',

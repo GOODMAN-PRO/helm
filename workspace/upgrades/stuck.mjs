@@ -40,6 +40,43 @@ export function recordStuck(summary, detail = '', source = 'auto') {
 
 export function listStuck(openOnly = true) { return readAll().filter(i => !openOnly || i.status !== 'resolved'); }
 
+// ---- auto-upgrade capture (shared by all gateways) ----
+// Strip any [STUCK: ...] markers the brain emitted, recording each to the queue.
+// Returns { text, recorded } where `text` has the markers removed.
+export function processStuckMarkers(replyText, userText = '') {
+  let recorded = false;
+  const text = (replyText || '').replace(/\[STUCK:\s*([^\]]+)\]/gi, (_m, s) => {
+    try { recordStuck(s.trim(), (userText || '').slice(0, 200), 'self'); recorded = true; } catch {}
+    return '';
+  });
+  return { text, recorded };
+}
+
+// Phrases that signal a real capability limit (not idioms like "can't wait").
+const CANT_PATTERNS = [
+  /\b(?:i|i'?m)\s+(?:can'?t|cannot|can not|am unable to|am not able to|won'?t be able to|wasn'?t able to|couldn'?t)\b[^.!?\n]*/i,
+  /\bi\s+(?:don'?t|do not)\s+have\s+(?:the\s+)?(?:ability|a way|access|tools?|permission|capability|means)\b[^.!?\n]*/i,
+  /\b(?:that'?s|this is)\s+(?:not\s+something\s+i\s+can|beyond\s+(?:what\s+i\s+can|my))\b[^.!?\n]*/i,
+  /\bi\s+(?:lack|don'?t\s+support)\b[^.!?\n]*/i,
+  /\bnot\s+(?:currently\s+)?(?:supported|implemented|possible for me)\b[^.!?\n]*/i,
+  /\bi\s+don'?t\s+(?:have|know how)\s+to\b[^.!?\n]*/i,
+];
+const CANT_IDIOMS = /can'?t\s+(?:wait|go wrong|thank|believe|help but|complain|argue)/i;
+
+// Safety net: if a reply says/implies Helm can't do something (and no [STUCK] was emitted), queue it
+// for the nightly self-upgrade. Records at most one item per reply. Returns the entry or null.
+export function autoCaptureCant(text, userText = '') {
+  if (!text) return null;
+  for (const re of CANT_PATTERNS) {
+    const m = text.match(re);
+    if (m && !CANT_IDIOMS.test(m[0])) {
+      const snippet = m[0].replace(/\s+/g, ' ').trim().slice(0, 160);
+      return recordStuck(`Said it can't: "${snippet}"`, `Owner asked: ${(userText || '').slice(0, 200)}`, 'auto-cant');
+    }
+  }
+  return null;
+}
+
 // Markdown-ish block for the nightly self-upgrade prompt.
 export function renderStuckForPrompt() {
   const open = listStuck(true);
