@@ -413,8 +413,14 @@ function ownerPersonaOverride() {
 // Key is always 'owner' since this bot is owner-locked.
 
 // ---- the brain: one Claude run on your subscription ----
-// Track in-flight runs so "stop" can actually kill them. 10-min hard cap for chat.
+// Track in-flight runs so "stop" can actually kill them. Per-task hard cap (configurable) for chat.
 const running = new Set();
+// Hard wall-clock cap per task before SIGKILL. Big build/scrape jobs (e.g. "scrape this site and
+// rebuild it") routinely need more than the old fixed 10 min, so make it configurable: set
+// HELM_TASK_CAP_MIN in .env (e.g. 30) to give long tasks more room. Default 20.
+const TASK_CAP_MIN = Math.max(1, parseInt(process.env.HELM_TASK_CAP_MIN || '20', 10) || 20);
+const TASK_CAP_MS  = TASK_CAP_MIN * 60_000;
+const CAP_MSG      = `hit ${TASK_CAP_MIN}-min cap`;
 function killAll() {
   let n = 0;
   for (const c of running) { c._stopped = true; try { c.kill('SIGKILL'); n++; } catch {} }
@@ -427,14 +433,14 @@ function runClaude(args, prompt) {
     const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell, windowsHide: true });
     running.add(child);
     let out = '', err = '';
-    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000); // 10-min cap
+    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, TASK_CAP_MS); // configurable cap (HELM_TASK_CAP_MIN, default 20)
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
     child.on('error', e => { clearTimeout(kill); running.delete(child); reject(e); });
     child.on('close', code => {
       clearTimeout(kill); running.delete(child);
       if (child._stopped) return reject(Object.assign(new Error('stopped by owner'), { stopped: true }));
-      if (child._timedOut) return reject(Object.assign(new Error('hit 10-min cap'), { timedOut: true }));
+      if (child._timedOut) return reject(Object.assign(new Error(CAP_MSG), { timedOut: true }));
       if (code === 0) resolve(out);
       else reject(new Error(err.trim() || `claude exited ${code}`));
     });
@@ -476,7 +482,7 @@ function runClaudeStream(args, prompt, onEvent) {
     const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell, windowsHide: true });
     running.add(child);
     let buf = '', err = '', result = null, sid = null, lastText = '';
-    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, 10 * 60_000);
+    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, TASK_CAP_MS);
     child.stdout.on('data', d => {
       buf += d;
       let nl;
@@ -497,7 +503,7 @@ function runClaudeStream(args, prompt, onEvent) {
     child.on('close', code => {
       clearTimeout(kill); running.delete(child);
       if (child._stopped) return reject(Object.assign(new Error('stopped by owner'), { stopped: true }));
-      if (child._timedOut) return reject(Object.assign(new Error('hit 10-min cap'), { timedOut: true }));
+      if (child._timedOut) return reject(Object.assign(new Error(CAP_MSG), { timedOut: true }));
       if (code === 0 || result != null) return resolve({ result: (result != null ? result : lastText) || '', session_id: sid });
       reject(new Error(err.trim() || `claude exited ${code}`));
     });
@@ -921,7 +927,7 @@ client.on(Events.MessageCreate, async msg => {
     try {
       recordStuck(
         e.timedOut
-          ? `Task hit the 10-min cap: "${(text || '(attachment)').slice(0, 80)}"`
+          ? `Task hit the ${TASK_CAP_MIN}-min cap: "${(text || '(attachment)').slice(0, 80)}"`
           : `Failed on "${(text || '(attachment)').slice(0, 60)}": ${String(e.message || e).slice(0, 140)}`,
         String(e.message || e).slice(0, 500), 'auto');
     } catch {}
@@ -931,7 +937,7 @@ client.on(Events.MessageCreate, async msg => {
       ? `\n\n_Local model issue: make sure Ollama is running and the model is pulled — \`ollama pull ${process.env.ANTHROPIC_MODEL || 'llama3.1'}\`. Endpoint: ${process.env.ANTHROPIC_BASE_URL || '(unset)'}._`
       : '';
     const m = e.timedOut
-      ? '⚠️ that task hit the 10-min cap and was stopped — try breaking it into a smaller step.'
+      ? `⚠️ that task hit the ${TASK_CAP_MIN}-min cap and was stopped — break it into smaller steps, or raise HELM_TASK_CAP_MIN in .env for big jobs.`
       : `⚠️ brain error: ${errStr.slice(0, 1700)}${localHint}`;
     try { await msg.reply(m); } catch {}  // Discord API failure in error path must not crash the process
   }
