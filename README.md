@@ -101,7 +101,6 @@ This is the one part nobody can do for you — Discord requires a bot that's you
 5. Paste the **token** and **user ID** into `npm run wizard` when prompted.
 
 > One token = one running bot. Don't run two copies on the same token.
-<!-- TODO: drop a short screen-recording here (assets/discord-bot-setup.gif) — the steps above are the script. -->
 
 Helm is a personal AI agent that lives on **your** hardware. You message it from **Discord** (or
 **iMessage** on a Mac); it runs Claude with full tools right on your machine — shell, files, web,
