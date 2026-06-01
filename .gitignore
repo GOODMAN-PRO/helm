@@ -1,6 +1,9 @@
 # secrets / deps / state
 node_modules/
 .env
+.env.bak*
+.env.local
+.env.*.bak
 *.log
 *.db
 *.db-wal
