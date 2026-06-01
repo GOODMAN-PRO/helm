@@ -41,11 +41,23 @@ const WORKSPACE = path.resolve(__dirname, process.env.WORKSPACE || './workspace'
 function resolveClaude() {
   const bin = CLAUDE_BIN || 'claude';
   if (process.platform !== 'win32') return { cmd: bin, shell: false };
-  if (/\.exe$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: false };
-  if (/\.cmd$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: true };
+  if (/\.(exe)$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: false };
+  if (/\.(cmd|bat|ps1)$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: true };
+  // CLAUDE_BIN points at the extension-less npm shim (...\npm\claude) — use the sibling .cmd/.exe.
   if (existsSync(bin + '.exe')) return { cmd: bin + '.exe', shell: false };
   if (existsSync(bin + '.cmd')) return { cmd: bin + '.cmd', shell: true };
-  return { cmd: bin, shell: true };   // let the shell resolve via PATHEXT
+  // Stale/wrong CLAUDE_BIN with no runnable sibling: ask Windows where claude actually is.
+  try {
+    const r = spawnSync('where', ['claude'], { encoding: 'utf8' });
+    if (r.status === 0 && r.stdout) {
+      const hits = r.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const exe = hits.find(h => /\.exe$/i.test(h));
+      const cmd = hits.find(h => /\.cmd$/i.test(h));
+      if (exe) return { cmd: exe, shell: false };
+      if (cmd) return { cmd: cmd, shell: true };
+    }
+  } catch {}
+  return { cmd: bin, shell: true };   // last resort: let the shell resolve via PATHEXT
 }
 // A free ONLINE model (Groq/OpenRouter/Together/Cerebras/...) is configured when these are set.
 // We run a tiny local proxy (workspace/proxy/llm-proxy.mjs) that translates Claude Code's
@@ -386,6 +398,8 @@ function splitAttachments(s) {
 client.once(Events.ClientReady, c => {
   const pref = getModelPref();
   console.log(`✅ Helm online as ${c.user.tag}  ·  model=${pref || 'auto-route'}  ·  owner=${OWNER_ID}`);
+  const cb = resolveClaude();
+  console.log(`   engine: ${cb.cmd}${cb.shell ? ' (via shell)' : ''}`);
 });
 
 client.on(Events.MessageCreate, async msg => {
