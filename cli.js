@@ -287,7 +287,7 @@ function tui(sock) {
       const detail = status ? ` ${C.dim}· ${status.replace(/^⚙️\s*/, '')}${C.x}` : '';
       return `${C.cyan}${g}${C.x} ${C.b}${busyVerb}…${C.x} ${C.gray}${secs}s${C.x}${detail} ${C.dim}· esc to interrupt${C.x}`;
     }
-    return status ? `${C.gray}${status}${C.x}` : `${C.dim}/ for commands · ⏎ send · ⇧⏎ newline · PgUp/PgDn scroll · esc to quit${C.x}`;
+    return status ? `${C.gray}${status}${C.x}` : `${C.dim}/ for commands · ⏎ send · ⌃J newline · PgUp/PgDn scroll · esc to quit${C.x}`;
   }
 
   // Render the rounded, full-width input box with a ghost placeholder when empty.
@@ -498,7 +498,10 @@ function tui(sock) {
         s = s.slice(1); handleKey('escape', null, false); continue;     // a bare Esc
       }
       const c = s[0];
-      if (c === '\r' || c === '\n') { s = s.slice(1); handleKey('return', null, false); continue; }
+      // Enter (CR, optionally CRLF) sends the message. Ctrl+J (LF, 0x0a) inserts a newline — these are
+      // distinct bytes on every terminal, so Ctrl+J is a universal "new line" that needs no key protocol.
+      if (c === '\r') { s = s.slice(1); if (s[0] === '\n') s = s.slice(1); handleKey('return', null, false); continue; }
+      if (c === '\n') { s = s.slice(1); newline(); continue; }
       if (c === '\t') { s = s.slice(1); handleKey('tab', null, false); continue; }
       if (c === '\x7f' || c === '\b') { s = s.slice(1); handleKey('backspace', null, false); continue; }
       if (c === '\x03') { s = s.slice(1); handleKey('c', 'c', true); continue; }   // ctrl-c
