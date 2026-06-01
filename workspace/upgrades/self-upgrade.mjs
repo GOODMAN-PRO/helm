@@ -169,6 +169,21 @@ try {
   // 5. restart + health-check; roll back if unhealthy
   if (!restartAndHealth()) { rollback(base, 'unhealthy after restart', summary); process.exit(0); }
 
+  // 5b. propagate to the fleet: push to origin, then update the OTHER machine's install so every
+  //     shell of this one brain runs the same upgraded code (memory already syncs per-run separately).
+  if (changed && !DRYRUN) {
+    const pushed = git('push', 'origin', 'HEAD:main').status === 0;
+    log(`push origin ${pushed ? 'ok' : 'FAIL (will retry next run)'}`);
+    const peer = process.env.HELM_WIN_HOST, peerDir = process.env.HELM_WIN_DIR || 'helm';
+    if (pushed && peer) {
+      // Update the peer's checked-out code to match origin (it doesn't run its own bot in the
+      // one-gateway model, so no restart needed — the next remote brain run uses the new code).
+      const r = sh('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', peer,
+        `cd ${peerDir} && git fetch origin && git reset --hard origin/main`], { timeout: 60_000 });
+      log(`peer sync (${peer}) ${r.status === 0 ? 'ok' : 'FAIL: ' + (r.stderr || '').trim().slice(0, 120)}`);
+    }
+  }
+
   // Clear the stuck queue once changes are applied and healthy (kept if nothing changed, so it retries).
   const archived = (changed && !DRYRUN) ? archiveAll() : 0;
   if (archived) log(`archived ${archived} stuck item(s) addressed this run`);
