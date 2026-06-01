@@ -241,6 +241,15 @@ const FLEET_INTENT = process.env.HELM_FLEET === '1';
 // Until one is configured we run everything locally — so neither a single-device box nor a
 // fleet-in-setup (intent on, peer not connected yet) can strand the bot SSHing to nowhere.
 const PEER_REACHABLE = !!HELM_WIN_HOST;
+// Is the other peer actually UP right now? Quick SSH probe (~4s), so an asleep/offline box makes us
+// fall back to local instead of hanging on a full connect timeout for every message.
+function peerReachable() {
+  if (!HELM_WIN_HOST) return false;
+  try {
+    const r = spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=4', HELM_WIN_HOST, 'exit'], { encoding: 'utf8', timeout: 7000 });
+    return r.status === 0;
+  } catch { return false; }
+}
 // The machine THIS bot runs on. Whatever it is, it's a first-class peer — the default active target.
 const LOCAL_MACHINE = process.platform === 'win32' ? 'windows' : 'mac';
 const TARGET_FILE = path.join(WORKSPACE, 'active-target');
@@ -559,13 +568,17 @@ function runClaudeStream(args, prompt, onEvent) {
 }
 
 async function ask(prompt, onProgress, target = LOCAL_MACHINE, mode = 'copilot') {
-  // Only hop to the other peer when one is ACTUALLY reachable (a host is configured). On a
-  // single-device install — or a fleet still mid-setup — a stale or mismatched active-target
-  // (e.g. "mac" left over on a Windows-only box) falls through to local instead of stranding the
-  // bot in an SSH attempt to a machine that doesn't exist.
+  // Hop to the other peer only if it's configured AND actually up right now. A configured-but-asleep
+  // peer used to strand every message in a ~10s+ SSH timeout ("Windows exec failed (exit 255)").
+  // If it's unreachable, fall back to running locally, switch the active target home, and say so.
   if (target !== LOCAL_MACHINE && PEER_REACHABLE) {
-    onProgress?.(`⚙️ working on **${target}**…`);
-    return runClaudeRemote(prompt);   // other peer → run there over SSH (returns final reply)
+    if (peerReachable()) {
+      onProgress?.(`⚙️ working on **${target}**…`);
+      return runClaudeRemote(prompt);   // other peer → run there over SSH (returns final reply)
+    }
+    onProgress?.(`⚠️ ${target} is unreachable — running on ${LOCAL_MACHINE} instead`);
+    try { setTarget(LOCAL_MACHINE); } catch {}   // don't keep probing a dead peer this session
+    target = LOCAL_MACHINE;
   }
   const model = pickModel(prompt);
   console.log(`[route] model=${model}`);
