@@ -822,8 +822,17 @@ client.on(Events.MessageCreate, async msg => {
     // On the windows target, push the files to the PC so the remote brain can read them.
     let refs = saved;
     if (target === 'windows' && saved.length) refs = saved.map(scpToWin).filter(Boolean);
-    if (refs.length) prompt = (text || '(no caption)') +
-      `\n\n[The owner attached ${refs.length} file(s) — look at them NOW with your Read tool (Read handles images): ${refs.join(' , ')}]`;
+    if (refs.length) {
+      const isImg = f => /\.(png|jpe?g|gif|webp|bmp|heic|tiff?)$/i.test(f);
+      const imgs = refs.filter(isImg), others = refs.filter(f => !isImg(f));
+      const parts = [text || '(no caption)', ''];
+      if (imgs.length) parts.push(
+        `[The owner attached ${imgs.length} image(s): ${imgs.join(' , ')}`,
+        `Analyze them NOW with your Read tool (it's multimodal). For each: describe what it shows, transcribe ALL visible text verbatim, and interpret any diagrams/charts/tables/math. Then address the caption above.`,
+        `If your current model can't see images (a text-only backend), run \`image.read --path <file> --mode ocr\` to extract the text instead.]`);
+      if (others.length) parts.push(`[The owner also attached ${others.length} file(s): ${others.join(' , ')} — open them with your Read tool.]`);
+      prompt = parts.join('\n');
+    }
   }
   const mode = getAutonomyMode();
   console.log(`📩 [${target}][${mode}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);

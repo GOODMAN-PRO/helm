@@ -318,6 +318,12 @@ Built-in tools: image.generate, screencap, gui.click, gui.type, gui.key, imessag
 discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 
+**Reading images:** you're multimodal — use your **Read** tool on any image file (attachments land in
+`workspace/inbox/`) to see it directly. For a careful pass — full text transcription, diagram/chart/
+table interpretation, or answering a specific question — use `image.read --path <file> [--question ...]`.
+On a text-only backend (free/local model that can't see images), use `image.read --path <file> --mode ocr`
+to extract the text. Verbatim-transcribe text in images; don't guess unreadable parts.
+
 **Image generation:** to make a picture, call `image.generate` (free, no key — works on any OS):
 `node workspace/tools/tools.mjs call image.generate --json '{"prompt":"..."}'`. It saves an image file
 and prints its path; **show it by ending your reply with `ATTACH: <that path>`** so the gateway

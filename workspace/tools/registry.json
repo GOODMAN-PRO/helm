@@ -1,5 +1,20 @@
 [
   {
+    "name": "image.read",
+    "summary": "Deeply analyze an image file: describe it, transcribe all visible text, interpret diagrams/charts. Optionally answer a question about it.",
+    "exec": "node tools/impl/image.read.mjs",
+    "args_schema": {
+      "path": { "type": "string", "required": true, "description": "Path to the image file to analyze" },
+      "question": { "type": "string", "description": "Optional question to answer about the image" },
+      "mode": { "type": "string", "description": "auto (default) · engine (multimodal vision) · ocr (text-only fallback)" }
+    },
+    "requires": [
+      "a multimodal backend (Claude) for full understanding, or OCR (mac Vision / Windows OCR / tesseract) for text"
+    ],
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
     "name": "image.generate",
     "summary": "Generate an image from a text prompt (free, no API key) and save it to a file.",
     "exec": "node tools/impl/image.generate.mjs",
