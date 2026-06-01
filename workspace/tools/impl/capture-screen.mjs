@@ -49,7 +49,14 @@ export function captureScreen(out, { timeout = 15_000 } = {}) {
   if (process.platform === 'win32') {
     const b64 = Buffer.from(windowsPsScript(out), 'utf16le').toString('base64');
     const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', b64], { encoding: 'utf8', timeout });
-    return r.status === 0 ? { ok: true } : { ok: false, error: r.stderr || (r.error && r.error.message) || 'powershell capture failed' };
+    if (r.status === 0) return { ok: true };
+    const raw = (r.stderr || '') + (r.stdout || '') + ((r.error && r.error.message) || '');
+    // CopyFromScreen needs an interactive desktop; over a non-interactive session (e.g. SSH/Session 0)
+    // it throws "handle is invalid". Give a clear, actionable message instead of raw CLIXML.
+    if (/handle is invalid|CopyFromScreen|Win32Exception/i.test(raw)) {
+      return { ok: false, error: 'Windows screen capture needs an interactive desktop session — this works when Helm runs locally on Windows, but not from a non-interactive/SSH session. Run Helm on the Windows machine itself to screenshot.' };
+    }
+    return { ok: false, error: (raw.trim().slice(0, 300)) || 'powershell capture failed' };
   }
   // Linux: try the common CLI screenshot tools in order; ENOENT means "not installed", keep trying.
   const candidates = [
