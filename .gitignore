@@ -117,3 +117,6 @@ workspace/diag/*.out
 workspace/.online
 # restart hand-off marker (written by the Discord `restart` command, cleared on next boot)
 workspace/.restarting
+
+# brain console log (runtime)
+workspace/helm.log

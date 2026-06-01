@@ -254,7 +254,16 @@ function peerReachable() {
 const LOCAL_MACHINE = process.platform === 'win32' ? 'windows' : 'mac';
 const TARGET_FILE = path.join(WORKSPACE, 'active-target');
 const VALID_TARGETS = ['mac', 'windows'];
-const getTarget = () => { try { const t = readFileSync(TARGET_FILE, 'utf8').trim(); return VALID_TARGETS.includes(t) ? t : LOCAL_MACHINE; } catch { return LOCAL_MACHINE; } };
+const getTarget = () => {
+  try {
+    const t = readFileSync(TARGET_FILE, 'utf8').trim();
+    if (!VALID_TARGETS.includes(t)) return LOCAL_MACHINE;
+    // Never report a peer that isn't actually reachable — otherwise `where` says "mac" while we're really
+    // running on (and screenshotting) THIS machine. On a single-device setup the active machine is here.
+    if (t !== LOCAL_MACHINE && !PEER_REACHABLE) return LOCAL_MACHINE;
+    return t;
+  } catch { return LOCAL_MACHINE; }
+};
 const setTarget = t => writeFileSync(TARGET_FILE, t);
 
 // Process inline directives the brain can emit in a reply:
@@ -790,8 +799,9 @@ client.on(Events.MessageCreate, async msg => {
     }
     return;
   }
-  if (/^\/?(where|which|target|status)\b/.test(low)) {
-    await msg.reply(`Active machine: **${getTarget()}**${getTarget() === 'windows' && !HELM_WIN_HOST ? ' (not configured)' : ''}.`);
+  if (/^\/?(where|which|target)\b/.test(low)) {   // NOT "status" — that's the owner's project-status command
+    const tgt = getTarget();
+    await msg.reply(`Active machine: **${tgt}**${tgt !== LOCAL_MACHINE && !PEER_REACHABLE ? ' (peer not reachable)' : ''}.`);
     return;
   }
 

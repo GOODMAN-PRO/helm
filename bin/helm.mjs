@@ -14,7 +14,7 @@
 import net from 'node:net';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');   // repo root
@@ -37,8 +37,15 @@ function brainUp(timeout = 600) {
 // Start the brain detached (background) and wait until its bridge is reachable.
 async function startBrainBackground() {
   process.stderr.write('Helm isn\'t running — starting it…\n');
-  const child = spawn(node, [path.join(ROOT, 'index.js')], { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true });
+  // Capture the brain's stdout+stderr to workspace/helm.log so errors (engine spawn failures, crashes,
+  // routing) are actually recorded — a detached `stdio: 'ignore'` process leaves nothing to debug.
+  const LOGFILE = path.join(ROOT, 'workspace', 'helm.log');
+  let out = 'ignore';
+  try { out = openSync(LOGFILE, 'a'); } catch {}
+  const stdio = out === 'ignore' ? 'ignore' : ['ignore', out, out];
+  const child = spawn(node, [path.join(ROOT, 'index.js')], { cwd: ROOT, detached: true, stdio, windowsHide: true });
   child.unref();
+  process.stderr.write(`(logs: ${LOGFILE})\n`);
   try { writeFileSync(PIDFILE, String(child.pid)); } catch {}
   for (let i = 0; i < 40; i++) {            // up to ~20s for Discord login + bridge listen
     if (await brainUp()) return true;
