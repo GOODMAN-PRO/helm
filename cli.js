@@ -158,8 +158,12 @@ function tui(sock) {
     return COMMANDS.filter(c => c.cmd.replace(/^\//, '').toLowerCase().startsWith(q));
   };
 
-  const enterAlt = () => out(`${ESC}?1049h${ESC}?2004h`);   // alt screen + bracketed paste (cursor stays visible)
-  const leaveAlt = () => out(`${ESC}?2004l${ESC}?25h${ESC}?1049l`);   // bracketed paste off, show cursor, restore
+  // alt screen + bracketed paste + modifyOtherKeys=2. The last one (CSI >4;2m) asks the terminal to
+  // report modified keys as distinct escape sequences — that's what lets us tell Shift+Enter apart from
+  // a plain Enter (normally they send the identical byte). Unknown to a terminal that doesn't support
+  // it, the sequence is simply ignored, so it's safe everywhere.
+  const enterAlt = () => out(`${ESC}?1049h${ESC}?2004h${ESC}>4;2m`);
+  const leaveAlt = () => out(`${ESC}>4;0m${ESC}?2004l${ESC}?25h${ESC}?1049l`);   // reset modifyOtherKeys, paste off, show cursor, restore
   const moveTo = (r, c) => out(`${ESC}${r};${c}H`);
   const clearLine = () => out(`${ESC}2K`);
 
@@ -283,7 +287,7 @@ function tui(sock) {
       const detail = status ? ` ${C.dim}· ${status.replace(/^⚙️\s*/, '')}${C.x}` : '';
       return `${C.cyan}${g}${C.x} ${C.b}${busyVerb}…${C.x} ${C.gray}${secs}s${C.x}${detail} ${C.dim}· esc to interrupt${C.x}`;
     }
-    return status ? `${C.gray}${status}${C.x}` : `${C.dim}/ for commands · ⏎ send · PgUp/PgDn scroll · esc to quit${C.x}`;
+    return status ? `${C.gray}${status}${C.x}` : `${C.dim}/ for commands · ⏎ send · ⇧⏎ newline · PgUp/PgDn scroll · esc to quit${C.x}`;
   }
 
   // Render the rounded, full-width input box with a ghost placeholder when empty.
@@ -295,14 +299,19 @@ function tui(sock) {
     moveTo(H - 2, 1); out(`${C.dim}╭${'─'.repeat(iw - 2)}╮${C.x}`);
     moveTo(H - 1, 1); clearLine();
     const inner = iw - PROMPT_COL;
-    // Multi-line input (e.g. a paste) is summarized like Claude Code: "[N lines pasted]" + a preview
-    // of the first line, so the box doesn't blow up. Single-line input shows normally.
+    // Multi-line input (a paste, or composed with Shift+Enter) shows a "[N lines]" tag plus the line
+    // you're currently on, so the box stays one row tall but you can see what you're typing. Single-line
+    // input shows normally.
     const nlines = input ? input.split('\n').length : 0;
     let display, cursorLen;
     if (nlines > 1) {
-      const first = input.split('\n')[0].slice(0, Math.max(0, inner - 20));
-      const summary = `${C.sky}[${nlines} lines pasted]${C.x} ${C.dim}${first}…${C.x}`;
-      display = summary; cursorLen = stripAnsi(summary).length;
+      const lines = input.split('\n');
+      const cur = lines[lines.length - 1];                 // the line currently being edited
+      const tag = `${C.sky}[${nlines} lines]${C.x} `;
+      const room = Math.max(4, inner - stripAnsi(tag).length);
+      const shownCur = cur.length > room ? '…' + cur.slice(cur.length - (room - 1)) : cur;
+      display = tag + shownCur;
+      cursorLen = stripAnsi(tag).length + shownCur.length;
     } else {
       const shown = input.length > inner ? '…' + input.slice(input.length - (inner - 1)) : input;
       display = input ? shown : `${C.dim}${PLACEHOLDER.slice(0, inner)}${C.x}`;
@@ -441,6 +450,28 @@ function tui(sock) {
     if (wasSplash) draw(); else drawInput();
   }
 
+  // Insert a literal newline into the input — Shift+Enter / Ctrl+Enter / Alt+Enter — so you can compose
+  // a multi-line message. The message is sent only on a plain Enter.
+  function newline() {
+    const wasSplash = splashing;
+    if (splashing) splashing = false;
+    input += '\n';
+    if (wasSplash) draw(); else drawInput();
+  }
+
+  // Act on a "CSI" key event reported by modifyOtherKeys (ESC[27;mod;key~) or the kitty/CSI-u protocol
+  // (ESC[key;mod u). key = the base keycode/ASCII, mod = 1 + bitmask(Shift1 Alt2 Ctrl4).
+  function csiKey(key, mod) {
+    const ctrl = ((mod - 1) & 4) !== 0;
+    if (key === 13 || key === 10) return mod > 1 ? newline() : handleKey('return', null, false);   // modified Enter -> newline
+    if (key === 27) return handleKey('escape', null, false);
+    if (key === 9)  return handleKey('tab', null, false);
+    if (key === 127 || key === 8) return handleKey('backspace', null, false);
+    if (ctrl && key >= 32 && key < 127) { const ch = String.fromCharCode(key).toLowerCase(); return handleKey(ch, ch, true); }
+    if (mod === 1 && key >= 32 && key < 127) return handleKey(null, String.fromCharCode(key), false);   // unmodified printable
+    // alt/shift-only combos and anything else: ignore
+  }
+
   // Walk a run of raw bytes that contains NO paste: arrows/keys, Enter, backspace, ctrl keys, chars.
   const KEYSEQ = { '\x1b[A':'up','\x1b[B':'down','\x1b[C':'right','\x1b[D':'left',
     '\x1b[5~':'pageup','\x1b[6~':'pagedown','\x1b[H':'home','\x1b[F':'end','\x1b[3~':'delete',
@@ -448,9 +479,21 @@ function tui(sock) {
   function feedKeys(s) {
     while (s.length) {
       if (s[0] === '\x1b') {
+        // Alt/Meta+Enter arrives as ESC + CR/LF -> newline
+        if (s[1] === '\r' || s[1] === '\n') { s = s.slice(2); newline(); continue; }
+        // modifyOtherKeys form: ESC [ 27 ; mod ; key ~   (this is what Shift+Enter becomes)
+        let mk = s.match(/^\x1b\[27;(\d+);(\d+)~/);
+        if (mk) { s = s.slice(mk[0].length); csiKey(+mk[2], +mk[1]); continue; }
+        // kitty / fixterms form: ESC [ key ; mod u   (or ESC [ key u)
+        let ku = s.match(/^\x1b\[(\d+)(?:;(\d+))?u/);
+        if (ku) { s = s.slice(ku[0].length); csiKey(+ku[1], ku[2] ? +ku[2] : 1); continue; }
+        // exact key sequences (arrows, pgup, etc.)
         let m = null;
         for (const k of Object.keys(KEYSEQ)) if (s.startsWith(k)) { m = k; break; }
         if (m) { s = s.slice(m.length); handleKey(KEYSEQ[m], null, false); continue; }
+        // modified arrows: ESC [ 1 ; mod (A-D) — map to the base arrow (only when fully arrived)
+        let ma = s.match(/^\x1b\[1;\d+([A-D])/);
+        if (ma) { const map = { A:'up', B:'down', C:'right', D:'left' }; s = s.slice(ma[0].length); handleKey(map[ma[1]], null, false); continue; }
         if (/^\x1b(\[[0-9;]*|O)$/.test(s)) { keyCarry = s; return; }   // incomplete escape seq — wait for more
         s = s.slice(1); handleKey('escape', null, false); continue;     // a bare Esc
       }
