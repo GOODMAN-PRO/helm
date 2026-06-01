@@ -69,6 +69,20 @@ cd ~/helm && npm start
 Keep it running 24/7 — `bash ~/helm/scripts/install-service.sh` (launchd / systemd) or, on Windows,
 `powershell -File scripts\install-service.ps1` (Task Scheduler).
 
+**Talk to it from your terminal with one command.** Register `helm` on your PATH once:
+```bash
+cd ~/helm && npm link
+```
+Then, from anywhere:
+```bash
+helm                 # open the terminal chat (starts Helm if it isn't running)
+helm "summarize my downloads folder"   # one-shot: send a message, print the reply
+echo "what changed in this repo?" | helm
+```
+The terminal is a live client of the one running Helm — the same brain, memory and conversation it
+uses on Discord and iMessage. (`helm start` runs the service in the foreground, `helm setup` the
+wizard, `helm stop` a background instance, `helm --help` for all of it.)
+
 ### Setup, step by step
 
 The install command above does steps 1–2 for you, then the wizard walks you through 3–5. Same on

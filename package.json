@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Your own tiny AI agent — Discord (+ iMessage on Mac) -> Claude on your subscription -> action.",
   "bin": {
+    "helm": "bin/helm.mjs",
     "helm-install": "bin/helm-install.mjs"
   },
   "scripts": {
