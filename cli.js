@@ -286,17 +286,20 @@ function tui(sock) {
   }
 
   // Render the rounded, full-width input box with a ghost placeholder when empty.
+  // The prompt is "│ > " = 4 columns before the text starts at column 5. Use ASCII ">" (always 1
+  // column wide — unlike ❯/U+276F, which some terminals render double-width and shove the cursor off).
+  const PROMPT_COL = 5;   // column where typed text begins
   function drawInputBox() {
     const iw = W - 2;
     moveTo(H - 2, 1); out(`${C.dim}╭${'─'.repeat(iw - 2)}╮${C.x}`);
     moveTo(H - 1, 1); clearLine();
-    const inner = iw - 5;
+    const inner = iw - PROMPT_COL;
     const shown = input.length > inner ? '…' + input.slice(input.length - (inner - 1)) : input;
     const body = input ? shown : `${C.dim}${PLACEHOLDER.slice(0, inner)}${C.x}`;
-    out(`${C.dim}│${C.x} ${C.cyan}❯${C.x} ${body}${ESC}K ${C.dim}│${C.x}`);
+    out(`${C.dim}│${C.x} ${C.cyan}>${C.x} ${body}${ESC}K`);
     moveTo(H, 1); out(`${C.dim}╰${'─'.repeat(iw - 2)}╯${C.x}`);
-    // cursor sits right after the typed text (at the prompt if empty)
-    moveTo(H - 1, 5 + (input ? stripAnsi(shown).length : 0));
+    // cursor sits right after the typed text (at the prompt position if empty)
+    moveTo(H - 1, PROMPT_COL + (input ? stripAnsi(shown).length : 0));
   }
 
   // Lightweight redraw of JUST the input line (no full-screen clear) — used while typing so the
