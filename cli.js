@@ -82,6 +82,19 @@ const WORD = [
 ];
 const GRAD = [C.teal, C.teal, C.cyan, C.cyan, C.sky, C.sky];   // per-row gradient for the wordmark
 
+// Strip markdown markers to PLAIN text (for width-correct wrapping). Helm replies are markdown
+// (**bold**, _italic_, `code`); the terminal can't render those, so we show the words without the
+// noise symbols. Applied before wrapping so line widths stay accurate.
+function demarkdown(s) {
+  return String(s)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')      // **bold**  -> bold
+    .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1$2')  // *italic* -> italic (avoid bullets)
+    .replace(/(^|[\s(])_([^_\n]+)_/g, '$1$2')    // _italic_ -> italic
+    .replace(/`([^`]+)`/g, '$1')            // `code`    -> code
+    .replace(/^#{1,6}\s+/gm, '')            // # heading -> heading
+    .replace(/^\s*[-*]\s+/gm, '• ');        // - bullet  -> • bullet
+}
+
 // word-wrap a plain string to width, preserving explicit newlines
 function wrap(text, width) {
   const lines = [];
@@ -159,7 +172,7 @@ function tui(sock) {
         : m.role === 'other' ? `${C.sky}${m.label || 'other'}${C.x}`
         : `${C.gray}·${C.x}`;
       const bodyColor = m.role === 'sys' ? C.gray : '';
-      const wrapped = wrap(m.text, w - 7);     // indent body under the tag
+      const wrapped = wrap(demarkdown(m.text), w - 7);     // strip markdown, then indent body under the tag
       wrapped.forEach((ln, i) => {
         const prefix = i === 0 ? `${tag.padEnd(5 + (tag.length - stripAnsi(tag).length))} ${C.dim}│${C.x} ` : `      ${C.dim}│${C.x} `;
         lines.push(prefix + bodyColor + ln + (bodyColor ? C.x : ''));

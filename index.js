@@ -663,9 +663,16 @@ client.on(Events.MessageCreate, async msg => {
   const useM = low.match(/^\/?use\s+(mac|windows|win|pc)\b/);
   if (useM) {
     const t = (useM[1] === 'mac') ? 'mac' : 'windows';
-    setTarget(t);
-    const note = (t === 'windows' && !HELM_WIN_HOST) ? ' — not configured yet (set HELM_WIN_HOST in .env)' : '';
-    await msg.reply(`Active machine: **${t}**${note}.`);
+    if (t === LOCAL_MACHINE) {
+      setTarget(t);
+      await msg.reply(`Already on **${t}** (this machine). Working here.`);
+    } else if (!PEER_REACHABLE) {
+      // Switching to the OTHER machine needs a configured, reachable peer. Don't pretend it worked.
+      await msg.reply(`Can't switch to **${t}** — no second machine is connected. This is a single-device setup (running on **${LOCAL_MACHINE}**). To add a peer, set HELM_WIN_HOST in .env, then \`use ${t}\` again. Staying on **${LOCAL_MACHINE}**.`);
+    } else {
+      setTarget(t);
+      await msg.reply(`Active machine: **${t}**. The other peer will handle the next message.`);
+    }
     return;
   }
   if (/^\/?(where|which|target|status)\b/.test(low)) {
