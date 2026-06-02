@@ -1169,12 +1169,23 @@ startCliBridge(async (text, reply) => {
   } finally { cliBusy = false; }
 });
 
+// Peer-only mode: do NOT connect to Discord. One Discord token = one gateway, but a fleet runs Helm on
+// more than one machine — if two connect to the same token they BOTH reply to every message (you saw
+// "Active machine: windows" AND "...: mac" for one `where`). The same-machine lock can't stop a second
+// MACHINE. So the non-gateway machine runs with HELM_PEER_ONLY=1: it stays a full local Helm (terminal
+// bridge, SSH peer) but never joins Discord — so only the one gateway answers. Set it on whichever
+// machine should NOT own Discord (e.g. the Mac if you drive Helm from Windows).
+const PEER_ONLY = /^(1|true|yes|on)$/i.test(process.env.HELM_PEER_ONLY || '');
+if (PEER_ONLY) {
+  console.log('🔇 HELM_PEER_ONLY set — not connecting to Discord (peer-only mode). Reachable via the terminal bridge and as an SSH peer; the gateway machine owns Discord.');
+}
+
 // Connect to Discord, with a clear reason if it can't (so "offline" isn't a mystery).
-if (/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
+if (!PEER_ONLY && /paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
   console.error('✋ DISCORD_TOKEN is still the placeholder. Run `npm run wizard` and paste your bot token (Developer Portal → your app → Bot → Reset Token).');
   process.exit(1);
 }
-client.login(DISCORD_TOKEN).catch(async e => {
+if (!PEER_ONLY) client.login(DISCORD_TOKEN).catch(async e => {
   const m = String(e?.message || e);
   if (/token/i.test(m)) {
     console.error('✋ Discord login failed: invalid DISCORD_TOKEN. Each bot needs its OWN token — get one at Developer Portal → your app → Bot → Reset Token, then `npm run wizard`. (One token = one running bot.)');

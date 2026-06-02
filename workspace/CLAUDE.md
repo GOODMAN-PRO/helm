@@ -111,6 +111,12 @@ already synced in.**
 - **Transfer files:** `pull <path>` (other machine → this one, into `workspace/inbox`) and `push <path>`
   (this machine → the other's `helm-inbox`). Or `scp` over the configured SSH alias (forward slashes).
 This is standalone (SSH/Tailscale, no cloud, no money).
+- **ONE gateway owns Discord (no duplicate replies).** One Discord token = one bot. If TWO machines run
+  the full bot on the same token, BOTH answer every message (you'll see "Active machine: windows" AND
+  "...: mac" for one `where`). The same-machine single-instance lock can't stop a second *machine*. So
+  exactly one machine connects to Discord; on the other set **`HELM_PEER_ONLY=1`** in its `.env` — it
+  stays a full local Helm (terminal bridge + SSH peer) but never joins Discord. The gateway reaches the
+  peer over SSH (`use mac`/`use windows`). Rule: run the bot on one machine; `HELM_PEER_ONLY=1` on any other.
 
 ## Templates (share your Helm's flavor)
 A template is a safe-to-share bundle of how a Helm looks/behaves — persona/style, gateways, model,
