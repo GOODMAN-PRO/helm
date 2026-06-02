@@ -117,14 +117,6 @@ function upgradeHistory() {
   }
 }
 
-function fleetTarget() {
-  try {
-    return readFileSync(path.join(WORKSPACE, 'active-target'), 'utf8').trim() || 'mac';
-  } catch {
-    return 'mac';
-  }
-}
-
 function gitLog() {
   try {
     const r = spawnSync('git', ['log', '--oneline', '-5'], { encoding: 'utf8', cwd: ROOT, timeout: 5000 });
@@ -164,7 +156,6 @@ function buildState() {
     jobs: schedulerJobs(),
     journal: thinkJournal(),
     upgradeHistory: upgradeHistory(),
-    fleetTarget: fleetTarget(),
     gitLog: gitLog(),
     recentRuns: recentRuns(),
   };
@@ -400,8 +391,6 @@ ${renderAllCards(state)}
   }
   function renderAllCards(state) {
     return '<div class="card"><h2>Services</h2>' + renderServices(state.services) + '</div>' +
-      '<div class="card"><h2>Fleet Target</h2><p class="fleet-badge">' + esc(state.fleetTarget) + '</p>' +
-      '<p class="dim" style="margin-top:8px">Read from workspace/active-target</p></div>' +
       '<div class="card full"><h2>Memory</h2>' + renderMemory(state.memory) + '</div>' +
       '<div class="card full"><h2>Scheduler Jobs</h2>' + renderJobs(state.jobs) + '</div>' +
       '<div class="card"><h2>Think Journal</h2>' + renderJournal(state.journal) + '</div>' +
@@ -448,11 +437,6 @@ function renderAllCards(state) {
   <div class="card">
     <h2>Services</h2>
     ${renderServices(state.services)}
-  </div>
-  <div class="card">
-    <h2>Fleet Target</h2>
-    <p class="fleet-badge">${esc(state.fleetTarget)}</p>
-    <p class="dim" style="margin-top:8px">Read from workspace/active-target</p>
   </div>
   <div class="card full">
     <h2>Memory</h2>

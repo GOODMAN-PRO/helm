@@ -9,6 +9,7 @@
 // Launched by launchd com.helm.think. Uses a light model (sonnet) so 24/7 cadence stays sustainable.
 
 import { spawnSync } from 'node:child_process';
+import { resolveClaude } from '../lib/engine.mjs';
 import { existsSync, writeFileSync, appendFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -175,11 +176,12 @@ function tick() {
   writeFileSync(THINK_LOCK, String(process.pid));
   try {
     log(`tick start (${deep ? 'WEEKLY deep review' : 'cheap'})`);
-    const r = spawnSync(CLAUDE_BIN, [
+    const cb = resolveClaude();
+    const r = spawnSync(cb.cmd, [
       '-p', '--output-format', 'json', '--model', MODEL,
       '--permission-mode', 'bypassPermissions', '--add-dir', ROOT,
       '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-    ], { cwd: WORKSPACE, input: prompt, encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024 });
+    ], { cwd: WORKSPACE, input: prompt, encoding: 'utf8', timeout, maxBuffer: 32 * 1024 * 1024, shell: cb.shell, windowsHide: true });
 
     let thought = '';
     try { thought = (JSON.parse(r.stdout).result || '').trim(); }

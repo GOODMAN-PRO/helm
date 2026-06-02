@@ -124,8 +124,7 @@ const COMMANDS = [
   { cmd: '!mode',  desc: 'show or set autonomy: !mode suggest|copilot|autopilot' },
   { cmd: '!model', desc: 'show or pin the model: !model opus|sonnet|haiku|auto' },
   { cmd: 'vault',  desc: 'store a secret: vault <NAME> <value>  ·  vault list' },
-  { cmd: 'where',  desc: 'show which machine (peer) is active' },
-  { cmd: 'use',    desc: 'switch active machine: use mac | use windows' },
+  { cmd: 'doctor', desc: 'check your setup: Node, engine, model, config' },
 ];
 
 function tui(sock) {
@@ -397,9 +396,9 @@ function tui(sock) {
     if (!items.length) return false;
     const chosen = items[menuIdx] || items[0];
     // commands that take args get the name + a space so you can keep typing; bare ones are ready to send
-    const takesArgs = /!mode|!model|vault|use|^\/?(pull|push|mind)/.test(chosen.cmd);
+    const takesArgs = /!mode|!model|vault|^\/?mind/.test(chosen.cmd);
     input = chosen.cmd + (takesArgs ? ' ' : '');
-    if (!takesArgs) return submit(), true;   // run /help, /exit, stop, where immediately
+    if (!takesArgs) return submit(), true;   // run bare commands (/help, /exit, stop, doctor) immediately
     draw(); return true;
   }
 

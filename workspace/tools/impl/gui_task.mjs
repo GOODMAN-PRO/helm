@@ -9,6 +9,7 @@
 
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { resolveClaude } from '../../lib/engine.mjs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
@@ -36,8 +37,9 @@ function verifyWithClaude(description, imgPath) {
     `{"verified":false,"failure_class":"<WRONG_ELEMENT|NOT_FOUND|PAGE_NOT_LOADED|AUTH_WALL>","explanation":"<one sentence>"}. ` +
     `No markdown, no extra text.\n\nImage file path: ${imgPath}`;
 
+  const cb = resolveClaude();
   const r = spawnSync(
-    'claude',
+    cb.cmd,
     [
       '-p',
       '--output-format', 'json',
@@ -46,7 +48,7 @@ function verifyWithClaude(description, imgPath) {
       '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
       '--max-turns', '3',
     ],
-    { input: prompt, encoding: 'utf8', timeout: 120_000 }
+    { input: prompt, encoding: 'utf8', timeout: 120_000, shell: cb.shell, windowsHide: true }
   );
   if (r.status !== 0) {
     throw new Error(`claude verify call failed (exit ${r.status}): ${(r.stderr ?? '').slice(0, 300)}`);
@@ -117,7 +119,8 @@ async function main() {
 
   const result = await guiStep(
     () => {
-      const r = spawnSync('/bin/sh', ['-c', cmd], { encoding: 'utf8', stdio: ['ignore', 'inherit', 'inherit'] });
+      // shell:true uses the OS default shell (/bin/sh on POSIX, cmd.exe on Windows) — '/bin/sh' doesn't exist on Windows.
+      const r = spawnSync(cmd, { shell: true, encoding: 'utf8', stdio: ['ignore', 'inherit', 'inherit'] });
       if (r.error) throw new Error(`action exec failed: ${r.error.message}`);
       if (r.status !== 0) throw new Error(`action exited ${r.status}`);
     },

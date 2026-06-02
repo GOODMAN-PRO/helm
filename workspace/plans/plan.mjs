@@ -16,6 +16,7 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { resolveClaude } from '../lib/engine.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH   = path.join(__dirname, 'plans.db');
@@ -138,14 +139,15 @@ function runnableSteps(planId) {
 
 // Run a single-turn claude -p call; returns stdout text or null on failure.
 function claudeOneTurn(prompt, timeoutMs) {
+  const cb = resolveClaude();
   const r = spawnSync(
-    'claude',
+    cb.cmd,
     ['-p', '--output-format', 'json',
      '--model', 'haiku',
      '--permission-mode', 'bypassPermissions',
      '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
      '--max-turns', '1'],
-    { input: prompt, encoding: 'utf8', timeout: timeoutMs }
+    { input: prompt, encoding: 'utf8', timeout: timeoutMs, shell: cb.shell, windowsHide: true }
   );
   if (r.status !== 0) return null;
   try {

@@ -10,6 +10,7 @@
 //
 // The vault path is machine-aware (Mac/Windows) and overridable with HELM_BRAIN.
 import { spawnSync } from 'node:child_process';
+import { resolveClaude } from '../../lib/engine.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -55,13 +56,14 @@ function buildPrompt(verb, input) {
 
 function run(verb, input) {
   const prompt = buildPrompt(verb, input);
-  const r = spawnSync(CLAUDE_BIN, [
+  const cb = resolveClaude();
+  const r = spawnSync(cb.cmd, [
     '-p', '--output-format', 'json',
     '--model', process.env.MIND_MODEL || 'sonnet',
     '--permission-mode', process.env.PERMISSION_MODE || 'bypassPermissions',
     '--add-dir', vaultPath(), '--add-dir', ROOT,
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-  ], { input: prompt, encoding: 'utf8', timeout: 20 * 60_000, maxBuffer: 128 * 1024 * 1024 });
+  ], { input: prompt, encoding: 'utf8', timeout: 20 * 60_000, maxBuffer: 128 * 1024 * 1024, shell: cb.shell, windowsHide: true });
   if (r.status !== 0) { console.error((r.stderr || 'claude failed').slice(0, 800)); process.exit(r.status || 1); }
   try { console.log((JSON.parse(r.stdout).result || '').trim()); }
   catch { console.log((r.stdout || '').trim()); }

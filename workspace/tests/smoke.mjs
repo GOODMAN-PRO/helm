@@ -474,7 +474,7 @@ function fail(label, reason) {
     const apiRes = await fetch(url + '/api/state');
     if (apiRes.status !== 200) throw new Error(`GET /api/state returned ${apiRes.status}`);
     const state = await apiRes.json();
-    for (const key of ['ts', 'services', 'memory', 'jobs', 'journal', 'upgradeHistory', 'fleetTarget', 'gitLog']) {
+    for (const key of ['ts', 'services', 'memory', 'jobs', 'journal', 'upgradeHistory', 'gitLog']) {
       if (!(key in state)) throw new Error(`/api/state missing key: ${key}`);
     }
     if (!Array.isArray(state.services)) throw new Error('state.services is not an array');

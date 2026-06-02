@@ -26,6 +26,15 @@ db.exec(`
   );
 `);
 
+// A brand-new DB created above (and older DBs) lacks the temporal columns that memory.mjs and
+// consolidate.mjs add lazily. Add them idempotently BEFORE the dedup DELETE references expired_at —
+// otherwise the first migration on a FRESH DB crashes with "no such column: expired_at".
+for (const ddl of [
+  `ALTER TABLE facts ADD COLUMN valid_from INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE facts ADD COLUMN expired_at INTEGER`,
+  `ALTER TABLE facts ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0`,
+]) { try { db.exec(ddl); } catch {} }
+
 // Deduplicate active rows only — keep lowest id per (kind, key) among non-expired rows.
 // Expired rows are historical records and must not be touched.
 db.exec(`

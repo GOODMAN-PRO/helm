@@ -20,7 +20,8 @@ const get     = k => { const i = rawArgs.indexOf(`--${k}`); return i !== -1 ? ra
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 function curlGet(url) {
-  const r = spawnSync('/usr/bin/curl', [
+  // Bare 'curl' (not /usr/bin/curl): Windows 10+ ships curl.exe and POSIX has curl on PATH — cross-platform.
+  const r = spawnSync('curl', [
     '-sL', '--max-time', '20', '--max-filesize', '5000000',
     '-A', UA, '--compressed',
     '-H', 'Accept: text/html,application/xhtml+xml',

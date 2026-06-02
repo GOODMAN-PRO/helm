@@ -10,6 +10,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
+import { resolveClaude } from '../../lib/engine.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { captureScreen } from './capture-screen.mjs';
@@ -32,8 +33,9 @@ function screenshot(imgPath) {
 
 function askClaude(prompt, imagePath) {
   const fullPrompt = `${prompt}\n\nImage file path: ${imagePath}`;
+  const cb = resolveClaude();
   const r = spawnSync(
-    'claude',
+    cb.cmd,
     [
       '-p',
       '--output-format', 'json',
@@ -42,7 +44,7 @@ function askClaude(prompt, imagePath) {
       '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
       '--max-turns', '3',
     ],
-    { input: fullPrompt, encoding: 'utf8', timeout: 120_000 }
+    { input: fullPrompt, encoding: 'utf8', timeout: 120_000, shell: cb.shell, windowsHide: true }
   );
   if (r.status !== 0) throw new Error((r.stderr || '').slice(0, 400) || 'claude exited non-zero');
   let out = r.stdout.trim();

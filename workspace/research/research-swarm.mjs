@@ -6,6 +6,7 @@
 // usage: node workspace/research/research-swarm.mjs [--workers 5] [--model sonnet]
 
 import { spawn, spawnSync } from 'node:child_process';
+import { resolveClaude } from '../lib/engine.mjs';
 import { readFileSync, appendFileSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,9 +31,10 @@ const notify = m => { try { spawnSync(process.execPath, [path.join(ROOT, 'bin', 
 
 function runClaude(cwd, prompt, capMin) {
   return new Promise(resolve => {
-    const child = spawn(CLAUDE, ['-p', '--output-format', 'json', '--model', MODEL,
+    const cb = resolveClaude();
+    const child = spawn(cb.cmd, ['-p', '--output-format', 'json', '--model', MODEL,
       '--permission-mode', 'bypassPermissions', '--add-dir', cwd,
-      '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}'], { cwd });
+      '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}'], { cwd, shell: cb.shell, windowsHide: true });
     let out = '', err = '';
     const kill = setTimeout(() => child.kill(), capMin * 60_000);
     child.stdout.on('data', d => { out += d; });

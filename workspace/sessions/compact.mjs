@@ -159,7 +159,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (inputFile) {
     context = readFileSync(inputFile, 'utf8');
   } else {
-    try { context = readFileSync('/dev/stdin', 'utf8'); } catch {}
+    try { context = readFileSync(0, 'utf8'); } catch {}   // fd 0 = stdin; cross-platform ('/dev/stdin' is POSIX-only)
   }
 
   if (!context.trim()) {

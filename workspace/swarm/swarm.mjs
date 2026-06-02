@@ -13,6 +13,7 @@
 //        [--build-model sonnet] [--review-model sonnet] [--tasks <file>] [--dry]
 
 import { spawn, spawnSync } from 'node:child_process';
+import { resolveClaude } from '../lib/engine.mjs';
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +47,9 @@ const ts = () => new Date().toISOString();
 const log = m => { const l = `[swarm ${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
 const flushTasks = tasks => { try { writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2)); } catch (e) { log('WARN: could not flush tasks: ' + e.message); } };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
+// On Windows npm is npm.cmd — spawnSync can't run a .cmd without a shell (ENOENT). Route npm via shell there.
+const IS_WIN = process.platform === 'win32';
+const npm = (args, opts = {}) => sh(IS_WIN ? 'npm.cmd' : 'npm', args, { shell: IS_WIN, ...opts });
 const git = (cwd, ...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', '-C', cwd, ...a]);
 const notify = msg => { try { sh(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
 // Extract the LAST VERDICT line — reviewers may quote previous verdicts before writing their own.
@@ -53,11 +57,12 @@ const lastVerdict = s => { const ms = (s || '').match(/VERDICT:\s*(?:APPROVE|REJ
 
 function runClaude(cwd, model, prompt) {
   return new Promise(resolve => {
-    const child = spawn(CLAUDE, [
+    const cb = resolveClaude();
+    const child = spawn(cb.cmd, [
       '-p', '--output-format', 'json', '--model', model,
       '--permission-mode', 'bypassPermissions', '--add-dir', cwd,
       '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-    ], { cwd });
+    ], { cwd, shell: cb.shell, windowsHide: true });
     let out = '', err = '';
     const kill = setTimeout(() => child.kill(), AGENT_CAP_MS);
     child.stdout.on('data', d => { out += d; });
@@ -264,12 +269,12 @@ const reviewPrompt = (t, builderSummary, handoff) => [
         continue;
       }
     }
-    if (git(ROOT, 'diff', '--name-only', before, 'HEAD').stdout.includes('package.json')) sh('npm', ['install', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
+    if (git(ROOT, 'diff', '--name-only', before, 'HEAD').stdout.includes('package.json')) npm(['install', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
     t.status = 'merged-pending-smoke'; if (!DRY) flushTasks(tasks);
     const smoke = sh('node', ['workspace/tests/smoke.mjs'], { cwd: ROOT, timeout: 12 * 60_000 });
     if (smoke.status !== 0) {
       git(ROOT, 'reset', '--hard', before);
-      sh('npm', ['ci', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
+      npm(['ci', '--no-audit', '--no-fund'], { cwd: ROOT, timeout: 10 * 60_000 });
       t.status = 'pending'; if (!DRY) flushTasks(tasks);
       results.push({ id: t.id, status: 'reverted-smoke' }); log(`reverted ${t.id} (smoke fail)`);
     } else {

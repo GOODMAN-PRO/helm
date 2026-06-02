@@ -57,6 +57,8 @@ workspace/swarm/bugsweep.json.bak
 
 # secrets vault (encrypted, but never commit)
 workspace/secrets/vault.json
+# vault master key (macOS uses Keychain; Windows/Linux store it here — never commit)
+workspace/secrets/master.key
 
 workspace/inbox/
 

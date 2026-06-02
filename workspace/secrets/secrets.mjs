@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Helm secrets vault — share sensitive info with Helm WITHOUT putting it in chat or git.
 //
-// Secrets are encrypted at rest (AES-256-GCM). The master key lives in the macOS Keychain
-// (never in the repo). The owner adds secrets locally via stdin (never as a CLI arg, so they
+// Secrets are encrypted at rest (AES-256-GCM). The master key lives in the macOS Keychain, or on
+// Windows a DPAPI-encrypted key file (Linux: a 0600 key file) — never in the repo. The owner adds
+// secrets locally via stdin (never as a CLI arg, so they
 // don't leak into shell history or the process list). Helm reads them with `get` when it needs
 // a credential — the plaintext never touches Discord/iMessage logs or git.
 //
@@ -26,24 +27,52 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const VAULT = process.env.HELM_VAULT_FILE || path.join(__dirname, 'vault.json');
 const KC_ACCOUNT = 'helm', KC_SERVICE = 'helm-vault-key';
+const KEYFILE = process.env.HELM_VAULT_KEYFILE || path.join(__dirname, 'master.key');
+const IS_MAC = process.platform === 'darwin';
+const IS_WIN = process.platform === 'win32';
 
 const die = m => { console.error(m); process.exit(1); };
 const out = o => console.log(JSON.stringify(o, null, 2));
 
+// Windows DPAPI: encrypt/decrypt bound to the current Windows user — the key never sits in plaintext
+// at rest (the CurrentUser scope ties it to this account, like the Keychain does on macOS).
+function ps(script) {
+  const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' });
+  if (r.status !== 0) throw new Error((r.stderr || 'powershell failed').trim());
+  return r.stdout.trim();
+}
+const dpapiProtect   = hex => ps(`Add-Type -AssemblyName System.Security; [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes('${hex}'),$null,'CurrentUser'))`);
+const dpapiUnprotect = b64 => ps(`Add-Type -AssemblyName System.Security; [Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String('${b64}'),$null,'CurrentUser'))`);
+
+// Master-key store, per platform. macOS -> Keychain. Windows -> DPAPI-wrapped key file. Linux -> 0600 file.
 function keychainGet() {
-  const r = spawnSync('/usr/bin/security', ['find-generic-password', '-a', KC_ACCOUNT, '-s', KC_SERVICE, '-w'], { encoding: 'utf8' });
-  return r.status === 0 ? r.stdout.trim() : null;
+  if (IS_MAC) {
+    const r = spawnSync('/usr/bin/security', ['find-generic-password', '-a', KC_ACCOUNT, '-s', KC_SERVICE, '-w'], { encoding: 'utf8' });
+    return r.status === 0 ? r.stdout.trim() : null;
+  }
+  if (!existsSync(KEYFILE)) return null;
+  const stored = readFileSync(KEYFILE, 'utf8').trim();
+  if (!stored) return null;
+  try { return IS_WIN ? dpapiUnprotect(stored) : stored; } catch { return null; }
 }
 function keychainSet(hex) {
-  // -U updates if it already exists
-  const r = spawnSync('/usr/bin/security', ['add-generic-password', '-a', KC_ACCOUNT, '-s', KC_SERVICE, '-w', hex, '-U'], { encoding: 'utf8' });
-  if (r.status !== 0) die('keychain write failed: ' + (r.stderr || '').trim());
+  if (IS_MAC) {
+    // -U updates if it already exists
+    const r = spawnSync('/usr/bin/security', ['add-generic-password', '-a', KC_ACCOUNT, '-s', KC_SERVICE, '-w', hex, '-U'], { encoding: 'utf8' });
+    if (r.status !== 0) die('keychain write failed: ' + (r.stderr || '').trim());
+    return;
+  }
+  mkdirSync(path.dirname(KEYFILE), { recursive: true });
+  let toStore = hex;
+  if (IS_WIN) { try { toStore = dpapiProtect(hex); } catch (e) { die('DPAPI key encryption failed: ' + e.message); } }
+  writeFileSync(KEYFILE, toStore);
+  try { chmodSync(KEYFILE, 0o600); } catch {}
 }
 function getKey() {
   const env = process.env.HELM_VAULT_KEY;
   if (env) { if (!/^[0-9a-fA-F]{64}$/.test(env)) die('HELM_VAULT_KEY must be 64 hex chars'); return Buffer.from(env, 'hex'); }
   const kc = keychainGet();
-  if (!kc) die('no vault key — run: node workspace/secrets/secrets.mjs init');
+  if (!kc) die('no vault key — run: node workspace/secrets/secrets.mjs init  (or set HELM_VAULT_KEY=<64 hex> in the environment)');
   return Buffer.from(kc, 'hex');
 }
 function loadVault() { try { return JSON.parse(readFileSync(VAULT, 'utf8')); } catch { return {}; } }
@@ -73,7 +102,9 @@ switch (verb) {
     if (process.env.HELM_VAULT_KEY) { console.log('using HELM_VAULT_KEY from env; nothing to do'); break; }
     if (keychainGet()) { console.log('vault key already present in Keychain'); break; }
     keychainSet(crypto.randomBytes(32).toString('hex'));
-    console.log('vault key created and stored in macOS Keychain');
+    console.log(IS_MAC ? 'vault key created and stored in the macOS Keychain'
+      : IS_WIN ? `vault key created and stored DPAPI-encrypted at ${KEYFILE}`
+      : `vault key created and stored (0600 file) at ${KEYFILE}`);
     break;
   }
   case 'set': {

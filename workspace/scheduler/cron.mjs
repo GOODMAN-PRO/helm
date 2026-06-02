@@ -43,9 +43,13 @@ export function cronMatches(expr, date = new Date()) {
 
   if (minute && !minute.has(date.getUTCMinutes()))   return false;
   if (hour   && !hour.has(date.getUTCHours()))       return false;
-  if (dom    && !dom.has(date.getUTCDate()))          return false;
   if (month  && !month.has(date.getUTCMonth() + 1))  return false;
-  if (dow    && !dow.has(date.getUTCDay()))           return false;
+  // Day-of-month + day-of-week follow standard (Vixie) cron: when BOTH are restricted, fire if EITHER
+  // matches (OR); when only one is restricted, that one must match. (parseField returns falsy for '*'.)
+  const domMatch = !dom || dom.has(date.getUTCDate());
+  const dowMatch = !dow || dow.has(date.getUTCDay());
+  if (dom && dow) { if (!domMatch && !dowMatch) return false; }
+  else if (!domMatch || !dowMatch) return false;
   return true;
 }
 

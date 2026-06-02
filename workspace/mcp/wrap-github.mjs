@@ -29,7 +29,7 @@ const env = { ...process.env, GITHUB_PERSONAL_ACCESS_TOKEN: r.stdout.trim() };
 const child = spawn('npx', ['-y', '@modelcontextprotocol/server-github'], {
   stdio: 'inherit',
   env,
-  shell: false,
+  shell: process.platform === 'win32',  // npx is npx.cmd on Windows — needs a shell or it ENOENTs
 });
 child.on('error', e => { process.stderr.write('[mcp/github] spawn error: ' + e.message + '\n'); process.exit(1); });
 child.on('exit', code => process.exit(code ?? 0));

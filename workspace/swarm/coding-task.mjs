@@ -10,6 +10,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveClaude } from '../lib/engine.mjs';
 import { applyEdits } from './apply-edit.mjs';
 import { view_file } from './tools/view_file.mjs';
 
@@ -18,13 +19,14 @@ const PHASE_CAP_MS = 5 * 60_000;
 
 function runClaude(cwd, model, prompt) {
   return new Promise(resolve => {
-    const child = spawn(CLAUDE, [
+    const cb = resolveClaude();
+    const child = spawn(cb.cmd, [
       '-p', '--output-format', 'json', '--model', model,
       '--permission-mode', 'bypassPermissions',
       '--add-dir', cwd,
       '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
       '--max-turns', '1',
-    ], { cwd });
+    ], { cwd, shell: cb.shell, windowsHide: true });
     let out = '', err = '';
     const kill = setTimeout(() => child.kill(), PHASE_CAP_MS);
     child.stdin.on('error', () => {});

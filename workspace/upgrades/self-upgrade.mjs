@@ -10,6 +10,7 @@
 //   HELM_UPGRADE_SKIP_SMOKE=1 skip the smoke gate (plumbing test only)
 
 import { spawnSync } from 'node:child_process';
+import { resolveClaude } from '../lib/engine.mjs';
 import { existsSync, writeFileSync, appendFileSync, readFileSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -146,11 +147,12 @@ try {
       queue,
     ].join('\n');
     log('running claude self-improvement (up to ~4.5h; nightly 00:00-05:00 window)...');
-    const cl = spawnSync(CLAUDE_BIN, [
+    const cb = resolveClaude();
+    const cl = spawnSync(cb.cmd, [
       '-p', '--output-format', 'json', '--model', MODEL,
       '--permission-mode', 'bypassPermissions', '--add-dir', ROOT,
       '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-    ], { cwd: ROOT, input: prompt, encoding: 'utf8', timeout: 270 * 60_000, maxBuffer: 256 * 1024 * 1024 });
+    ], { cwd: ROOT, input: prompt, encoding: 'utf8', timeout: 270 * 60_000, maxBuffer: 256 * 1024 * 1024, shell: cb.shell, windowsHide: true });
     try { summary = (JSON.parse(cl.stdout).result || '').trim(); } catch { summary = (cl.stdout || cl.stderr || '').trim().slice(-1500); }
     log(`claude exit ${cl.status}`);
   }

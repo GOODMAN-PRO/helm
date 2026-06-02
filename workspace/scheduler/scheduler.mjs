@@ -5,6 +5,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { spawn, spawnSync } from 'node:child_process';
+import { resolveClaude } from '../lib/engine.mjs';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path   from 'node:path';
@@ -98,7 +99,8 @@ function fireJob(job) {
   writeFileSync(path.join(runDir, 'prompt.txt'), job.payload);
   appendLog(runDir, { event: 'start', job: job.name, cron: job.cron });
 
-  const child = spawn(CLAUDE_BIN, args, { cwd: WORKSPACE });
+  const cb = resolveClaude();
+  const child = spawn(cb.cmd, args, { cwd: WORKSPACE, shell: cb.shell, windowsHide: true });
   let out = '', err = '';
 
   // 2-hour hard cap — prevents a hung job from holding a process reference forever.
