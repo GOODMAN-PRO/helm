@@ -204,6 +204,20 @@ async function main() {
         catch (e) { fail('auth', `custom endpoint unreachable: ${ab} (${e.message || e})`, 'Start the model server (e.g. ollama serve) or fix ANTHROPIC_BASE_URL.'); }
       }
     }
+  } else if (mode === 'vertex') {
+    const proj = get('GCP_PROJECT_ID') || get('VERTEX_PROJECT_ID') || get('ANTHROPIC_VERTEX_PROJECT_ID');
+    const region = get('VERTEX_REGION') || get('CLOUD_ML_REGION') || 'us-east5';
+    const vmodel = get('VERTEX_MODEL') || 'claude-sonnet-4-5@20250929';
+    if (!proj) fail('auth', 'AUTH_MODE=vertex but no GCP project set', 'Add GCP_PROJECT_ID=your-project to .env (or run helm setup and pick Vertex AI).');
+    else ok('auth', `vertex mode: project ${proj} · ${region} · ${vmodel}`);
+    const gc = spawnSync('gcloud', ['--version'], { encoding: 'utf8', shell: IS_WIN, timeout: 15000 });
+    if (gc.status === 0) ok('gcloud', `gcloud installed (${(gc.stdout || '').split(/\r?\n/)[0]})`);
+    else warn('gcloud', 'gcloud CLI not found on PATH', 'Install Google Cloud SDK; if just installed, open a new terminal. Then: gcloud auth application-default login');
+    const adc = IS_WIN
+      ? path.join(process.env.APPDATA || '', 'gcloud', 'application_default_credentials.json')
+      : path.join(process.env.HOME || '', '.config', 'gcloud', 'application_default_credentials.json');
+    if (existsSync(adc)) ok('gcloud-auth', 'gcloud application default credentials present');
+    else warn('gcloud-auth', 'no gcloud application default credentials', 'Run once:  gcloud auth application-default login');
   } else {
     ok('auth', 'subscription mode (Claude Pro/Max). If you hit auth errors, run `claude` once to log in.');
   }

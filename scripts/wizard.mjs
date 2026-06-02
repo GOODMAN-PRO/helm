@@ -283,6 +283,7 @@ const rawOk = !process.env.HELM_PLAIN && isTTY && typeof input.setRawMode === 'f
 const MANAGED = new Set(['DISCORD_TOKEN', 'OWNER_ID', 'GATEWAYS', 'AUTH_MODE', 'MODEL', 'PERMISSION_MODE',
   'CLAUDE_BIN', 'WORKSPACE', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'ANTHROPIC_AUTH_TOKEN',
   'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'PROXY_PORT',
+  'GCP_PROJECT_ID', 'VERTEX_PROJECT_ID', 'ANTHROPIC_VERTEX_PROJECT_ID', 'VERTEX_REGION', 'CLOUD_ML_REGION', 'VERTEX_MODEL', 'VERTEX_SMALL_MODEL', 'CLAUDE_CODE_USE_VERTEX',
   'HELM_FLEET', 'HELM_WIN_HOST', 'HELM_WIN_CLAUDE', 'HELM_WIN_DIR', 'HELM_PEER_ONLY']);
 function readEnvMap(p) {
   const m = {};
@@ -298,6 +299,13 @@ function buildEnv(cfg) {
     `GATEWAYS=${cfg.gateways.join(',')}`,
     `AUTH_MODE=${cfg.authMode}`,
     ...(cfg.authMode === 'apikey' ? [`ANTHROPIC_API_KEY=${cfg.apiKey}`] : []),
+    // Claude on Google Vertex AI: index.js sets CLAUDE_CODE_USE_VERTEX + the env Claude Code needs and
+    // talks to Vertex natively (no proxy). Auth is gcloud Application Default Credentials.
+    ...(cfg.authMode === 'vertex' ? [
+      `GCP_PROJECT_ID=${cfg.vertexProject || ''}`,
+      `VERTEX_REGION=${cfg.vertexRegion || 'us-east5'}`,
+      `VERTEX_MODEL=${cfg.vertexModelId || 'claude-sonnet-4-5@20250929'}`,
+    ] : []),
     // FREE model — ONLINE provider: route Claude Code through the local proxy (index.js auto-starts it
     // and points Claude Code's ANTHROPIC_BASE_URL at it). The proxy translates Anthropic -> the
     // provider's OpenAI-compatible /v1/chat/completions.
@@ -336,6 +344,7 @@ function applyConfig(cfg) {
   console.log(cfg.svc ? `It's running in the background. Logs: ${ROOT}/agent.log` : `Start it:   helm            (or: node "${ROOT}${path.sep}index.js")`);
   if (cfg.authMode === 'subscription') console.log("Backend: Claude subscription — make sure you've run 'claude' once and logged in.");
   else if (cfg.authMode === 'apikey') console.log('Backend: Anthropic API key (billed pay-as-you-go).');
+  else if (cfg.authMode === 'vertex') console.log(`Backend: Claude on Vertex AI — ${cfg.vertexModelId || 'claude-sonnet-4-5@20250929'} · project ${cfg.vertexProject || '(none!)'} · ${cfg.vertexRegion || 'us-east5'}.\n!!  Run once if you haven't:  gcloud auth application-default login   (and enable Vertex AI API + Claude in Model Garden).`);
   else if (cfg.online) console.log(`Backend: free online model ${cfg.openaiModel} (${cfg.openaiBase}) — Helm auto-starts a local proxy to translate to it.${cfg.openaiKey ? '' : '\n!!  No API key entered — add OPENAI_API_KEY to .env before starting.'}`);
   else console.log(`Backend: free / local model (${cfg.modelId}) via Ollama.`);
   if (cfg.ollamaModel && !localReady) {
@@ -446,18 +455,32 @@ async function main() {
         const items = [
           { label: 'Claude subscription (Pro / Max)', hint: 'log in with claude — no per-message cost' },
           { label: 'Anthropic API key', hint: 'pay-as-you-go — no subscription needed' },
+          { label: 'Claude on Google Vertex AI', hint: 'real Claude billed to Google Cloud — great with the $300 free-trial credits' },
           { label: 'Any other model — local or hosted', hint: 'free or paid: Ollama, OpenAI, Gemini, Groq, OpenRouter, DeepSeek… point Helm at any model' },
         ];
-        const def = a.authMode === 'apikey' ? 1 : a.authMode === 'custom' ? 2 : 0;
+        const def = a.authMode === 'apikey' ? 1 : a.authMode === 'vertex' ? 2 : a.authMode === 'custom' ? 3 : 0;
         const r = await select('How do you want to power Helm?', items, def);
         if (r === BACK) return BACK;
-        a.authMode = r === 1 ? 'apikey' : r === 2 ? 'custom' : 'subscription';
+        a.authMode = ['subscription', 'apikey', 'vertex', 'custom'][r];
         return true;
       } },
     { id: 'apikey', when: () => a.authMode === 'apikey', run: async () => {
         openUrl('https://console.anthropic.com/settings/keys');
         const r = await text('Anthropic API key', { def: a.apiKey || '', mask: true, hint: 'opened in your browser (starts with sk-ant-)' });
         if (r === BACK) return BACK; a.apiKey = r; return true;
+      } },
+    { id: 'vproj', when: () => a.authMode === 'vertex', run: async () => {
+        openUrl('https://console.cloud.google.com/');
+        const r = await text('GCP project ID', { def: a.vertexProject || '', hint: 'billing on (the $300 trial works). Cloud Console -> project picker -> copy the ID (not the display name)' });
+        if (r === BACK) return BACK; a.vertexProject = r; return true;
+      } },
+    { id: 'vregion', when: () => a.authMode === 'vertex', run: async () => {
+        const r = await text('Vertex region', { def: a.vertexRegion || 'us-east5', hint: 'a region where you enabled Claude in Model Garden' });
+        if (r === BACK) return BACK; a.vertexRegion = r; return true;
+      } },
+    { id: 'vmodel', when: () => a.authMode === 'vertex', run: async () => {
+        const r = await text('Vertex model id', { def: a.vertexModelId || 'claude-sonnet-4-5@20250929', hint: 'exact id from Model Garden (name@version). Needs: Vertex AI API on, Claude enabled, and `gcloud auth application-default login`' });
+        if (r === BACK) return BACK; a.vertexModelId = r; return true;
       } },
     { id: 'modelpick', when: () => a.authMode === 'custom', run: async () => {
         const specs = detectSpecs(); const rec = recommendIdx(specs);
@@ -496,7 +519,7 @@ async function main() {
         const r = await text('API key for that endpoint', { def: a.apiKey || '', mask: true, hint: 'leave blank if none' });
         if (r === BACK) return BACK; a.apiKey = r; return true;
       } },
-    { id: 'claudemodel', when: () => a.authMode !== 'custom', run: async () => {
+    { id: 'claudemodel', when: () => a.authMode === 'subscription' || a.authMode === 'apikey', run: async () => {
         const r = await select('Claude model', [
           { label: 'opus', hint: 'best reasoning — heavier on Max limits' },
           { label: 'sonnet', hint: 'fast + sustainable' },
@@ -523,9 +546,10 @@ async function main() {
         row('Owner ID', a.ownerId || `${C.yel}(none)${C.reset}`);
         row('Backend',
           a.authMode === 'apikey' ? `Anthropic API key ${a.apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}`
+          : a.authMode === 'vertex' ? `Vertex AI ${C.teal}${a.vertexModelId || 'claude-sonnet-4-5@20250929'}${C.reset} ${C.dim}(${a.vertexProject || `${C.yel}no project!${C.reset}${C.dim}`} · ${a.vertexRegion || 'us-east5'})${C.reset}`
           : a.authMode === 'custom' ? (a.online ? `Free online ${C.teal}${a.openaiModel}${C.reset} ${C.dim}(${a.openaiBase})${C.reset} ${a.openaiKey ? `${C.grn}key set${C.reset}` : `${C.yel}no key${C.reset}`}` : a.ollamaModel ? `Local model ${C.teal}${a.ollamaModel}${C.reset} (auto-download)` : `Custom — ${C.teal}${a.modelId}${C.reset} @ ${a.baseUrl}`)
           : 'Claude subscription (OAuth)');
-        if (a.authMode !== 'custom') row('Model', a.model || 'sonnet');
+        if (a.authMode === 'subscription' || a.authMode === 'apikey') row('Model', a.model || 'sonnet');
         row('Permissions', a.perm);
         row('Service', a.svc ? 'yes' : 'no');
         row('Machine', `${C.teal}${IS_MAC ? 'macOS' : IS_WIN ? 'Windows' : 'Linux'}${C.reset} ${C.dim}(single machine)${C.reset}`);
@@ -550,6 +574,7 @@ async function main() {
     apiKey: a.apiKey || '', baseUrl: a.baseUrl || '', modelId: a.modelId || '', model: a.model || 'sonnet',
     perm: a.perm || 'default', svc: !!a.svc, claudeBin: which('claude'), ollamaModel: a.ollamaModel || '',
     online: !!a.online, openaiBase: a.openaiBase || '', openaiModel: a.openaiModel || '', openaiKey: a.openaiKey || '',
+    vertexProject: a.vertexProject || '', vertexRegion: a.vertexRegion || '', vertexModelId: a.vertexModelId || '',
   });
 }
 

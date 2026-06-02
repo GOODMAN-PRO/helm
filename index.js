@@ -36,7 +36,7 @@ const {
   CLAUDE_BIN = 'claude',
   MODEL = 'sonnet',
   PERMISSION_MODE = 'bypassPermissions',
-  AUTH_MODE = 'subscription',   // 'subscription' (Claude Pro/Max OAuth) | 'apikey' (ANTHROPIC_API_KEY)
+  AUTH_MODE = 'subscription',   // 'subscription' (OAuth) | 'apikey' (ANTHROPIC_API_KEY) | 'vertex' (Claude on Google Vertex AI) | 'custom' (free/local via proxy)
 } = process.env;
 const WORKSPACE = path.resolve(__dirname, process.env.WORKSPACE || './workspace');
 
@@ -136,6 +136,16 @@ function claudeEnv() {
       e.ANTHROPIC_BASE_URL = `http://127.0.0.1:${PROXY_PORT}`;
       e.ANTHROPIC_AUTH_TOKEN = 'helm-proxy';     // proxy ignores it; just satisfy Claude Code
     }
+  } else if (AUTH_MODE === 'vertex') {
+    // Claude models on Google Vertex AI. Claude Code speaks to Vertex natively (no proxy); auth is
+    // gcloud Application Default Credentials (auto-refreshed), so strip any Anthropic key/url that
+    // would override it. Project + region come from .env (friendly aliases accepted).
+    e.CLAUDE_CODE_USE_VERTEX = '1';
+    e.ANTHROPIC_VERTEX_PROJECT_ID = process.env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.GCP_PROJECT_ID || process.env.VERTEX_PROJECT_ID || '';
+    e.CLOUD_ML_REGION = process.env.CLOUD_ML_REGION || process.env.VERTEX_REGION || 'us-east5';
+    // Give background/small tasks a valid Vertex model too, so Claude Code never 404s on a default id.
+    e.ANTHROPIC_SMALL_FAST_MODEL = process.env.VERTEX_SMALL_MODEL || process.env.ANTHROPIC_SMALL_FAST_MODEL || vertexModel();
+    delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
   } else {
     // subscription (OAuth) — strip anything that would override the login
     delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
@@ -188,8 +198,15 @@ function setAutonomyMode(mode) {
 // Map of pending autopilot auto-proceed timers keyed by channel id.
 const autopilotTimers = new Map();
 
+// The Vertex Claude model id (e.g. claude-sonnet-4-5@20250929). Set VERTEX_MODEL in .env to the exact
+// id you enabled in Vertex Model Garden; this default is a known-good Claude Sonnet on Vertex.
+function vertexModel() {
+  return process.env.VERTEX_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5@20250929';
+}
 // Pick --model for this turn: fixed pref overrides the complexity classifier.
 function pickModel(prompt) {
+  // Claude on Vertex: pass the Vertex model id straight through.
+  if (AUTH_MODE === 'vertex') return vertexModel();
   // free online model behind the proxy: the proxy forces OPENAI_MODEL upstream, so --model is
   // cosmetic — pass the provider model id so logs/UX read sensibly.
   if (proxyConfigured()) return process.env.OPENAI_MODEL;
@@ -410,6 +427,9 @@ async function ask(prompt, onProgress, mode = 'copilot') {
     return `⚠️ I can't reach your model endpoint (${process.env.OPENAI_BASE_URL}), so I can't think yet. ` +
       `If it's a free local model: install Ollama from https://ollama.com, run \`ollama pull ${process.env.OPENAI_MODEL}\`, ` +
       `then say \`restart\`. Or run \`helm setup\` and pick a different backend (e.g. your Claude login).`;
+  }
+  if (AUTH_MODE === 'vertex' && !(process.env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.GCP_PROJECT_ID || process.env.VERTEX_PROJECT_ID)) {
+    return '⚠️ Vertex mode is on but no GCP project is set. Add `GCP_PROJECT_ID=your-project-id` to .env, run `gcloud auth application-default login`, then say `restart`.';
   }
   const model = pickModel(prompt);
   console.log(`[route] model=${model}`);
