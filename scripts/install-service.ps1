@@ -11,10 +11,23 @@ if (-not (Test-Path (Join-Path $Dir ".env"))) { Write-Host "No .env in $Dir - ru
 #   -Daily  : run once a day at the given HH:mm (one-shot jobs)
 # /IT keeps tasks in the interactive desktop session so Claude + screenshots work.
 function New-HelmTask($name, $script, [string]$daily = $null) {
-  $tr = "`"$Node`" `"$Dir\$script`""
+  $scriptPath = Join-Path $Dir $script
+  # node.exe lives under "C:\Program Files\..." — that space broke schtasks /TR (PowerShell drops the
+  # embedded quotes when handing the value to schtasks.exe, so it saw two separate bad arguments).
+  # Use 8.3 short paths (no spaces) so /TR needs no inner quoting; fall back to escaped quotes if 8.3
+  # names are disabled on this volume.
+  $tr = $null
+  try {
+    $fso = New-Object -ComObject Scripting.FileSystemObject
+    $ns = $fso.GetFile($Node).ShortPath
+    $ss = $fso.GetFile($scriptPath).ShortPath
+    if ($ns -notmatch '\s' -and $ss -notmatch '\s') { $tr = "$ns $ss" }
+  } catch {}
+  if (-not $tr) { $tr = "\`"$Node\`" \`"$scriptPath\`"" }
   if ($daily) { schtasks /Create /TN $name /TR $tr /SC DAILY /ST $daily /RL LIMITED /IT /F | Out-Null }
   else        { schtasks /Create /TN $name /TR $tr /SC ONLOGON /RL LIMITED /IT /F | Out-Null }
-  Write-Host ("  ok  {0,-16} {1}" -f $name, $(if ($daily) { "daily $daily" } else { "at logon" }))
+  if ($LASTEXITCODE -eq 0) { Write-Host ("  ok  {0,-16} {1}" -f $name, $(if ($daily) { "daily $daily" } else { "at logon" })) }
+  else { Write-Host ("  xx  {0,-16} schtasks /Create failed (exit {1})" -f $name, $LASTEXITCODE) -ForegroundColor Red }
 }
 
 Write-Host "Installing Helm local services (Task Scheduler):"
