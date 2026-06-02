@@ -12,6 +12,8 @@ foreach ($t in "HelmDiscord","HelmScheduler","HelmThink","HelmSelfUpgrade","Helm
   schtasks /End /TN $t 2>$null | Out-Null
   schtasks /Delete /TN $t /F 2>$null | Out-Null
 }
+# Remove per-user Startup launchers (the at-logon daemons run from here, not schtasks ONLOGON).
+Get-ChildItem -LiteralPath ([Environment]::GetFolderPath('Startup')) -Filter 'Helm*.vbs' 2>$null | Remove-Item -Force 2>$null
 # Kill any node processes running Helm — from the install dir OR an npx-cache copy.
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" 2>$null |
   Where-Object { $_.CommandLine -and ($_.CommandLine -like "*$Dir*" -or $_.CommandLine -like "*\helm\index.js*" -or $_.CommandLine -like "*node_modules\helm\*") } |
