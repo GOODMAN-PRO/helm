@@ -36,7 +36,7 @@ function fail(label, reason) {
     if (!src.includes('splitAttachments')) throw new Error('splitAttachments missing from index.js');
     if (!src.includes('ATTACH:')) throw new Error('ATTACH: convention missing');
     if (!src.includes('workspace/sessions.mjs')) throw new Error('unified sessions not imported in index.js');
-    if (!src.includes('30 * 60_000')) throw new Error('30-min cap not found in index.js (old 5-min cap still present?)');
+    if (!src.includes('TASK_CAP_MS')) throw new Error('configurable task cap (TASK_CAP_MS) not found in index.js');
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
@@ -1829,10 +1829,10 @@ function fail(label, reason) {
     const su = readFileSync(path.join(WORKSPACE, 'upgrades/self-upgrade.mjs'), 'utf8');
     if (!su.includes("from './stuck.mjs'") || !su.includes('renderStuckForPrompt') || !su.includes('archiveAll'))
       throw new Error('self-upgrade.mjs does not integrate the stuck queue');
-    // index.js must record stuck on failure + expose the [STUCK:]/[USE:] directives
+    // index.js must record stuck on failure + handle the [STUCK:] directive
     const idx = readFileSync(path.join(ROOT, 'index.js'), 'utf8');
     if (!idx.includes('recordStuck(')) throw new Error('index.js does not record stuck events');
-    if (!idx.includes('[STUCK:') || !idx.includes('[USE:')) throw new Error('index.js missing STUCK/USE directive handling');
+    if (!idx.includes('[STUCK:')) throw new Error('index.js missing STUCK directive handling');
     ok(label);
   } catch (e) { fail(label, e.message); }
   finally {

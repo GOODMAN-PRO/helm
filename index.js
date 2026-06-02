@@ -144,22 +144,6 @@ mkdirSync(WORKSPACE, { recursive: true });
   } catch {}
 })();
 
-// First-run FLEET setup: if the owner said "more than one device" in the wizard (HELM_FLEET=1) but
-// the second peer isn't connected yet, seed a private fleet.md "NOT STARTED" marker. The persona
-// then tells Helm to get the second machine connected (verify SSH/Tailscale, test the link) BEFORE
-// the owner interview. Single-device installs (HELM_FLEET=0/unset) skip this entirely.
-(() => {
-  try {
-    if (process.env.HELM_FLEET !== '1') return;
-    const fleetFile = path.join(WORKSPACE, 'fleet.md');
-    const tmpl = path.join(WORKSPACE, 'fleet.example.md');
-    if (!existsSync(fleetFile) && existsSync(tmpl)) {
-      writeFileSync(fleetFile, readFileSync(tmpl, 'utf8'));
-      console.log('🛰  Fleet mode: created workspace/fleet.md — Helm will connect your second device on first message.');
-    }
-  } catch {}
-})();
-
 // ---- autonomy mode (suggest / copilot / autopilot) ----
 // Stored as preference 'helm.autonomy_mode' in memory.db.
 const MEMORY_DB = path.join(WORKSPACE, 'memory/memory.db');
@@ -220,175 +204,20 @@ function mcpConfigArg() {
   } catch { return '{"mcpServers":{}}'; }
 }
 
-// ---- fleet: EQUAL PEERS that share one knowledge vault ("use mac" / "use windows") ----
-// The Mac and the Windows box are equal peers — neither is "home" or in charge. Each runs a FULL,
-// independent Helm with full local powers; they share exactly one thing: the HelmBrain vault, synced
-// both ways by workspace/tools/brain-sync.mjs. "use <machine>" just picks which peer is active; the
-// active peer does all the work LOCALLY and never reaches back to the other to get its job done.
-// This bot process runs on ONE machine (the local peer); the other is reached over SSH on demand.
-// Configure the OTHER peer in .env:
-//   HELM_WIN_HOST=you@windows-host   (LAN IP or Tailscale name; key-based SSH)
-//   HELM_WIN_CLAUDE=claude           (path to claude on the other peer, optional)
-//   HELM_WIN_DIR=helm                (the OTHER peer's Helm install dir — full code+tools, for parity)
-const HELM_WIN_HOST = process.env.HELM_WIN_HOST || '';
-const HELM_WIN_CLAUDE = process.env.HELM_WIN_CLAUDE || 'claude';
-// Run the remote peer inside its OWN full Helm install (default ~/helm) so it has the same code,
-// tools and powers as the local peer — not a stripped, mac-fed brain dir.
-const HELM_WIN_DIR = process.env.HELM_WIN_DIR || 'helm';
-// Did the owner say they run multiple devices? (wizard sets HELM_FLEET=1.) This only drives the
-// first-boot "connect your second device" onboarding — NOT routing.
-const FLEET_INTENT = process.env.HELM_FLEET === '1';
-// Can we ACTUALLY reach another peer right now? Routing to the other machine requires a real host.
-// Until one is configured we run everything locally — so neither a single-device box nor a
-// fleet-in-setup (intent on, peer not connected yet) can strand the bot SSHing to nowhere.
-const PEER_REACHABLE = !!HELM_WIN_HOST;
-// Is the other peer actually UP right now? Quick SSH probe (~4s), so an asleep/offline box makes us
-// fall back to local instead of hanging on a full connect timeout for every message.
-function peerReachable() {
-  if (!HELM_WIN_HOST) return false;
-  try {
-    const r = spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=4', HELM_WIN_HOST, 'exit'], { encoding: 'utf8', timeout: 7000 });
-    return r.status === 0;
-  } catch { return false; }
-}
-// The machine THIS bot runs on. Whatever it is, it's a first-class peer — the default active target.
-const LOCAL_MACHINE = process.platform === 'win32' ? 'windows' : 'mac';
-const TARGET_FILE = path.join(WORKSPACE, 'active-target');
-const VALID_TARGETS = ['mac', 'windows'];
-const getTarget = () => {
-  try {
-    const t = readFileSync(TARGET_FILE, 'utf8').trim();
-    if (!VALID_TARGETS.includes(t)) return LOCAL_MACHINE;
-    // Never report a peer that isn't actually reachable — otherwise `where` says "mac" while we're really
-    // running on (and screenshotting) THIS machine. On a single-device setup the active machine is here.
-    if (t !== LOCAL_MACHINE && !PEER_REACHABLE) return LOCAL_MACHINE;
-    return t;
-  } catch { return LOCAL_MACHINE; }
-};
-const setTarget = t => writeFileSync(TARGET_FILE, t);
+// ---- single machine ----
+// Helm runs on ONE machine. It detects which OS it's on (see OS_NAME below) but there is no fleet,
+// no peer, no cross-machine sync — every task runs locally, right here.
 
 // Process inline directives the brain can emit in a reply:
 //   [STUCK: <what blocked me>]  -> queued for the nightly self-upgrade
-//   [USE: mac|windows]          -> switch the active machine at will (mid-conversation)
-// Returns the reply text with directives stripped (plus a small note if it switched).
+// Returns the reply text with directives stripped.
 function handleDirectives(replyText, userText = '') {
-  let note = '';
   // Strip + record any [STUCK: ...] markers (shared capture logic).
   const { text: stripped, recorded } = processStuckMarkers(replyText, userText);
-  let t = stripped.replace(/\[USE:\s*(mac|windows|win|pc)\s*\]/gi, (_m, w) => {
-    const tgt = /^mac$/i.test(w) ? 'mac' : 'windows';
-    try { setTarget(tgt); } catch {}
-    note = `\n\n_(switched active machine to **${tgt}**)_`;
-    return '';
-  });
   // Auto-upgrade safety net: if Helm says/implies it can't do something but didn't emit [STUCK],
   // detect it and queue it anyway so the nightly self-upgrade builds the missing capability.
-  if (!recorded) { try { autoCaptureCant(t, userText); } catch {} }
-  return (t.trim() + note).trim();
-}
-
-// ---- ONE BRAIN, ONE MEMORY: sync the brain's memory to wherever it runs ----
-// Helm is a single assistant whose "shell" can move between machines. Its memory must follow it, so
-// before running on the other machine we PUSH the current memory there, and after, we PULL the updated
-// memory back. memory.db is plain SQLite (no WAL at rest) so a file copy is a consistent snapshot.
-// Only one machine runs the brain at a time (the active target), so last-writer-wins is correct.
-// LogLevel=ERROR silences OpenSSH 10's "not using a post-quantum key exchange" INFO warning (and other
-// chatter) that otherwise pollutes captured stderr — genuine errors (auth/host-key/refused) still show.
-const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'LogLevel=ERROR'];
-// Strip any post-quantum warning lines that still leak through, so they never masquerade as the error.
-const sshClean = s => (s || '').split('\n').filter(l => !/post-quantum|store now|decrypt later|vulnerable to|may need to be upgraded|openssh\.com\/pq/i.test(l)).join('\n').trim();
-const MEM_FILES = ['memory/memory.db', 'owner.md', 'memory/INDEX.md'];   // relative to workspace/
-function syncMemory(direction) {   // 'push' = local->remote (before run), 'pull' = remote->local (after)
-  if (!HELM_WIN_HOST) return;
-  const remoteWs = `${HELM_WIN_DIR}/workspace`;                 // forward slashes for scp
-  if (direction === 'push') {
-    const winMem = `${HELM_WIN_DIR.replace(/\//g, '\\')}\\workspace\\memory`;
-    try { spawnSync('ssh', [...SSH_OPTS, HELM_WIN_HOST, `if not exist ${winMem} mkdir ${winMem}`], { encoding: 'utf8', timeout: 15_000 }); } catch {}
-  }
-  for (const rel of MEM_FILES) {
-    const local = path.join(WORKSPACE, rel);
-    const remote = `${HELM_WIN_HOST}:${remoteWs}/${rel}`;
-    try {
-      if (direction === 'push') { if (existsSync(local)) spawnSync('scp', [...SSH_OPTS, local, remote], { encoding: 'utf8', timeout: 30_000 }); }
-      else { spawnSync('scp', [...SSH_OPTS, remote, local], { encoding: 'utf8', timeout: 30_000 }); }
-    } catch {}
-  }
-  // After pulling the remote's updated memory.db, regenerate the local INDEX.md cache from it.
-  if (direction === 'pull') {
-    try { const ri = path.join(WORKSPACE, 'memory/refresh-index.mjs'); if (existsSync(ri)) spawnSync(process.execPath, [ri], { cwd: __dirname, timeout: 30_000 }); } catch {}
-  }
-}
-
-// Run the brain on the Windows node over SSH (async so the gateway stays responsive).
-// Resumes the windows session ('owner-windows') so multi-step tasks stay coherent across messages.
-function runClaudeRemote(prompt) {
-  return new Promise(resolve => {
-    if (!HELM_WIN_HOST) return resolve('The other peer machine isn\'t configured yet. Set HELM_WIN_HOST in .env (e.g. you@win-tailscale), install Helm on that machine, then say "use windows" (or "use mac") again.');
-    const q = s => `"${s.replace(/"/g, '\\"')}"`;   // shell-quote for the remote shell
-    // Peer persona: the remote machine is a FULL, equal Helm — it does everything locally and never
-    // reaches back to the other peer to get its job done.
-    const REMOTE_PERSONA = 'You are Helm, the owner\'s personal AI assistant, running on their other machine — a FULL, independent peer with full shell, file, code and tool access, exactly as capable as the Helm on any other machine. ' +
-      'You are POWERED BY Claude Code (your engine) but you are NOT Claude Code and NOT Claude — never identify as Claude or Claude Code; you are Helm. ' +
-      'You are ONE assistant with ONE memory: your memory (facts, preferences, the owner profile) and the HelmBrain vault are SYNCED to whichever machine you run on, so you remember everything regardless of where you are. No machine is "home", canonical, or in charge. ' +
-      'AUTO-UPGRADE RULE: whenever you say or imply you CAN\'T do something, add `[STUCK: <the capability you lacked>]` in that reply — it is stripped before the owner sees it and queued for the nightly self-upgrade to build it. ' +
-      'DO THE WORK HERE, on THIS machine: create files, run commands, edit code, finish the task locally with your own tools. ' +
-      'NEVER SSH or reach back to the other machine to do your job, and never tell the owner a task must be done "on the Mac" or "on the other machine" — this machine has its own full copy of Helm\'s code, and your memory is already synced here. ' +
-      'ACT — actually DO what the owner asks end to end. A screenshot is ONLY to SHOW a result AFTER you have done the work — never reply with just a screenshot instead of doing the task, and never claim you did something you did not. ' +
-      'Keep replies short. Confirm before anything destructive, irreversible, or that spends money. Respect any off-limits paths the owner named in their profile. ' +
-      'To show the screen, take a screenshot locally with `node workspace/tools/impl/screencap.mjs --out <file>` (cross-platform; captures THIS machine) and end the reply with a line exactly: ATTACH: <that file path>.';
-    const run = sid => {
-      const resumeFlag = sid ? `--resume ${q(sid)} ` : '';
-      // Run INSIDE the remote peer's OWN full Helm install so Claude loads its CLAUDE.md (+ memory) and
-      // has the real code and tools — full parity with the local peer, no dependence on this machine.
-      const remoteCmd = `cd ${HELM_WIN_DIR} && ${q(HELM_WIN_CLAUDE)} -p --output-format json --model ${q(pickModel(prompt))} --permission-mode ${q(PERMISSION_MODE)} ${resumeFlag}--append-system-prompt ${q(REMOTE_PERSONA)}`;
-      const child = spawn('ssh', [...SSH_OPTS, HELM_WIN_HOST, remoteCmd]);
-      let out = '', err = '';
-      const kill = setTimeout(() => child.kill(), 30 * 60_000);
-      child.stdout.on('data', d => { out += d; });
-      child.stderr.on('data', d => { err += d; });
-      child.on('error', e => { clearTimeout(kill); resolve(`Windows SSH error: ${e.message}`); });
-      child.on('close', code => {
-        clearTimeout(kill);
-        if (code !== 0) {
-          if (sid) { deleteSession('owner-windows'); return run(null); }   // stale session -> retry fresh
-          const e2 = sshClean(err);   // drop the post-quantum warning so the real cause is visible
-          return resolve(e2
-            ? `Peer exec failed (exit ${code}): ${e2.slice(0, 500)}`
-            : `Peer exec failed (exit ${code}) — SSH connected but the remote command returned an error (often: the peer is offline, SSH keys aren't set up, or claude/the Helm dir isn't found there). Test it: \`ssh ${HELM_WIN_HOST} echo ok\`.`);
-        }
-        try {
-          const j = JSON.parse(out);
-          if (j.session_id) setSession('owner-windows', j.session_id, 'windows');
-          try { syncMemory('pull'); } catch {}   // bring the brain's updated memory back
-          resolve((j.result ?? '').toString().trim() || '(empty reply)');
-        } catch { try { syncMemory('pull'); } catch {} resolve(out.trim() || '(no output)'); }
-      });
-      child.stdin.write(prompt); child.stdin.end();
-    };
-    try { syncMemory('push'); } catch {}   // give the remote brain the current memory before it runs
-    run(getSession('owner-windows'));
-  });
-}
-
-// Pull a file off the Windows box (for ATTACH paths produced by the windows brain, e.g. screenshots).
-function scpFromWin(winPath) {
-  if (!HELM_WIN_HOST) return null;
-  const INBOX = path.join(WORKSPACE, 'inbox');
-  mkdirSync(INBOX, { recursive: true });
-  const fwd = winPath.replace(/\\/g, '/');   // scp needs forward slashes; backslash paths fail
-  const local = path.join(INBOX, `win-${Date.now()}-${path.basename(fwd) || 'file'}`);
-  const r = spawnSync('scp', [...SSH_OPTS, `${HELM_WIN_HOST}:${fwd}`, local], { encoding: 'utf8' });
-  return r.status === 0 ? local : null;
-}
-
-// Push a local file TO the Windows box so the windows brain can read it (e.g. an attachment the
-// owner sent while on the windows target). Returns a path the windows brain can Read, or null.
-function scpToWin(localPath) {
-  if (!HELM_WIN_HOST) return null;
-  const base = path.basename(localPath).replace(/[^\w.\-]/g, '_');
-  spawnSync('ssh', [...SSH_OPTS, HELM_WIN_HOST, 'if not exist helm-inbox mkdir helm-inbox'], { encoding: 'utf8' });
-  const r = spawnSync('scp', [...SSH_OPTS, localPath, `${HELM_WIN_HOST}:helm-inbox/${base}`], { encoding: 'utf8' });
-  return r.status === 0 ? `helm-inbox/${base}` : null;  // relative to the windows home (where the ssh brain runs)
+  if (!recorded) { try { autoCaptureCant(stripped, userText); } catch {} }
+  return stripped.trim();
 }
 
 // ---- persona: appended to Claude Code's own (tool-enabled) system prompt ----
@@ -413,13 +242,12 @@ const PERSONA_BASE =
   'On Windows the capture tool falls back through a scheduled task to reach the user\'s desktop, so SSH/Session-0 is NOT a blocker. ' +
   'NEVER refuse a screenshot with "non-interactive session", "no display", "no GUI access", or "SSH limitation" — instead just run `node workspace/tools/impl/screencap.mjs --out /tmp/sm.png` (Windows: use `%TEMP%\\sm.png`) and end your reply with `ATTACH: <that path>`. If the screen is genuinely locked the tool returns a clear error — only then explain that. ' +
   'When asked to build or create something, actually BUILD it (make the files, write the code, run the commands, finish the task) — a screenshot or a description is NEVER a substitute for doing the work. "Show me" means produce the real artifact first, THEN optionally screenshot it to display the result. ' +
-  'Two directives you may emit anywhere in a reply (they are stripped before the owner sees them): ' +
-  '(1) AUTO-UPGRADE RULE — whenever you say or imply you CAN\'T do something (can\'t, cannot, unable, ' +
+  'AUTO-UPGRADE RULE — whenever you say or imply you CAN\'T do something (can\'t, cannot, unable, ' +
   'don\'t have the ability/tool/access/permission, not supported, not currently possible, beyond what you ' +
-  'can do), you MUST add `[STUCK: <the exact capability you lacked>]` in that same reply. It is queued for ' +
-  'your nightly self-upgrade to BUILD that capability and fix the root cause. Never say "I can\'t" without ' +
-  'queuing it. (Also use it for any limitation worth fixing later.) ' +
-  '(2) you are ONE assistant whose shell can move between the owner\'s machines (fleet). Your memory (facts, preferences, owner profile) and the HelmBrain vault are SYNCED across machines, so you remember everything wherever you run — none is "home" or more powerful. You do every task LOCALLY on the machine you are on; never reach back to another machine to get your job done, and never tell the owner a task must be done on a different machine. Only switch machines with `[USE: windows]` or `[USE: mac]` if the owner explicitly wants the OTHER machine active (e.g. to act on something physically on it) — otherwise stay put and do the work here. ' +
+  'can do), you MUST add `[STUCK: <the exact capability you lacked>]` anywhere in that same reply (it is ' +
+  'stripped before the owner sees it). It is queued for your nightly self-upgrade to BUILD that capability ' +
+  'and fix the root cause. Never say "I can\'t" without queuing it. (Also use it for any limitation worth fixing later.) ' +
+  'You run on ONE machine — there is no other machine to defer to; do every task right here, locally. ' +
   'Respect any off-limits paths/projects the owner names in @owner.md.';
 
 const MODE_GUIDANCE = {
@@ -437,31 +265,9 @@ const MODE_GUIDANCE = {
     '"go" after 60 seconds. For simple 1-2 command tasks, execute immediately without the plan marker.',
 };
 
-// If the owner picked multi-device but the second peer isn't connected yet, prepend a directive so
-// Helm sets the fleet up FIRST (verify SSH/Tailscale reachability, then record it) before onboarding.
-// Reads the marker fresh each turn so the directive disappears once fleet.md is marked CONNECTED.
-function fleetOnboardingDirective() {
-  try {
-    if (process.env.HELM_FLEET !== '1') return '';
-    const p = path.join(WORKSPACE, 'fleet.md');
-    if (!existsSync(p)) return '';
-    const s = readFileSync(p, 'utf8');
-    if (!/NOT STARTED/i.test(s)) return '';   // already connected — stay quiet
-    const host = HELM_WIN_HOST || '(not set yet — ask the owner for the other machine\'s SSH host or Tailscale name)';
-    return '\n\nFLEET SETUP (do this BEFORE the owner interview): the owner runs Helm on MORE THAN ONE ' +
-      'device and the second peer is not connected yet. First, get the two machines linked: confirm the ' +
-      `other peer's reachable address (current HELM_WIN_HOST=${host}), test it with a non-interactive SSH ` +
-      '(`ssh -o BatchMode=yes -o ConnectTimeout=10 <host> echo ok`), and if SSH/Tailscale or keys are ' +
-      'missing, walk the owner through installing them (Tailscale is easiest: same tailnet on both). When ' +
-      'the link works, confirm the other peer has its own full Helm install, then write what you set up ' +
-      'into workspace/fleet.md and change its status line to "CONNECTED". THEN proceed to the owner ' +
-      'interview. If the owner says "skip" or "later", mark fleet.md "DEFERRED" and move on. Keep it short.';
-  } catch { return ''; }
-}
-
 function buildPersona(mode = 'copilot') {
   const guidance = MODE_GUIDANCE[mode] ?? MODE_GUIDANCE.copilot;
-  return `${PERSONA_BASE}${fleetOnboardingDirective()}${ownerPersonaOverride()}\n${guidance}`;
+  return `${PERSONA_BASE}${ownerPersonaOverride()}\n${guidance}`;
 }
 // Optional persona/style override applied by an imported Helm template.
 function ownerPersonaOverride() {
@@ -577,19 +383,8 @@ function runClaudeStream(args, prompt, onEvent) {
   });
 }
 
-async function ask(prompt, onProgress, target = LOCAL_MACHINE, mode = 'copilot') {
-  // Hop to the other peer only if it's configured AND actually up right now. A configured-but-asleep
-  // peer used to strand every message in a ~10s+ SSH timeout ("Windows exec failed (exit 255)").
-  // If it's unreachable, fall back to running locally, switch the active target home, and say so.
-  if (target !== LOCAL_MACHINE && PEER_REACHABLE) {
-    if (peerReachable()) {
-      onProgress?.(`⚙️ working on **${target}**…`);
-      return runClaudeRemote(prompt);   // other peer → run there over SSH (returns final reply)
-    }
-    onProgress?.(`⚠️ ${target} is unreachable — running on ${LOCAL_MACHINE} instead`);
-    try { setTarget(LOCAL_MACHINE); } catch {}   // don't keep probing a dead peer this session
-    target = LOCAL_MACHINE;
-  }
+async function ask(prompt, onProgress, mode = 'copilot') {
+  // Single machine: every task runs locally on this box. (No fleet / peer SSH / cross-machine sync.)
   const model = pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [
@@ -783,28 +578,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- fleet commands (handled before the brain) ----
   const low = text.toLowerCase();
-  const useM = low.match(/^\/?use\s+(mac|windows|win|pc)\b/);
-  if (useM) {
-    const t = (useM[1] === 'mac') ? 'mac' : 'windows';
-    if (t === LOCAL_MACHINE) {
-      setTarget(t);
-      await msg.reply(`Already on **${t}** (this machine). Working here.`);
-    } else if (!PEER_REACHABLE) {
-      // Switching to the OTHER machine needs a configured, reachable peer. Don't pretend it worked.
-      await msg.reply(`Can't switch to **${t}** — no second machine is connected. This is a single-device setup (running on **${LOCAL_MACHINE}**). To add a peer, set HELM_WIN_HOST in .env, then \`use ${t}\` again. Staying on **${LOCAL_MACHINE}**.`);
-    } else {
-      setTarget(t);
-      await msg.reply(`Active machine: **${t}**. The other peer will handle the next message.`);
-    }
-    return;
-  }
-  if (/^\/?(where|which|target)\b/.test(low)) {   // NOT "status" — that's the owner's project-status command
-    const tgt = getTarget();
-    await msg.reply(`Active machine: **${tgt}**${tgt !== LOCAL_MACHINE && !PEER_REACHABLE ? ' (peer not reachable)' : ''}.`);
-    return;
-  }
 
   // ---- project tracker: owner can list / add / cancel / finish / delete projects ----
   if (/^\/?projects?\s*$/i.test(low)) { await msg.reply('**Projects**\n' + renderProjects()); return; }
@@ -869,28 +643,6 @@ client.on(Events.MessageCreate, async msg => {
         await msg.reply(m);
       }
     } catch (e) { await msg.reply('template error: ' + String(e.message || e).slice(0, 300)); }
-    return;
-  }
-
-  // ---- file transfer between Mac and Windows (both directions) ----
-  const pullM = text.match(/^\/?pull\s+(.+)$/i);
-  if (pullM) {
-    if (!HELM_WIN_HOST) { await msg.reply('Windows node not configured (set HELM_WIN_HOST in .env).'); return; }
-    const wp = pullM[1].trim();
-    const lf = scpFromWin(wp);
-    if (!lf) { await msg.reply(`Couldn't pull \`${wp}\` from Windows — check the path and that the PC is reachable.`); return; }
-    await msg.reply(`Pulled from Windows → \`${lf}\``);
-    try { await msg.reply({ files: [lf] }); } catch {}
-    return;
-  }
-  const pushM = text.match(/^\/?push\s+(.+)$/i);
-  if (pushM) {
-    if (!HELM_WIN_HOST) { await msg.reply('Windows node not configured (set HELM_WIN_HOST in .env).'); return; }
-    let lp = pushM[1].trim().replace(/^~(?=[/\\])/, process.env.HOME || '');
-    if (!existsSync(lp)) { await msg.reply(`No such file on the Mac: \`${lp}\``); return; }
-    const wp = scpToWin(lp);
-    if (!wp) { await msg.reply(`Couldn't push \`${lp}\` to Windows.`); return; }
-    await msg.reply(`Pushed to Windows → \`C:\\Users\\User\\${wp.replace(/\//g, '\\')}\``);
     return;
   }
 
@@ -967,7 +719,6 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  const target = getTarget();
   // ---- download any attachments so Helm can actually SEE/read them ----
   let prompt = text;
   if (msg.attachments.size) {
@@ -982,9 +733,7 @@ client.on(Events.MessageCreate, async msg => {
         writeFileSync(p, buf); saved.push(p);
       } catch { /* skip a failed download */ }
     }
-    // On the windows target, push the files to the PC so the remote brain can read them.
-    let refs = saved;
-    if (target === 'windows' && saved.length) refs = saved.map(scpToWin).filter(Boolean);
+    const refs = saved;
     if (refs.length) {
       const isImg = f => /\.(png|jpe?g|gif|webp|bmp|heic|tiff?)$/i.test(f);
       const imgs = refs.filter(isImg), others = refs.filter(f => !isImg(f));
@@ -998,7 +747,7 @@ client.on(Events.MessageCreate, async msg => {
     }
   }
   const mode = getAutonomyMode();
-  console.log(`📩 [${target}][${mode}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);
+  console.log(`📩 [${mode}] ${text || '(attachment)'}${msg.attachments.size ? ' +' + msg.attachments.size + 'file' : ''}`);
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
   // Live status: one message that gets edited as Helm works, so you can see what it's doing
@@ -1012,11 +761,11 @@ client.on(Events.MessageCreate, async msg => {
   };
   const clearStatus = () => { if (statusMsg) { const m = statusMsg; statusMsg = null; m.delete().catch(() => {}); } };
   try {
-    const reply = await ask(prompt, onProgress, target, mode);
+    const reply = await ask(prompt, onProgress, mode);
     clearInterval(typing);
     clearStatus();
     let { text: rawBody, files } = splitAttachments(reply);
-    rawBody = handleDirectives(rawBody, text);   // [STUCK: ...] -> queue · [USE: mac|windows] -> switch
+    rawBody = handleDirectives(rawBody, text);   // [STUCK: ...] -> queue for the nightly self-upgrade
 
     // Autopilot plan detection: if Claude included [PLAN-PENDING], strip the marker,
     // post the plan, then auto-send "go" after 60 s (cancellable by "stop").
@@ -1031,13 +780,11 @@ client.on(Events.MessageCreate, async msg => {
         autopilotTimers.delete(channelRef.id);
         channelRef.sendTyping().catch(() => {});
         try {
-          const execReply = await ask('go ahead with the plan', null, target, mode);
+          const execReply = await ask('go ahead with the plan', null, mode);
           const { text: execBody, files: execFiles } = splitAttachments(execReply);
           for (const part of chunks(execBody || '(done)')) await channelRef.send(part);
           for (const f of execFiles) {
-            let lf = f;
-            if (target === 'windows' && /^[A-Za-z]:[\\/]/.test(f)) { lf = scpFromWin(f); if (!lf) { await channelRef.send(`(couldn't fetch ${f} from windows)`); continue; } }
-            try { await channelRef.send({ files: [lf] }); }
+            try { await channelRef.send({ files: [f] }); }
             catch (e) { await channelRef.send(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
           }
         } catch (e) {
@@ -1048,12 +795,7 @@ client.on(Events.MessageCreate, async msg => {
     } else {
       for (const part of chunks(body || '(see attachment)')) await msg.reply(part);
       for (const f of files) {
-        let lf = f;
-        if (target === 'windows' && /^[A-Za-z]:[\\/]/.test(f)) {       // a Windows path -> pull it to the Mac first
-          lf = scpFromWin(f);
-          if (!lf) { await msg.reply(`(couldn't fetch ${f} from windows)`); continue; }
-        }
-        try { await msg.reply({ files: [lf] }); }
+        try { await msg.reply({ files: [f] }); }
         catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
       }
       try { mirrorReply(body || '(see attachment)'); } catch {}   // show Discord replies in any open terminal
@@ -1064,7 +806,7 @@ client.on(Events.MessageCreate, async msg => {
       const conv = path.join(WORKSPACE, 'conversations');
       mkdirSync(conv, { recursive: true });
       appendFileSync(path.join(conv, new Date().toISOString().slice(0, 10) + '.md'),
-        `\n**[${new Date().toISOString().slice(11, 16)}] owner (${target}):** ${text || '(attachment)'}\n**helm:** ${body}\n`);
+        `\n**[${new Date().toISOString().slice(11, 16)}] owner (discord):** ${text || '(attachment)'}\n**helm:** ${body}\n`);
     } catch {}
   } catch (e) {
     clearInterval(typing);
@@ -1152,8 +894,7 @@ startCliBridge(async (text, reply) => {
   cliBusy = true;
   try {
     const mode = getAutonomyMode();
-    const target = getTarget();
-    const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, target, mode);
+    const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, mode);
     const { text: rawBody } = splitAttachments(raw);
     const body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
     reply(body);   // broadcasts to every terminal once (no separate mirrorReply, or it'd double-send)
@@ -1169,23 +910,12 @@ startCliBridge(async (text, reply) => {
   } finally { cliBusy = false; }
 });
 
-// Peer-only mode: do NOT connect to Discord. One Discord token = one gateway, but a fleet runs Helm on
-// more than one machine — if two connect to the same token they BOTH reply to every message (you saw
-// "Active machine: windows" AND "...: mac" for one `where`). The same-machine lock can't stop a second
-// MACHINE. So the non-gateway machine runs with HELM_PEER_ONLY=1: it stays a full local Helm (terminal
-// bridge, SSH peer) but never joins Discord — so only the one gateway answers. Set it on whichever
-// machine should NOT own Discord (e.g. the Mac if you drive Helm from Windows).
-const PEER_ONLY = /^(1|true|yes|on)$/i.test(process.env.HELM_PEER_ONLY || '');
-if (PEER_ONLY) {
-  console.log('🔇 HELM_PEER_ONLY set — not connecting to Discord (peer-only mode). Reachable via the terminal bridge and as an SSH peer; the gateway machine owns Discord.');
-}
-
 // Connect to Discord, with a clear reason if it can't (so "offline" isn't a mystery).
-if (!PEER_ONLY && /paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
+if (/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
   console.error('✋ DISCORD_TOKEN is still the placeholder. Run `npm run wizard` and paste your bot token (Developer Portal → your app → Bot → Reset Token).');
   process.exit(1);
 }
-if (!PEER_ONLY) client.login(DISCORD_TOKEN).catch(async e => {
+client.login(DISCORD_TOKEN).catch(async e => {
   const m = String(e?.message || e);
   if (/token/i.test(m)) {
     console.error('✋ Discord login failed: invalid DISCORD_TOKEN. Each bot needs its OWN token — get one at Developer Portal → your app → Bot → Reset Token, then `npm run wizard`. (One token = one running bot.)');
