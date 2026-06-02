@@ -49,6 +49,7 @@ function probeServer(name, entry) {
       child = spawn(entry.command, entry.args || [], {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: process.platform === 'win32',
+        windowsHide: true,
       });
     } catch (e) {
       return settle({ name, status: 'DOWN', error: String(e.message || e) });

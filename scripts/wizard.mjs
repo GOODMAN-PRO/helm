@@ -164,10 +164,14 @@ function which(bin) {
 const sleep = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} };
 
 // Curated local models the wizard can auto-download via Ollama (free, private, no account).
-// Auto-download local models are intentionally empty: small Ollama models (3B-8B) can't follow
-// Claude Code's agent prompt — they summarize it instead of acting as Helm. Use a free ONLINE 70B
-// below, or a Custom endpoint pointing at a 70B+ local server.
-const LOCAL_MODELS = [];
+// Only models strong enough to follow Claude Code's agent prompt are listed — small ones (3B-8B)
+// just summarize the prompt instead of acting. These are BIG: a strong GPU (24GB+ VRAM) or a
+// high-memory Mac, and slower than the online options. On modest hardware pick Groq below instead.
+const LOCAL_MODELS = [
+  { label: 'Qwen2.5-Coder 32B — strong, coding-tuned (~20 GB VRAM)', id: 'qwen2.5-coder:32b' },
+  { label: 'Llama 3.3 70B — most capable, general (~40 GB+ VRAM/RAM)', id: 'llama3.3:70b' },
+  { label: 'Qwen2.5 72B — most capable (~40 GB+ VRAM/RAM)', id: 'qwen2.5:72b' },
+];
 // Free ONLINE providers (OpenAI-compatible). Helm routes through its local translation proxy
 // (workspace/proxy/llm-proxy.mjs) so Claude Code can use them. Each has a free tier — paste a key.
 const FREE_ONLINE = [
@@ -193,8 +197,9 @@ function detectSpecs() {
 }
 // Memory budget for local inference: Apple Silicon shares RAM; else max(VRAM, half of RAM).
 function recommendIdx(s) {
-  const budget = s.apple ? s.ramGB : Math.max(s.vramGB, Math.floor(s.ramGB / 2));
-  return budget >= 8 ? 1 : 0;   // 8B if comfortable, else the small 3B
+  // The capable local models are all 32B+ (need a strong GPU / lots of RAM), so don't auto-recommend
+  // one — the safe default stays the online provider (Groq). -1 = nothing tagged "recommended".
+  return -1;
 }
 function specLine(s) {
   const parts = [`${s.ramGB} GB RAM`];
@@ -244,7 +249,7 @@ function ensureOllama(model) {
   if (!bin) { console.log(`⚠  Could not auto-install Ollama. Install it from https://ollama.com, run:  ollama pull ${model}  then restart Helm.`); return false; }
   // ensure the local server is up
   if (spawnSync(bin, ['list'], { encoding: 'utf8', timeout: 8000 }).status !== 0) {
-    try { const s = spawn(bin, ['serve'], { detached: true, stdio: 'ignore' }); s.unref(); } catch {}
+    try { const s = spawn(bin, ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }); s.unref(); } catch {}
     for (let i = 0; i < 15; i++) { sleep(1000); if (spawnSync(bin, ['list'], { encoding: 'utf8', timeout: 8000 }).status === 0) break; }
   }
   console.log(`\nDownloading the model "${model}" (a few GB, one-time)...`);

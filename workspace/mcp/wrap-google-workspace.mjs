@@ -46,6 +46,7 @@ const env = {
 const child = spawn('npx', ['-y', '@modelcontextprotocol/server-google-workspace'], {
   stdio: 'inherit',
   env,
+  windowsHide: true,
   shell: process.platform === 'win32',  // npx is npx.cmd on Windows — needs a shell or it ENOENTs
 });
 child.on('error', e => { process.stderr.write('[mcp/google-workspace] spawn error: ' + e.message + '\n'); process.exit(1); });
