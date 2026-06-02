@@ -388,6 +388,11 @@
 
       <h3 class="setup-h">Safety &amp; permissions</h3>
       <p class="term-note">Helm is a real agent on your machine: shell, files, web, screen, mouse/keyboard, scheduled actions, and a tested nightly self-upgrade. It's <b>owner-locked</b> to your Discord ID, secrets live in an encrypted vault, and it confirms before anything destructive. Start in <b>“ask before each action”</b> mode (the wizard's recommended default) and switch to full autonomy only once you trust it on that machine. Run it on hardware you own. It uses your own Claude account.</p>
+
+      <h3 class="setup-h">Uninstall</h3>
+      <p class="term-note">One line — stops every service, kills the processes, and removes the install (asks first; your HelmBrain vault and backups are left alone):</p>
+      <p class="term-note"><b>macOS / Linux:</b> <code>curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.sh | sh</code><br>
+      <b>Windows:</b> <code>irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.ps1 | iex</code></p>
     </div>
   </section>
 </div>

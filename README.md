@@ -75,6 +75,17 @@ npm start
 Keep it running 24/7 — `bash ~/helm/scripts/install-service.sh` (launchd / systemd) or, on Windows,
 `powershell -File scripts\install-service.ps1` (Task Scheduler).
 
+**Uninstall** — one line. Stops + unregisters all services, kills its processes, and removes the install
+(asks before deleting; your `~/HelmBrain` vault and any backups are left alone):
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.sh | sh
+```
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.ps1 | iex
+```
+
 ## Terminal — one command: `helm`
 
 Don't want to open Discord? Talk to Helm straight from your shell. The terminal is a live window into
