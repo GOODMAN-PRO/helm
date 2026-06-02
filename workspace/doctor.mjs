@@ -190,8 +190,12 @@ async function main() {
     if (base && model) {
       await checkOpenAIEndpoint(base, key, model);
       const pp = parseInt(get('PROXY_PORT') || '8787', 10);
-      if (await portOpen(pp)) warn('proxy-port', `proxy port ${pp} is already in use`, `Stop whatever holds port ${pp}, or set PROXY_PORT to a free port in .env.`);
-      else ok('proxy-port', `free-model proxy port ${pp} is free`);
+      if (await portOpen(pp)) {
+        // If Helm's brain is up, that port is its OWN proxy — expected, not a conflict.
+        const brainUp = await portOpen(parseInt(get('HELM_CLI_PORT') || '4625', 10));
+        if (brainUp) ok('proxy-port', `proxy port ${pp} in use by the running Helm (its own proxy) — fine`);
+        else warn('proxy-port', `proxy port ${pp} is held by another process (Helm isn't running)`, `Stop whatever holds port ${pp}, or set PROXY_PORT to a free port in .env.`);
+      } else ok('proxy-port', `free-model proxy port ${pp} is free`);
     } else {
       const ab = get('ANTHROPIC_BASE_URL');
       if (!ab) fail('auth', 'AUTH_MODE=custom but neither OPENAI_* nor ANTHROPIC_BASE_URL is set', 'Run helm setup and pick a free model (local Ollama or a free online provider).');
