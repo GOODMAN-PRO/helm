@@ -13,6 +13,15 @@ import { assertNode } from '../workspace/preflight/node-guard.mjs';
 // Refuse to configure on a Node too old to run Helm (clear message instead of a later node:sqlite crash).
 assertNode();
 
+// Open a URL in the user's default browser (best-effort; never blocks or breaks setup).
+function openUrl(url) {
+  try {
+    if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', url], { stdio: 'ignore', windowsHide: true, detached: true }).unref();
+    else if (process.platform === 'darwin') spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
+    else spawn('xdg-open', [url], { stdio: 'ignore', detached: true }).unref();
+  } catch {}
+}
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IS_MAC = process.platform === 'darwin';
 const IS_LINUX = process.platform === 'linux';
@@ -348,13 +357,18 @@ async function runPlain() {
   console.log('  API keys:    https://console.anthropic.com/settings/keys   Local models: https://ollama.com\n');
   const gw = (await ask('Gateways — discord, imessage, or both', 'discord')).toLowerCase();
   const gateways = gw.includes('both') ? ['discord', 'imessage'] : gw.includes('imessage') ? (gw.includes('discord') ? ['discord', 'imessage'] : ['imessage']) : ['discord'];
-  let token = ''; if (gateways.includes('discord')) token = await ask('Discord bot token (https://discord.com/developers/applications -> Bot -> Reset Token)');
+  let token = '';
+  if (gateways.includes('discord')) {
+    console.log('  Opening the Discord Developer Portal in your browser — create your bot, then Bot -> Reset Token.');
+    openUrl('https://discord.com/developers/applications');
+    token = await ask('Discord bot token (https://discord.com/developers/applications -> Bot -> Reset Token)');
+  }
   const ownerId = await ask('Your Discord user ID (enable Developer Mode, right-click your name -> Copy User ID)');
   const b = await ask('Power Helm with — 1) Claude subscription  2) Anthropic API key  3) Any other model (local/hosted)', '1');
   const authMode = b === '2' ? 'apikey' : b === '3' ? 'custom' : 'subscription';
   let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
   let online = false, openaiBase = '', openaiModel = '', openaiKey = '';
-  if (authMode === 'apikey') apiKey = await ask('Anthropic API key (https://console.anthropic.com/settings/keys)');
+  if (authMode === 'apikey') { openUrl('https://console.anthropic.com/settings/keys'); apiKey = await ask('Anthropic API key (https://console.anthropic.com/settings/keys)'); }
   else if (authMode === 'custom') {
     const specs = detectSpecs(); const rec = recommendIdx(specs);
     console.log(`  Your machine: ${specLine(specs)}`);
@@ -368,6 +382,7 @@ async function runPlain() {
       const p = FREE_ONLINE[pick - 1];
       online = true; openaiBase = p.baseUrl; openaiModel = p.model;
       console.log(`  Get a free API key: ${p.keyUrl}`);
+      openUrl(p.keyUrl);
       openaiKey = await ask(`${p.label.split(' —')[0]} API key`);
       const custom = await ask('Model id (Enter for default)', p.model);
       if (custom) openaiModel = custom;
@@ -407,7 +422,8 @@ async function main() {
   const owner = '';
   let ownerId = '';
   if (gateways.includes('discord')) {
-    token = await text('Discord bot token', { mask: true, hint: 'https://discord.com/developers/applications -> your app -> Bot -> Reset Token' });
+    openUrl('https://discord.com/developers/applications');
+    token = await text('Discord bot token', { mask: true, hint: 'opened in your browser — your app -> Bot -> Reset Token' });
   }
   ownerId = await text('Your Discord user ID (owner lock)', { hint: 'Discord -> Settings -> Advanced -> Developer Mode on, then right-click your name -> Copy User ID' });
 
@@ -422,7 +438,8 @@ async function main() {
   let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
   let online = false, openaiBase = '', openaiModel = '', openaiKey = '';
   if (authMode === 'apikey') {
-    apiKey = await text('Anthropic API key', { mask: true, hint: 'https://console.anthropic.com/settings/keys (starts with sk-ant-)' });
+    openUrl('https://console.anthropic.com/settings/keys');
+    apiKey = await text('Anthropic API key', { mask: true, hint: 'opened in your browser (starts with sk-ant-)' });
   } else if (authMode === 'custom') {
     // Pick a free ONLINE provider (runs via Helm's proxy), a free LOCAL model (auto-downloaded),
     // or a fully custom endpoint.
@@ -439,6 +456,7 @@ async function main() {
       const p = FREE_ONLINE[mi];
       online = true; openaiBase = p.baseUrl; openaiModel = p.model;
       console.log(`\n  Get a free API key: ${p.keyUrl}`);
+      openUrl(p.keyUrl);
       openaiKey = await text(`${p.label.split(' —')[0]} API key`, { mask: true, hint: `free tier — create one at ${p.keyUrl}` });
       const custom = await text('Model id (Enter to use the default)', { def: p.model, hint: 'override only if you want a different model on this provider' });
       if (custom) openaiModel = custom;
