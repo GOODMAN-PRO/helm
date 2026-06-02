@@ -164,11 +164,10 @@ function which(bin) {
 const sleep = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} };
 
 // Curated local models the wizard can auto-download via Ollama (free, private, no account).
-const LOCAL_MODELS = [
-  { label: 'Llama 3.2 (3B) — small & fast (~2 GB)', id: 'llama3.2' },
-  { label: 'Llama 3.1 (8B) — balanced (~5 GB)', id: 'llama3.1' },
-  { label: 'Qwen2.5 Coder (7B) — best for coding (~5 GB)', id: 'qwen2.5-coder' },
-];
+// Auto-download local models are intentionally empty: small Ollama models (3B-8B) can't follow
+// Claude Code's agent prompt — they summarize it instead of acting as Helm. Use a free ONLINE 70B
+// below, or a Custom endpoint pointing at a 70B+ local server.
+const LOCAL_MODELS = [];
 // Free ONLINE providers (OpenAI-compatible). Helm routes through its local translation proxy
 // (workspace/proxy/llm-proxy.mjs) so Claude Code can use them. Each has a free tier — paste a key.
 const FREE_ONLINE = [
@@ -358,7 +357,7 @@ async function runPlain() {
     FREE_ONLINE.forEach((p, i) => console.log(`    ${i + 1}) ${p.label}  [free online — needs a free key]`));
     LOCAL_MODELS.forEach((m, i) => console.log(`    ${FREE_ONLINE.length + i + 1}) ${m.label}${i === rec ? '  (recommended)' : ''}  [free local]`));
     console.log(`    ${FREE_ONLINE.length + LOCAL_MODELS.length + 1}) Custom endpoint (your own Anthropic-compatible URL / router)`);
-    const def = FREE_ONLINE.length + rec + 1;
+    const def = 1;   // default to the first free online provider (Groq)
     const pick = parseInt(await ask('Choice', String(def)), 10) || def;
     if (pick >= 1 && pick <= FREE_ONLINE.length) {
       const p = FREE_ONLINE[pick - 1];
@@ -429,7 +428,7 @@ async function main() {
       ...LOCAL_MODELS.map((m, i) => ({ label: m.label + (i === rec ? '   ← recommended for your machine' : ''), hint: 'free · local · private · auto-downloads' })),
       { label: 'Custom endpoint (your own Anthropic-compatible URL / router)', hint: 'advanced — LiteLLM / claude-code-router / self-hosted' },
     ];
-    const localRecIdx = FREE_ONLINE.length + rec;   // default-highlight the recommended local model
+    const localRecIdx = 0;   // default-highlight the first free online provider (Groq)
     const mi = await select(`Pick a model   (detected: ${specLine(specs)})`, choices, localRecIdx);
     if (mi < FREE_ONLINE.length) {
       const p = FREE_ONLINE[mi];

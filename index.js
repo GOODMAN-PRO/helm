@@ -935,6 +935,7 @@ function startProxy() {
     cwd: __dirname,
     env: { ...process.env, PROXY_PORT: String(PROXY_PORT) },
     stdio: ['ignore', 'inherit', 'inherit'],
+    windowsHide: true,   // don't pop a console window on Windows
   });
   console.log(`🔌 Free-model proxy: Claude Code -> http://127.0.0.1:${PROXY_PORT} -> ${process.env.OPENAI_BASE_URL} (${process.env.OPENAI_MODEL})`);
   proxyChild.on('exit', code => {
