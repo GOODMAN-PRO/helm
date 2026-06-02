@@ -143,10 +143,10 @@ function claudeEnv() {
   return e;
 }
 
-if (!DISCORD_TOKEN || !OWNER_ID) {
-  console.error('✋ Missing DISCORD_TOKEN or OWNER_ID in .env');
-  process.exit(1);
-}
+// Discord is OPTIONAL — Helm can run terminal-only (the `helm` CLI talks to the brain over the local
+// bridge). Only connect to Discord when it's actually configured; otherwise start without it.
+const DISCORD_ON = !!DISCORD_TOKEN && !!OWNER_ID && !/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN);
+if (!DISCORD_ON) console.error('Discord not configured - running terminal-only. Use `helm` in a terminal; add DISCORD_TOKEN + OWNER_ID to .env and restart to enable Discord.');
 mkdirSync(WORKSPACE, { recursive: true });
 
 // First-run onboarding: ensure a private owner.md exists (CLAUDE.md imports @owner.md). On a fresh
@@ -996,11 +996,9 @@ startCliBridge(async (text, reply) => {
 });
 
 // Connect to Discord, with a clear reason if it can't (so "offline" isn't a mystery).
-if (/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN || '')) {
-  console.error('✋ DISCORD_TOKEN is still the placeholder. Run `npm run wizard` and paste your bot token (Developer Portal → your app → Bot → Reset Token).');
-  process.exit(1);
-}
-client.login(DISCORD_TOKEN).catch(async e => {
+if (!DISCORD_ON) {
+  console.error('Discord login skipped (not configured) - terminal-only. Run `helm`, or add a real DISCORD_TOKEN + OWNER_ID and restart.');
+} else client.login(DISCORD_TOKEN).catch(async e => {
   const m = String(e?.message || e);
   if (/token/i.test(m)) {
     console.error('✋ Discord login failed: invalid DISCORD_TOKEN. Each bot needs its OWN token — get one at Developer Portal → your app → Bot → Reset Token, then `npm run wizard`. (One token = one running bot.)');

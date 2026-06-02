@@ -12,20 +12,22 @@ foreach ($t in "HelmDiscord","HelmScheduler","HelmThink","HelmSelfUpgrade","Helm
   schtasks /End /TN $t 2>$null | Out-Null
   schtasks /Delete /TN $t /F 2>$null | Out-Null
 }
-# Kill any node processes running from this install.
+# Kill any node processes running Helm — from the install dir OR an npx-cache copy.
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" 2>$null |
-  Where-Object { $_.CommandLine -and $_.CommandLine -like "*$Dir*" } |
+  Where-Object { $_.CommandLine -and ($_.CommandLine -like "*$Dir*" -or $_.CommandLine -like "*\helm\index.js*" -or $_.CommandLine -like "*node_modules\helm\*") } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force 2>$null }
 
 # Remove the global `helm` command if it was linked (npm is npm.cmd on Windows).
 & npm.cmd rm -g helm 2>$null | Out-Null
 
 Write-Host "Helm services stopped and unregistered."
-if (-not (Test-Path $Dir)) { Write-Host "No install at $Dir - nothing to delete."; exit 0 }
+# NOTE: use `return`, not `exit` — this script is run via `irm ... | iex`, and `exit` would close the
+# whole terminal window. `return` ends the script cleanly in both `iex` and `-File` modes.
+if (-not (Test-Path $Dir)) { Write-Host "No install dir at $Dir (an npx run leaves nothing here to delete). Services + global command removed."; return }
 
 if ($env:HELM_YES -ne "1") {
   $ans = Read-Host "Delete the install at $Dir ? (y/N)"
-  if ($ans -notmatch '^[Yy]') { Write-Host "Kept $Dir (services are stopped). Aborted."; exit 0 }
+  if ($ans -notmatch '^[Yy]') { Write-Host "Kept $Dir (services are stopped). Aborted."; return }
 }
 Remove-Item -Recurse -Force $Dir
 Write-Host "Helm uninstalled from $Dir. Your HelmBrain vault and any backups were left untouched."

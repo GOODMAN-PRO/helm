@@ -343,8 +343,13 @@ function applyConfig(cfg) {
     console.log('   Or run `helm setup` again and pick a different backend (e.g. your Claude login).');
     console.log('─'.repeat(60));
   }
-  console.log(`Then DM your bot on Discord.${cfg.gateways.includes('imessage') ? '  (iMessage: grant node Full Disk Access in System Settings.)' : ''}`);
-  console.log('Reminder: one Discord token = one running instance.');
+  if (cfg.token) {
+    console.log(`Then DM your bot on Discord.${cfg.gateways.includes('imessage') ? '  (iMessage: grant node Full Disk Access in System Settings.)' : ''}`);
+    console.log('Reminder: one Discord token = one running instance.');
+  } else {
+    console.log('Discord skipped — Helm runs terminal-only. Use `helm` in a terminal.');
+    console.log('Add DISCORD_TOKEN to .env (or re-run setup) and restart to turn Discord on.');
+  }
   process.exit(0);
 }
 
@@ -360,8 +365,9 @@ async function runPlain() {
   let token = '';
   if (gateways.includes('discord')) {
     console.log('  Opening the Discord Developer Portal in your browser — create your bot, then Bot -> Reset Token.');
+    console.log('  (Or press Enter to skip Discord for now — Helm runs terminal-only; add the token later.)');
     openUrl('https://discord.com/developers/applications');
-    token = await ask('Discord bot token (https://discord.com/developers/applications -> Bot -> Reset Token)');
+    token = await ask('Discord bot token (Enter to skip)');
   }
   const ownerId = await ask('Your Discord user ID (enable Developer Mode, right-click your name -> Copy User ID)');
   const b = await ask('Power Helm with — 1) Claude subscription  2) Anthropic API key  3) Any other model (local/hosted)', '1');
@@ -423,7 +429,7 @@ async function main() {
   let ownerId = '';
   if (gateways.includes('discord')) {
     openUrl('https://discord.com/developers/applications');
-    token = await text('Discord bot token', { mask: true, hint: 'opened in your browser — your app -> Bot -> Reset Token' });
+    token = await text('Discord bot token (Enter to skip)', { mask: true, hint: 'opened in your browser — Bot -> Reset Token. Or press Enter to skip Discord; Helm runs terminal-only.' });
   }
   ownerId = await text('Your Discord user ID (owner lock)', { hint: 'Discord -> Settings -> Advanced -> Developer Mode on, then right-click your name -> Copy User ID' });
 
