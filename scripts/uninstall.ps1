@@ -17,6 +17,9 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" 2>$null |
   Where-Object { $_.CommandLine -and $_.CommandLine -like "*$Dir*" } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force 2>$null }
 
+# Remove the global `helm` command if it was linked (npm is npm.cmd on Windows).
+& npm.cmd rm -g helm 2>$null | Out-Null
+
 Write-Host "Helm services stopped and unregistered."
 if (-not (Test-Path $Dir)) { Write-Host "No install at $Dir - nothing to delete."; exit 0 }
 
