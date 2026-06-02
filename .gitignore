@@ -123,3 +123,8 @@ workspace/helm.log
 
 # owner project tracker (personal)
 workspace/projects.json
+
+# Helm network: private identity key, friend list, hub relay store
+workspace/network/identity.json
+workspace/network/friends.json
+workspace/network/hub-data.json
