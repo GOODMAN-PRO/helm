@@ -110,7 +110,8 @@ async function checkOpenAIEndpoint(base, key, model) {
     if (r.status >= 200 && r.status < 300) {
       let ids = [];
       try { const j = JSON.parse(r.body); ids = (j.data || j.models || []).map(m => m.id || m.name).filter(Boolean); } catch {}
-      if (ids.length && !ids.includes(model)) {
+      const _norm = s => String(s).replace(/^models\//, ''); const _ids = ids.map(_norm);
+      if (ids.length && !_ids.includes(_norm(model))) {
         warn('model', `model "${model}" isn't in the provider's model list`, `Available e.g.: ${ids.slice(0, 6).join(', ')}. Set OPENAI_MODEL to one of these.`);
       } else {
         ok('model-endpoint', `reachable, model "${model}" ok (${base})`);
