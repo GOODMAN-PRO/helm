@@ -21,7 +21,7 @@ import { config as loadEnv } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
-loadEnv({ path: path.join(ROOT, '.env') });
+loadEnv({ path: path.join(ROOT, '.env'), override: true });
 
 const CLAUDE = process.env.CLAUDE_BIN || 'claude';
 const MODEL  = process.env.COMPACT_MODEL || 'haiku';

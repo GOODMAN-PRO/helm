@@ -23,7 +23,7 @@ import { HANDOFF_SCHEMA, pruneFileReads } from '../sessions/compact.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/swarm
 const WORKSPACE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(__dirname, '../..');
-loadEnv({ path: path.join(ROOT, '.env') });
+loadEnv({ path: path.join(ROOT, '.env'), override: true });
 
 const argv = process.argv;
 const arg = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };

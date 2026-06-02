@@ -19,7 +19,7 @@ import { config as loadEnv } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));   // workspace/tools/impl
 const ROOT = path.resolve(__dirname, '../../..');                // secondme/
-loadEnv({ path: path.join(ROOT, '.env') });
+loadEnv({ path: path.join(ROOT, '.env'), override: true });
 const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude';
 const MIND_MD = path.join(ROOT, 'workspace/mind/MIND.md');
 

@@ -16,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT      = path.resolve(__dirname, '../..'); // secondme/
 const WORKSPACE = path.resolve(__dirname, '..');    // secondme/workspace/
 
-loadEnv({ path: path.join(ROOT, '.env') });
+loadEnv({ path: path.join(ROOT, '.env'), override: true });
 
 const {
   CLAUDE_BIN     = 'claude',

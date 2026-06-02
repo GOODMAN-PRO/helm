@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: path.join(__dirname, '.env') });
+loadEnv({ path: path.join(__dirname, '.env'), override: true });
 const PORT = parseInt(process.env.HELM_CLI_PORT || '4625', 10);
 const HOST = '127.0.0.1';
 

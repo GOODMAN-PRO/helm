@@ -19,7 +19,7 @@ import { renderStuckForPrompt, archiveAll } from './stuck.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/upgrades
 const ROOT = path.resolve(__dirname, '../..');                  // secondme/
-loadEnv({ path: path.join(ROOT, '.env') });
+loadEnv({ path: path.join(ROOT, '.env'), override: true });
 const { CLAUDE_BIN = 'claude', MODEL = 'opus' } = process.env;
 const DRYRUN = process.env.HELM_UPGRADE_DRYRUN === '1';
 const SKIP_SMOKE = process.env.HELM_UPGRADE_SKIP_SMOKE === '1';

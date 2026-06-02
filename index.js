@@ -27,7 +27,7 @@ import { register as netRegister, addFriend, acceptFriend, listFriends, sendMess
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: path.join(__dirname, '.env') });
+loadEnv({ path: path.join(__dirname, '.env'), override: true });
 
 // ---- config (.env) ----
 const {

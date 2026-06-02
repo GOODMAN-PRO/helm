@@ -18,7 +18,7 @@ import { config as loadEnv } from 'dotenv';
 const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/think
 const WORKSPACE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(__dirname, '../..');
-loadEnv({ path: path.join(ROOT, '.env') });
+loadEnv({ path: path.join(ROOT, '.env'), override: true });
 
 const { CLAUDE_BIN = 'claude' } = process.env;
 const MODEL = process.env.THINK_MODEL || 'sonnet';

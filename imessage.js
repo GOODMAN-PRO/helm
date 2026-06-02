@@ -17,7 +17,7 @@ import { runHealthChecks } from './workspace/mcp/check.mjs';
 import { processStuckMarkers, autoCaptureCant } from './workspace/upgrades/stuck.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: path.join(__dirname, '.env') });
+loadEnv({ path: path.join(__dirname, '.env'), override: true });
 
 const {
   CLAUDE_BIN = 'claude',
