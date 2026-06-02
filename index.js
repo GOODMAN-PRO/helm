@@ -21,6 +21,7 @@ import { exportTemplate, importTemplate, listTemplates } from './workspace/templ
 import { runHealthChecks } from './workspace/mcp/check.mjs';
 import { startCliBridge, mirrorReply, mirrorEcho, mirrorStatus } from './workspace/cli-bridge.mjs';
 import { listSkills, runSkillCommand } from './workspace/skills/loader.mjs';
+import { renderProjects, addProject, cancelProject, deleteProject, doneProject } from './workspace/projects/projects.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -802,6 +803,34 @@ client.on(Events.MessageCreate, async msg => {
   if (/^\/?(where|which|target)\b/.test(low)) {   // NOT "status" — that's the owner's project-status command
     const tgt = getTarget();
     await msg.reply(`Active machine: **${tgt}**${tgt !== LOCAL_MACHINE && !PEER_REACHABLE ? ' (peer not reachable)' : ''}.`);
+    return;
+  }
+
+  // ---- project tracker: owner can list / add / cancel / finish / delete projects ----
+  if (/^\/?projects?\s*$/i.test(low)) { await msg.reply('**Projects**\n' + renderProjects()); return; }
+  let pm;
+  if ((pm = text.match(/^\/?(?:new|add)\s+project\s+(.+)/i))) {
+    const r = addProject(pm[1].trim());
+    await msg.reply((r.already ? `Already tracking **${r.project.name}**.` : `Added **${r.project.name}**.`) + '\n\n' + renderProjects());
+    return;
+  }
+  if ((pm = text.match(/^\/?(cancel|delete|remove|finish|done|complete)\s+project\s+(.+)/i))) {
+    const verb = pm[1].toLowerCase(); const name = pm[2].trim();
+    const r = /delete|remove/.test(verb) ? deleteProject(name) : /finish|done|complete/.test(verb) ? doneProject(name) : cancelProject(name);
+    if (!r.ok) { await msg.reply(`${r.error}.${r.names && r.names.length ? ' Tracked: ' + r.names.join(', ') + '.' : ''}`); return; }
+    await msg.reply((r.deleted ? `Deleted **${r.deleted}**.` : `**${r.project.name}** → **${r.project.status}**.`) + '\n\n' + renderProjects());
+    return;
+  }
+
+  // ---- self-review: scan today's messages for tasks I declined/failed, queue them for self-upgrade ----
+  if (/^\/?(self-?review|review (the )?(day|today|messages|chat))\b/i.test(low)) {
+    await msg.reply("Reviewing today's messages for anything I declined or failed…");
+    try {
+      const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'upgrades', 'review-day.mjs')], { cwd: __dirname, encoding: 'utf8', timeout: 30_000 });
+      let j = {}; try { j = JSON.parse((r.stdout || '').trim().split('\n').pop()); } catch {}
+      if (j.queued > 0) await msg.reply(`Queued **${j.queued}** task(s) I couldn't do for tonight's self-upgrade:\n${(j.items || []).map(x => `• ${x}`).join('\n')}`);
+      else await msg.reply(`Scanned ${j.scanned || 0} exchange(s) — nothing I declined or failed today. Queue's clean.`);
+    } catch (e) { await msg.reply('Review failed: ' + String(e.message || e).slice(0, 200)); }
     return;
   }
 

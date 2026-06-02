@@ -120,3 +120,6 @@ workspace/.restarting
 
 # brain console log (runtime)
 workspace/helm.log
+
+# owner project tracker (personal)
+workspace/projects.json

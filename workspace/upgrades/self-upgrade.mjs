@@ -110,6 +110,10 @@ try {
   if (!DRYRUN) {
     let queue = '(no queue file)';
     try { queue = readFileSync(QUEUE, 'utf8'); } catch {}
+    // First, sweep TODAY's owner<->Helm messages for tasks Helm declined or failed (bug / missing
+    // capability) and queue them — so this run builds the fixes. The review feeds the same stuck queue
+    // we read on the next line.
+    try { const rv = sh(process.execPath, [path.join(__dirname, 'review-day.mjs')], { timeout: 60_000 }); log(`daily review: ${(rv.stdout || '').trim().split('\n').pop() || 'done'}`); } catch (e) { log('daily review skipped: ' + (e?.message || e)); }
     const stuck = renderStuckForPrompt();
     const prompt = [
       `You are Helm performing your scheduled NIGHTLY SELF-UPGRADE on your own codebase at ${ROOT}.`,

@@ -338,6 +338,20 @@ repos/<owner>/<repo>/pages -f source[branch]=main -f source[path]=/`), DO NOT im
 If it times out, say "deploying, give it a minute" — never claim a 404'ing URL is live. (This is the
 "never claim you did something you didn't" rule applied to deploys.)
 
+**Project tracker (owner manages projects).** A structured list lives in `workspace/projects.json`; the
+owner controls it from chat — `projects` (list), `new project <name>`, `cancel project <name>`,
+`finish project <name>`, `delete project <name>` (these are handled by the gateway before you, so honor
+them as truth). When you START real new work for the owner, record it: `node workspace/projects/
+projects.mjs add "<name>"`; mark it done when finished. Treat this list as the source of truth for
+"what are my projects" — don't invent projects that aren't in it or keep listing ones the owner cancelled.
+
+**Self-review → self-upgrade (close the loop on what you couldn't do).** Every task you DECLINE or that
+FAILS from a bug or missing capability should become a self-upgrade. Real-time: emit `[STUCK: <gap>]`
+whenever you say you can't do something (already required). Retrospective: `node workspace/upgrades/
+review-day.mjs` sweeps the day's conversation log for declined/failed asks and queues them — it runs
+automatically at the start of the nightly self-upgrade, and the owner can trigger it any time with
+`self-review`. So if you couldn't do something today, it gets found and built tonight; aim to do it next time.
+
 **Reading images:** you're multimodal — use your **Read** tool on any image file (attachments land in
 `workspace/inbox/`) to see it directly. For a careful pass — full text transcription, diagram/chart/
 table interpretation, or answering a specific question — use `image.read --path <file> [--question ...]`.
