@@ -31,5 +31,16 @@ if ($env:HELM_YES -ne "1") {
   $ans = Read-Host "Delete the install at $Dir ? (y/N)"
   if ($ans -notmatch '^[Yy]') { Write-Host "Kept $Dir (services are stopped). Aborted."; return }
 }
-Remove-Item -Recurse -Force $Dir
-Write-Host "Helm uninstalled from $Dir. Your HelmBrain vault and any backups were left untouched."
+# A just-killed brain can hold file handles for a moment; wait, then delete with a couple of retries so
+# a transient lock doesn't leave the folder (and a stale .env, which would skip setup next install).
+Start-Sleep -Milliseconds 600
+foreach ($i in 1..3) {
+  Remove-Item -LiteralPath $Dir -Recurse -Force 2>$null
+  if (-not (Test-Path $Dir)) { break }
+  Start-Sleep -Seconds 1
+}
+if (Test-Path $Dir) {
+  Write-Host "Couldn't fully delete $Dir - a file is still locked. Close anything using it (or reopen this terminal) and delete the folder manually." -ForegroundColor Yellow
+} else {
+  Write-Host "Helm uninstalled from $Dir. Your HelmBrain vault and any backups were left untouched."
+}
