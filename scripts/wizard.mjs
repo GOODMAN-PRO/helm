@@ -32,6 +32,7 @@ try { input = new tty.ReadStream(fs.openSync('/dev/tty', 'r')); ownTty = true; }
 catch { input = process.stdin; }
 const out = process.stdout;
 const isTTY = !!input.isTTY;
+const BACK = Symbol('back');   // a prompt returns this when the user presses Esc / Left to go back a step
 
 const C = {
   reset: '\x1b[0m', dim: '\x1b[2m', b: '\x1b[1m',
@@ -70,6 +71,7 @@ function parseKey(buf) {
   if (s === ' ') return { space: true };
   if (s === '\x1b[A' || s === 'k') return { up: true };
   if (s === '\x1b[B' || s === 'j') return { down: true };
+  if (s === '\x1b[D' || s === '\x1b') return { back: true };   // Left arrow or Esc = go back a step
   return { str: s };
 }
 
@@ -78,7 +80,7 @@ function select(title, items, idx = 0) {
     raw(true); hideCur();
     const render = () => {
       header();
-      out.write(`  ${C.b}${title}${C.reset}\n  ${C.dim}up/down move · enter select${C.reset}\n\n`);
+      out.write(`  ${C.b}${title}${C.reset}\n  ${C.dim}up/down move · enter select · esc back${C.reset}\n\n`);
       items.forEach((it, i) => {
         const sel = i === idx;
         const ptr = sel ? `${C.cyan}>${C.reset} ` : '  ';
@@ -94,6 +96,7 @@ function select(title, items, idx = 0) {
       if (k.up) { idx = (idx - 1 + items.length) % items.length; render(); }
       else if (k.down) { idx = (idx + 1) % items.length; render(); }
       else if (k.enter) { input.off('data', onData); resolve(idx); }
+      else if (k.back) { input.off('data', onData); resolve(BACK); }
     };
     render(); input.resume(); input.on('data', onData);
   });
@@ -107,7 +110,7 @@ function multiselect(title, items) {
     raw(true); hideCur();
     const render = () => {
       header();
-      out.write(`  ${C.b}${title}${C.reset}\n  ${C.dim}up/down move · space toggle · enter confirm${C.reset}\n\n`);
+      out.write(`  ${C.b}${title}${C.reset}\n  ${C.dim}up/down move · space toggle · enter confirm · esc back${C.reset}\n\n`);
       items.forEach((it, i) => {
         const sel = i === idx;
         const box = it.checked ? `${C.grn}[x]${C.reset}` : (it.disabled ? `${C.dim}[ ]${C.reset}` : `${C.gray}[ ]${C.reset}`);
@@ -125,6 +128,7 @@ function multiselect(title, items) {
       else if (k.down) { do { idx = (idx + 1) % items.length; } while (items[idx].disabled); render(); }
       else if (k.space) { if (!items[idx].disabled) { items[idx].checked = !items[idx].checked; render(); } }
       else if (k.enter) { input.off('data', onData); resolve(items.map((it, i) => (it.checked && !it.disabled) ? i : -1).filter(i => i >= 0)); }
+      else if (k.back) { input.off('data', onData); resolve(BACK); }
     };
     render(); input.resume(); input.on('data', onData);
   });
@@ -145,6 +149,7 @@ function text(label, { def = '', mask = false, hint = '' } = {}) {
     };
     const onData = buf => {
       const s = buf.toString('utf8');
+      if (s === '\x1b' || s === '\x1b[D') { input.off('data', onData); out.write('\n'); return resolve(BACK); }   // Esc / Left = go back
       for (const ch of s) {
         if (ch === '\x03') { cleanup(); process.exit(130); }
         if (ch === '\r' || ch === '\n') { input.off('data', onData); out.write('\n'); return resolve((val || def).trim()); }
@@ -411,107 +416,141 @@ async function runPlain() {
 
 async function main() {
   if (!rawOk) { await runPlain(); return; }
+  const a = { gateways: ['discord'] };   // accumulator; steps read/write it so back-nav can revisit
 
-  // 1) gateways
-  const gwItems = [
-    { label: 'Discord', hint: 'DM a bot — works on every OS', checked: true },
-    { label: 'iMessage', hint: IS_MAC ? 'macOS — reads Messages, needs Full Disk Access' : 'macOS only (this machine is not a Mac)', checked: false, disabled: !IS_MAC },
+  // Each step: { id, when?(skip if false), run() -> value | BACK }. The driver advances on a value,
+  // retreats to the previous APPLICABLE step on BACK (Esc / Left in any prompt). Forward path is
+  // identical to before when you never press back.
+  const steps = [
+    { id: 'gateways', run: async () => {
+        const items = [
+          { label: 'Discord', hint: 'DM a bot — works on every OS', checked: a.gateways.includes('discord') },
+          { label: 'iMessage', hint: IS_MAC ? 'macOS — reads Messages, needs Full Disk Access' : 'macOS only (this machine is not a Mac)', checked: a.gateways.includes('imessage'), disabled: !IS_MAC },
+        ];
+        const r = await multiselect('Choose your gateways', items);
+        if (r === BACK) return BACK;
+        let picks = r; if (picks.length === 0) picks = [0];
+        const g = []; if (picks.includes(0)) g.push('discord'); if (picks.includes(1)) g.push('imessage');
+        a.gateways = g; return true;
+      } },
+    { id: 'token', when: () => a.gateways.includes('discord'), run: async () => {
+        openUrl('https://discord.com/developers/applications');
+        const r = await text('Discord bot token (Enter to skip)', { def: a.token || '', mask: true, hint: 'opened in your browser — Bot -> Reset Token. Or press Enter to skip Discord; Helm runs terminal-only.' });
+        if (r === BACK) return BACK; a.token = r; return true;
+      } },
+    { id: 'ownerId', run: async () => {
+        const r = await text('Your Discord user ID (owner lock)', { def: a.ownerId || '', hint: 'Discord -> Settings -> Advanced -> Developer Mode on, then right-click your name -> Copy User ID' });
+        if (r === BACK) return BACK; a.ownerId = r; return true;
+      } },
+    { id: 'backend', run: async () => {
+        const items = [
+          { label: 'Claude subscription (Pro / Max)', hint: 'log in with claude — no per-message cost' },
+          { label: 'Anthropic API key', hint: 'pay-as-you-go — no subscription needed' },
+          { label: 'Any other model — local or hosted', hint: 'free or paid: Ollama, OpenAI, Gemini, Groq, OpenRouter, DeepSeek… point Helm at any model' },
+        ];
+        const def = a.authMode === 'apikey' ? 1 : a.authMode === 'custom' ? 2 : 0;
+        const r = await select('How do you want to power Helm?', items, def);
+        if (r === BACK) return BACK;
+        a.authMode = r === 1 ? 'apikey' : r === 2 ? 'custom' : 'subscription';
+        return true;
+      } },
+    { id: 'apikey', when: () => a.authMode === 'apikey', run: async () => {
+        openUrl('https://console.anthropic.com/settings/keys');
+        const r = await text('Anthropic API key', { def: a.apiKey || '', mask: true, hint: 'opened in your browser (starts with sk-ant-)' });
+        if (r === BACK) return BACK; a.apiKey = r; return true;
+      } },
+    { id: 'modelpick', when: () => a.authMode === 'custom', run: async () => {
+        const specs = detectSpecs(); const rec = recommendIdx(specs);
+        const choices = [
+          ...FREE_ONLINE.map(p => ({ label: p.label, hint: 'free online · needs a free API key · fast' })),
+          ...LOCAL_MODELS.map((m, i) => ({ label: m.label + (i === rec ? '   ← recommended for your machine' : ''), hint: 'free · local · private · auto-downloads' })),
+          { label: 'Custom endpoint (your own Anthropic-compatible URL / router)', hint: 'advanced — LiteLLM / claude-code-router / self-hosted' },
+        ];
+        const r = await select(`Pick a model   (detected: ${specLine(specs)})`, choices, a.mi ?? 0);
+        if (r === BACK) return BACK;
+        a.mi = r;
+        a.online = false; a.ollamaModel = ''; a.openaiBase = ''; a.openaiModel = ''; a.baseUrl = ''; a.modelId = ''; a.customEndpoint = false;
+        if (r < FREE_ONLINE.length) { const p = FREE_ONLINE[r]; a.online = true; a.openaiBase = p.baseUrl; a.openaiModel = p.model; a.keyUrl = p.keyUrl; a.provLabel = p.label; }
+        else if (r < FREE_ONLINE.length + LOCAL_MODELS.length) { a.ollamaModel = LOCAL_MODELS[r - FREE_ONLINE.length].id; a.modelId = a.ollamaModel; a.baseUrl = 'http://localhost:11434'; }
+        else { a.customEndpoint = true; }
+        return true;
+      } },
+    { id: 'onlinekey', when: () => a.authMode === 'custom' && a.online, run: async () => {
+        console.log(`\n  Get a free API key: ${a.keyUrl}`); openUrl(a.keyUrl);
+        const r = await text(`${a.provLabel.split(' —')[0]} API key`, { def: a.openaiKey || '', mask: true, hint: `free tier — create one at ${a.keyUrl}` });
+        if (r === BACK) return BACK; a.openaiKey = r; return true;
+      } },
+    { id: 'onlinemodel', when: () => a.authMode === 'custom' && a.online, run: async () => {
+        const r = await text('Model id (Enter to use the default)', { def: a.openaiModel, hint: 'override only if you want a different model on this provider' });
+        if (r === BACK) return BACK; if (r) a.openaiModel = r; return true;
+      } },
+    { id: 'epurl', when: () => a.authMode === 'custom' && a.customEndpoint, run: async () => {
+        const r = await text('Model endpoint URL', { def: a.baseUrl || 'http://localhost:11434', hint: 'Anthropic-compatible endpoint, or a router (LiteLLM / claude-code-router)' });
+        if (r === BACK) return BACK; a.baseUrl = r; return true;
+      } },
+    { id: 'epmodel', when: () => a.authMode === 'custom' && a.customEndpoint, run: async () => {
+        const r = await text('Model name', { def: a.modelId || 'llama3.1', hint: 'e.g. gpt-4o, gemini-2.0, llama-3.1-70b' });
+        if (r === BACK) return BACK; a.modelId = r; return true;
+      } },
+    { id: 'epkey', when: () => a.authMode === 'custom' && a.customEndpoint, run: async () => {
+        const r = await text('API key for that endpoint', { def: a.apiKey || '', mask: true, hint: 'leave blank if none' });
+        if (r === BACK) return BACK; a.apiKey = r; return true;
+      } },
+    { id: 'claudemodel', when: () => a.authMode !== 'custom', run: async () => {
+        const r = await select('Claude model', [
+          { label: 'opus', hint: 'best reasoning — heavier on Max limits' },
+          { label: 'sonnet', hint: 'fast + sustainable' },
+        ], a.model === 'sonnet' ? 1 : 0);
+        if (r === BACK) return BACK; a.model = ['opus', 'sonnet'][r]; return true;
+      } },
+    { id: 'perm', run: async () => {
+        const r = await select('Tool permissions — how much can Helm do on its own?', [
+          { label: 'default — ask before each action', hint: 'safer; recommended when starting out. Helm asks before running tools.' },
+          { label: 'bypassPermissions — full autonomy', hint: 'Helm acts without asking (shell, files, screen). Powerful; only if you trust it on this machine.' },
+        ], a.perm === 'bypassPermissions' ? 1 : 0);
+        if (r === BACK) return BACK; a.perm = ['default', 'bypassPermissions'][r]; return true;
+      } },
+    { id: 'service', run: async () => {
+        const r = await select(`Run 24/7 in the background? (${IS_MAC ? 'launchd' : IS_LINUX ? 'systemd --user' : 'service'})`, [{ label: 'Yes' }, { label: 'No' }], a.svc === false ? 1 : 0);
+        if (r === BACK) return BACK; a.svc = (r === 0); return true;
+      } },
+    { id: 'review', run: async () => {
+        header();
+        out.write(`  ${C.b}Review${C.reset}\n\n`);
+        const row = (k, v) => out.write(`  ${C.gray}${k.padEnd(14)}${C.reset}${v}\n`);
+        row('Gateways', `${C.teal}${a.gateways.join(', ')}${C.reset}`);
+        row('Discord token', a.token ? `${C.grn}set${C.reset} ${C.dim}(hidden)${C.reset}` : `${C.yel}none${C.reset}`);
+        row('Owner ID', a.ownerId || `${C.yel}(none)${C.reset}`);
+        row('Backend',
+          a.authMode === 'apikey' ? `Anthropic API key ${a.apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}`
+          : a.authMode === 'custom' ? (a.online ? `Free online ${C.teal}${a.openaiModel}${C.reset} ${C.dim}(${a.openaiBase})${C.reset} ${a.openaiKey ? `${C.grn}key set${C.reset}` : `${C.yel}no key${C.reset}`}` : a.ollamaModel ? `Local model ${C.teal}${a.ollamaModel}${C.reset} (auto-download)` : `Custom — ${C.teal}${a.modelId}${C.reset} @ ${a.baseUrl}`)
+          : 'Claude subscription (OAuth)');
+        if (a.authMode !== 'custom') row('Model', a.model || 'sonnet');
+        row('Permissions', a.perm);
+        row('Service', a.svc ? 'yes' : 'no');
+        row('Machine', `${C.teal}${IS_MAC ? 'macOS' : IS_WIN ? 'Windows' : 'Linux'}${C.reset} ${C.dim}(single machine)${C.reset}`);
+        out.write('\n');
+        const r = await select('Write this config?', [{ label: 'Yes' }, { label: 'No — go back' }], 0);
+        return r === 0 ? 'DONE' : BACK;
+      } },
   ];
-  let picks = await multiselect('Choose your gateways', gwItems);
-  if (picks.length === 0) picks = [0]; // default to Discord if nothing chosen
-  const gateways = [];
-  if (picks.includes(0)) gateways.push('discord');
-  if (picks.includes(1)) gateways.push('imessage');
 
-  // 2) credentials
-  let token = '';
-  const owner = '';
-  let ownerId = '';
-  if (gateways.includes('discord')) {
-    openUrl('https://discord.com/developers/applications');
-    token = await text('Discord bot token (Enter to skip)', { mask: true, hint: 'opened in your browser — Bot -> Reset Token. Or press Enter to skip Discord; Helm runs terminal-only.' });
-  }
-  ownerId = await text('Your Discord user ID (owner lock)', { hint: 'Discord -> Settings -> Advanced -> Developer Mode on, then right-click your name -> Copy User ID' });
-
-  // 2.5) backend — how Helm is powered
-  const backendItems = [
-    { label: 'Claude subscription (Pro / Max)', hint: 'log in with claude — no per-message cost' },
-    { label: 'Anthropic API key', hint: 'pay-as-you-go — no subscription needed' },
-    { label: 'Any other model — local or hosted', hint: 'free or paid: Ollama, OpenAI, Gemini, Groq, OpenRouter, DeepSeek… point Helm at any model' },
-  ];
-  const backendIdx = await select('How do you want to power Helm?', backendItems);
-  const authMode = backendIdx === 1 ? 'apikey' : backendIdx === 2 ? 'custom' : 'subscription';
-  let apiKey = '', baseUrl = '', modelId = '', ollamaModel = '';
-  let online = false, openaiBase = '', openaiModel = '', openaiKey = '';
-  if (authMode === 'apikey') {
-    openUrl('https://console.anthropic.com/settings/keys');
-    apiKey = await text('Anthropic API key', { mask: true, hint: 'opened in your browser (starts with sk-ant-)' });
-  } else if (authMode === 'custom') {
-    // Pick a free ONLINE provider (runs via Helm's proxy), a free LOCAL model (auto-downloaded),
-    // or a fully custom endpoint.
-    const specs = detectSpecs();
-    const rec = recommendIdx(specs);
-    const choices = [
-      ...FREE_ONLINE.map(p => ({ label: p.label, hint: 'free online · needs a free API key · fast' })),
-      ...LOCAL_MODELS.map((m, i) => ({ label: m.label + (i === rec ? '   ← recommended for your machine' : ''), hint: 'free · local · private · auto-downloads' })),
-      { label: 'Custom endpoint (your own Anthropic-compatible URL / router)', hint: 'advanced — LiteLLM / claude-code-router / self-hosted' },
-    ];
-    const localRecIdx = 0;   // default-highlight the first free online provider (Groq)
-    const mi = await select(`Pick a model   (detected: ${specLine(specs)})`, choices, localRecIdx);
-    if (mi < FREE_ONLINE.length) {
-      const p = FREE_ONLINE[mi];
-      online = true; openaiBase = p.baseUrl; openaiModel = p.model;
-      console.log(`\n  Get a free API key: ${p.keyUrl}`);
-      openUrl(p.keyUrl);
-      openaiKey = await text(`${p.label.split(' —')[0]} API key`, { mask: true, hint: `free tier — create one at ${p.keyUrl}` });
-      const custom = await text('Model id (Enter to use the default)', { def: p.model, hint: 'override only if you want a different model on this provider' });
-      if (custom) openaiModel = custom;
-    } else if (mi < FREE_ONLINE.length + LOCAL_MODELS.length) {
-      ollamaModel = LOCAL_MODELS[mi - FREE_ONLINE.length].id; modelId = ollamaModel; baseUrl = 'http://localhost:11434';
-    } else {
-      baseUrl = await text('Model endpoint URL', { def: 'http://localhost:11434', hint: 'Anthropic-compatible endpoint, or a router (LiteLLM / claude-code-router)' });
-      modelId = await text('Model name', { def: 'llama3.1', hint: 'e.g. gpt-4o, gemini-2.0, llama-3.1-70b' });
-      apiKey = await text('API key for that endpoint', { mask: true, hint: 'leave blank if none' });
-    }
+  let i = 0;
+  while (i < steps.length) {
+    const s = steps[i];
+    if (s.when && !s.when()) { i++; continue; }
+    const r = await s.run();
+    if (r === 'DONE') break;
+    if (r === BACK) { i--; while (i >= 0 && steps[i].when && !steps[i].when()) i--; if (i < 0) i = 0; continue; }
+    i++;
   }
 
-  // 3) Claude model — only relevant for the Claude backends; a custom/local model is already chosen.
-  let model = 'sonnet';
-  if (authMode !== 'custom') {
-    model = ['opus', 'sonnet'][await select('Claude model', [
-      { label: 'opus', hint: 'best reasoning — heavier on Max limits' },
-      { label: 'sonnet', hint: 'fast + sustainable' },
-    ])];
-  }
-
-  // 4) permissions — default to the SAFER "ask first" mode for newcomers; autonomy is an opt-in.
-  const perm = ['default', 'bypassPermissions'][await select('Tool permissions — how much can Helm do on its own?', [
-    { label: 'default — ask before each action', hint: 'safer; recommended when starting out. Helm asks before running tools.' },
-    { label: 'bypassPermissions — full autonomy', hint: 'Helm acts without asking (shell, files, screen). Powerful; only if you trust it on this machine.' },
-  ])];
-
-  // 5) service
-  const svc = await confirm(`Run 24/7 in the background? (${IS_MAC ? 'launchd' : IS_LINUX ? 'systemd --user' : 'service'})`, true);
-
-  // 6) review + confirm
-  const claudeBin = which('claude');
-  header();
-  out.write(`  ${C.b}Review${C.reset}\n\n`);
-  const row = (k, v) => out.write(`  ${C.gray}${k.padEnd(14)}${C.reset}${v}\n`);
-  row('Gateways', `${C.teal}${gateways.join(', ')}${C.reset}`);
-  row('Discord token', token ? `${C.grn}set${C.reset} ${C.dim}(hidden)${C.reset}` : `${C.yel}none${C.reset}`);
-  row('Owner ID', ownerId || `${C.yel}(none)${C.reset}`);
-  row('Backend',
-    authMode === 'apikey' ? `Anthropic API key ${apiKey ? `${C.grn}(set)${C.reset}` : `${C.yel}(none)${C.reset}`}`
-    : authMode === 'custom' ? (online ? `Free online ${C.teal}${openaiModel}${C.reset} ${C.dim}(${openaiBase})${C.reset} ${openaiKey ? `${C.grn}key set${C.reset}` : `${C.yel}no key${C.reset}`}` : ollamaModel ? `Local model ${C.teal}${ollamaModel}${C.reset} (auto-download)` : `Custom — ${C.teal}${modelId}${C.reset} @ ${baseUrl}`)
-    : 'Claude subscription (OAuth)');
-  if (authMode !== 'custom') row('Model', model);
-  row('Permissions', perm);
-  row('Service', svc ? 'yes' : 'no');
-  row('Machine', `${C.teal}${IS_MAC ? 'macOS' : IS_WIN ? 'Windows' : 'Linux'}${C.reset} ${C.dim}(single machine)${C.reset}`);
-  out.write('\n');
-  if (!(await confirm('Write this config?', true))) { cleanup(); console.log('\nCancelled. Nothing written.'); process.exit(1); }
-  applyConfig({ gateways, token, ownerId, authMode, apiKey, baseUrl, modelId, model, perm, svc, claudeBin, ollamaModel, online, openaiBase, openaiModel, openaiKey });
+  applyConfig({
+    gateways: a.gateways, token: a.token || '', ownerId: a.ownerId || '', authMode: a.authMode || 'subscription',
+    apiKey: a.apiKey || '', baseUrl: a.baseUrl || '', modelId: a.modelId || '', model: a.model || 'sonnet',
+    perm: a.perm || 'default', svc: !!a.svc, claudeBin: which('claude'), ollamaModel: a.ollamaModel || '',
+    online: !!a.online, openaiBase: a.openaiBase || '', openaiModel: a.openaiModel || '', openaiKey: a.openaiKey || '',
+  });
 }
 
 // If the fancy UI is unavailable or errors out, fall back to the plain Q&A rather than show nothing.
