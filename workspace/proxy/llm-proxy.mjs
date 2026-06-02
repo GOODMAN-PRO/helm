@@ -98,12 +98,16 @@ const server = http.createServer(async (req, res) => {
       const t = await up.text();
       console.error(`[helm-proxy][upstream-err] ${up.status} ${t.slice(0, 300)}`);
       const hint = (up.status === 401 || up.status === 403)
-        ? `Provider rejected the API key (HTTP ${up.status}). Check OPENAI_API_KEY for ${BASE} — run \`helm doctor\`.`
+        ? `Provider rejected the API key (HTTP ${up.status}). OPENAI_API_KEY for ${BASE} is wrong/expired — run \`helm setup\` and paste a valid key.`
         : up.status === 404
         ? `Provider 404 — model "${MODEL}" may not exist at ${BASE}. Run \`helm doctor\` to list valid models.`
         : `${up.status}: ${t.slice(0, 600)}`;
-      res.writeHead(502, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ type: 'error', error: { type: 'upstream_error', message: hint } }));
+      // Pass the status THROUGH so Claude Code reacts correctly: 400/401/403/404 FAIL FAST (no pointless
+      // retry storm on a bad key/model — that's what made it "hang"); only 429/5xx are retried.
+      const code = [400, 401, 403, 404, 429].includes(up.status) ? up.status : 502;
+      const etype = code === 401 ? 'authentication_error' : code === 403 ? 'permission_error' : code === 400 ? 'invalid_request_error' : code === 404 ? 'not_found_error' : code === 429 ? 'rate_limit_error' : 'api_error';
+      res.writeHead(code, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ type: 'error', error: { type: etype, message: hint } }));
       return;
     }
     const oai = await up.json();
