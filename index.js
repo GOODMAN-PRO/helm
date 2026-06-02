@@ -108,6 +108,21 @@ const PROXY_PORT = parseInt(process.env.PROXY_PORT || '8787', 10);
 function proxyConfigured() {
   return AUTH_MODE === 'custom' && !!process.env.OPENAI_BASE_URL && !!process.env.OPENAI_MODEL;
 }
+// Fast TCP probe so a dead local model endpoint (e.g. Ollama not running) fails with a clear message
+// instead of hanging the whole turn on a connection that never answers.
+function endpointUp(url, timeout = 2500) {
+  return new Promise(res => {
+    try {
+      const u = new URL(url);
+      const port = u.port ? +u.port : (u.protocol === 'https:' ? 443 : 80);
+      const sock = net.connect({ host: u.hostname, port });
+      const done = ok => { try { sock.destroy(); } catch {} res(ok); };
+      sock.once('connect', () => done(true));
+      sock.once('error', () => done(false));
+      sock.setTimeout(timeout, () => done(false));
+    } catch { res(false); }
+  });
+}
 function claudeEnv() {
   const e = { ...process.env };
   if (AUTH_MODE === 'apikey') {
@@ -389,6 +404,13 @@ function runClaudeStream(args, prompt, onEvent) {
 
 async function ask(prompt, onProgress, mode = 'copilot') {
   // Single machine: every task runs locally on this box. (No fleet / peer SSH / cross-machine sync.)
+  // Free/local backend preflight: if the model endpoint isn't reachable, say so clearly and fast —
+  // otherwise the engine hangs forever trying to reach a dead Ollama/proxy upstream.
+  if (proxyConfigured() && !(await endpointUp(process.env.OPENAI_BASE_URL))) {
+    return `⚠️ I can't reach your model endpoint (${process.env.OPENAI_BASE_URL}), so I can't think yet. ` +
+      `If it's a free local model: install Ollama from https://ollama.com, run \`ollama pull ${process.env.OPENAI_MODEL}\`, ` +
+      `then say \`restart\`. Or run \`helm setup\` and pick a different backend (e.g. your Claude login).`;
+  }
   const model = pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [

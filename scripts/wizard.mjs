@@ -213,18 +213,36 @@ function ollamaBin() {
   for (const c of cands) { if (c && fs.existsSync(c)) return c; }
   return null;
 }
+// macOS without Homebrew: install Ollama from the official app download (no admin, no brew).
+function macInstallOllama() {
+  try {
+    const zip = path.join(os.tmpdir(), 'Ollama-darwin.zip');
+    console.log('Downloading Ollama for macOS (official — no Homebrew needed, ~?GB)...');
+    if (spawnSync('curl', ['-fsSL', '-o', zip, 'https://ollama.com/download/Ollama-darwin.zip'], { stdio: 'inherit', timeout: 600_000 }).status !== 0) return false;
+    // ditto extracts the .zip and preserves the .app bundle; unzip is the fallback.
+    if (spawnSync('ditto', ['-xk', zip, '/Applications'], { stdio: 'inherit' }).status !== 0)
+      spawnSync('unzip', ['-oq', zip, '-d', '/Applications'], { stdio: 'inherit' });
+    try { fs.unlinkSync(zip); } catch {}
+    return fs.existsSync('/Applications/Ollama.app/Contents/Resources/ollama');
+  } catch { return false; }
+}
 // Install Ollama if needed, make sure it's serving, and pull the chosen model — "does the rest".
+// Returns true only if the model is pulled and the server answers, so the caller can warn (and not
+// leave a silently-broken local backend) when it isn't ready.
 function ensureOllama(model) {
-  if (process.env.HELM_SKIP_MODEL_DOWNLOAD) { console.log(`(skipping model download — run later:  ollama pull ${model})`); return; }
+  if (process.env.HELM_SKIP_MODEL_DOWNLOAD) { console.log(`(skipping model download — run later:  ollama pull ${model})`); return false; }
   let bin = ollamaBin();
   if (!bin) {
     console.log('\nInstalling Ollama (free local model runtime)...');
     if (IS_WIN) spawnSync('winget', ['install', '-e', '--id', 'Ollama.Ollama', '--accept-source-agreements', '--accept-package-agreements'], { stdio: 'inherit' });
-    else if (process.platform === 'darwin') { if (spawnSync('which', ['brew']).status === 0) spawnSync('brew', ['install', 'ollama'], { stdio: 'inherit' }); }
+    else if (process.platform === 'darwin') {
+      if (spawnSync('which', ['brew']).status === 0) spawnSync('brew', ['install', 'ollama'], { stdio: 'inherit' });
+      if (!ollamaBin()) macInstallOllama();   // no Homebrew (or brew failed) → official app download
+    }
     else spawnSync('sh', ['-c', 'curl -fsSL https://ollama.com/install.sh | sh'], { stdio: 'inherit' });
     bin = ollamaBin();
   }
-  if (!bin) { console.log(`Could not auto-install Ollama. Install it from https://ollama.com, then run:  ollama pull ${model}`); return; }
+  if (!bin) { console.log(`⚠  Could not auto-install Ollama. Install it from https://ollama.com, run:  ollama pull ${model}  then restart Helm.`); return false; }
   // ensure the local server is up
   if (spawnSync(bin, ['list'], { encoding: 'utf8', timeout: 8000 }).status !== 0) {
     try { const s = spawn(bin, ['serve'], { detached: true, stdio: 'ignore' }); s.unref(); } catch {}
@@ -232,8 +250,9 @@ function ensureOllama(model) {
   }
   console.log(`\nDownloading the model "${model}" (a few GB, one-time)...`);
   const r = spawnSync(bin, ['pull', model], { stdio: 'inherit' });
-  if (r.status === 0) console.log(`Model "${model}" is ready — Helm runs on it for free.`);
-  else console.log(`Couldn't pull "${model}". Open the Ollama app (or run 'ollama serve'), then: ollama pull ${model}`);
+  if (r.status === 0) { console.log(`Model "${model}" is ready — Helm runs on it for free.`); return true; }
+  console.log(`⚠  Couldn't pull "${model}". Open the Ollama app (or run 'ollama serve'), then: ollama pull ${model}`);
+  return false;
 }
 // the fancy full-screen UI needs a raw-mode TTY; otherwise we use a plain Q&A that works anywhere.
 // Set HELM_PLAIN=1 to force the plain flow (handy if a terminal mangles the full-screen UI).
@@ -287,7 +306,7 @@ function applyConfig(cfg) {
   fs.writeFileSync(path.join(ROOT, '.env'), buildEnv(cfg), { mode: 0o600 });
   cleanup();
   console.log(`\nok  wrote ${path.join(ROOT, '.env')}`);
-  if (cfg.ollamaModel) ensureOllama(cfg.ollamaModel);
+  const localReady = cfg.ollamaModel ? ensureOllama(cfg.ollamaModel) : true;
   if (cfg.svc) {
     const r = (IS_MAC || IS_LINUX)
       ? spawnSync('bash', [path.join(ROOT, 'scripts', 'install-service.sh')], { stdio: 'inherit' })
@@ -300,7 +319,17 @@ function applyConfig(cfg) {
   if (cfg.authMode === 'subscription') console.log("Backend: Claude subscription — make sure you've run 'claude' once and logged in.");
   else if (cfg.authMode === 'apikey') console.log('Backend: Anthropic API key (billed pay-as-you-go).');
   else if (cfg.online) console.log(`Backend: free online model ${cfg.openaiModel} (${cfg.openaiBase}) — Helm auto-starts a local proxy to translate to it.${cfg.openaiKey ? '' : '\n!!  No API key entered — add OPENAI_API_KEY to .env before starting.'}`);
-  else console.log(`Backend: free / local model (${cfg.modelId} @ ${cfg.baseUrl}) — make sure that endpoint is running.`);
+  else console.log(`Backend: free / local model (${cfg.modelId}) via Ollama.`);
+  if (cfg.ollamaModel && !localReady) {
+    console.log('\n' + '─'.repeat(60));
+    console.log('⚠  HEADS UP: the free local model is NOT ready, so Helm can\'t think yet.');
+    console.log('   Ollama didn\'t install or the model didn\'t download. To finish:');
+    console.log('     1) install Ollama from https://ollama.com');
+    console.log(`     2) run:  ollama pull ${cfg.ollamaModel}`);
+    console.log('     3) restart Helm  (helm)');
+    console.log('   Or run `helm setup` again and pick a different backend (e.g. your Claude login).');
+    console.log('─'.repeat(60));
+  }
   console.log(`Then DM your bot on Discord.${cfg.gateways.includes('imessage') ? '  (iMessage: grant node Full Disk Access in System Settings.)' : ''}`);
   console.log('Reminder: one Discord token = one running instance.');
   process.exit(0);
