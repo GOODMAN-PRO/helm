@@ -189,6 +189,7 @@ const LOCAL_MODELS = [
 // Free ONLINE providers (OpenAI-compatible). Helm routes through its local translation proxy
 // (workspace/proxy/llm-proxy.mjs) so Claude Code can use them. Each has a free tier — paste a key.
 const FREE_ONLINE = [
+  { label: 'Google Gemini — 2.0 Flash (free tier, 1M ctx — handles big prompts)', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.0-flash', keyUrl: 'https://aistudio.google.com/apikey' },
   { label: 'Groq — Llama 3.3 70B (fast, 128k ctx)', baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', keyUrl: 'https://console.groq.com/keys' },
   { label: 'OpenRouter — free models', baseUrl: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.3-70b-instruct:free', keyUrl: 'https://openrouter.ai/keys' },
   { label: 'Cerebras — Llama 3.3 70B (very fast)', baseUrl: 'https://api.cerebras.ai/v1', model: 'llama-3.3-70b', keyUrl: 'https://cloud.cerebras.ai' },
