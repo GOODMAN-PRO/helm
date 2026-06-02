@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-22d3ee?style=for-the-badge" alt="MIT license">
   <img src="https://img.shields.io/badge/macOS%20·%20Windows%20·%20Linux-101a27?style=for-the-badge" alt="platforms">
-  <img src="https://img.shields.io/badge/node-18%2B-38bdf8?style=for-the-badge" alt="node 18+">
+  <img src="https://img.shields.io/badge/node-22.5%2B-38bdf8?style=for-the-badge" alt="node 22.5+">
   <img src="https://img.shields.io/badge/engine-Claude%20Code-5eead4?style=for-the-badge" alt="engine: Claude Code">
 </p>
 
@@ -23,27 +23,32 @@
 ## Install
 
 One command — checks prerequisites, fetches the code, installs deps, and walks you through setup.
+Needs **Node 22.5+** (Helm uses Node's built-in `node:sqlite`); the installers add or upgrade it for you.
 
-**Recommended — any OS, no shell script** (just Node, which Helm needs anyway):
-```bash
-npx github:GOODMAN-PRO/helm
-```
 **macOS / Linux** (works with `bash` *or* `sh` — the script is POSIX):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh
 ```
-**Windows (PowerShell)**
+**Windows (PowerShell)** — works even when the script policy is "Restricted":
 ```powershell
 irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex
 ```
-> Windows tip: this installer works even when PowerShell's script policy is "Restricted". If a bare
-> `npx` command fails with *"running scripts is disabled"*, use this PowerShell line instead, or run
-> `npx.cmd github:GOODMAN-PRO/helm`, or once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-The `curl` / PowerShell installers set up **everything they need** — Node, Claude Code (Helm's engine),
-and dependencies (git is optional; a tarball is used otherwise). The **npx** method needs Node already
-(it runs on Node). The setup wizard then lets you choose your gateways (Discord / iMessage), your
-backend (subscription / API key / **free local model**), and whether to run 24/7 as a background service.
+These set up **everything**: Node (installs/upgrades to 22.5+ if needed), Claude Code (the engine —
+auto-skipped if you choose a free model), and dependencies. **git is optional** — they fall back to a
+zip/tarball download. They register the `helm` command and launch the setup wizard.
+
+**Alternative — npx** (needs **git** *and* **Node 22.5+** already on your machine):
+```bash
+npx github:GOODMAN-PRO/helm setup
+```
+> Windows note: a bare `npx` can fail with *"running scripts is disabled"*. Use
+> `npx.cmd github:GOODMAN-PRO/helm setup`, the PowerShell installer above, or once:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+The wizard lets you choose gateways (Discord / iMessage), backend (subscription / API key /
+**free local or online model**), and whether to run 24/7 as a service. Stuck? Run **`helm doctor`** —
+it checks Node, the engine, your model + key, and config, and prints a fix for anything wrong.
 
 <details>
 <summary>More ways</summary>
@@ -96,7 +101,7 @@ It connects to the agent you're already running, so nothing is duplicated. Other
 The install command above does steps 1–2 for you, then the wizard walks you through 3–5. Same on
 macOS, Windows and Linux.
 
-1. **Get prerequisites** — the installer auto-installs Node 18+ and Claude Code (the engine) if missing.
+1. **Get prerequisites** — the installer auto-installs Node 22.5+ and Claude Code (the engine) if missing.
 2. **Fetch + install** — downloads Helm and runs `npm install`.
 3. **Make a Discord bot** — open the [Developer Portal](https://discord.com/developers/applications) →
    **New Application** → **Bot** → **Reset Token** and copy the token. Invite it to a server, or just DM it.
@@ -109,8 +114,7 @@ macOS, Windows and Linux.
 5. **Message it** — DM your bot on Discord (or text the Mac on iMessage). It runs on your machine and
    reports back.
 
-Reconfigure anytime with `npm run wizard`. Switch the brain between your Mac and Windows box from chat
-with `use windows` / `use mac`.
+Reconfigure anytime with `helm setup` (or `npm run wizard`). Check your setup with `helm doctor`.
 
 ### Create your Discord bot (~2 minutes)
 
@@ -136,10 +140,10 @@ a **free / local model**.
 - **Message it anywhere** — Discord, or iMessage on a Mac. Owner-locked to your ID.
 - **Real long-term memory** — structured recall plus **Helm Mind**, an AI-first second brain over a
   synced Markdown knowledge base that rewrites itself as you talk.
-- **Your whole fleet** — switch between Mac and Windows at will over SSH/Tailscale; move files both ways.
+- **Runs on free models too** — point it at a local Ollama model ($0, offline) or a free online
+  provider; no Claude subscription or API key required.
 - **Sees and drives your screen** — screenshots, clicks and types; operates apps that have no API.
-  Cross-platform: it captures **whichever machine the brain is running on** — the Mac, or your Windows
-  box when you've switched with `use windows`.
+  Works on whichever machine Helm runs on (macOS, Windows, or Linux).
 - **Thinks 24/7 & upgrades itself** — background cognition; nightly self-improvement gated by tests
   that auto-revert on failure. When it gets stuck, it queues the problem to fix overnight.
 - **Encrypted secrets vault** — hand it credentials safely; never echoed into chat, logs or git.
@@ -164,7 +168,7 @@ Pick at install (or set `AUTH_MODE` in `.env`):
 ## Compared to other agents
 
 OpenClaw is the closest peer — also local, open, and multi-channel. Helm's edge is what it does on top:
-one synced brain across your fleet, 24/7 self-improvement, and a parallel build swarm.
+persistent synced memory, 24/7 self-improvement, and a parallel build swarm.
 
 | Capability | Helm | OpenClaw |
 |---|:--:|:--:|
@@ -173,7 +177,6 @@ one synced brain across your fleet, 24/7 self-improvement, and a parallel build 
 | Chat from Discord / iMessage | ✓ | ✓ |
 | Free / local models | ✓ | ✓ |
 | Persistent memory + synced brain | ✓ | ~ |
-| Multi-machine fleet (Mac + Windows) | ✓ | ~ |
 | Clicks & types in any app | ✓ | ~ |
 | Thinks 24/7 &amp; self-upgrades | ✓ | — |
 | Parallel build swarm | ✓ | — |

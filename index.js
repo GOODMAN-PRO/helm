@@ -84,6 +84,8 @@ function resolveClaude() {
     process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
     process.env.APPDATA && path.join(process.env.APPDATA, 'Claude', 'claude.exe'),
     process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs', 'claude', 'claude.exe'),
+    // ~/.local/bin toolchain (no-admin installs) — claude.exe or the native-installer shim
+    process.env.USERPROFILE && path.join(process.env.USERPROFILE, '.local', 'bin', 'claude.exe'),
     // prefer the package's claude.exe over the npm shims
     process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
   ].filter(Boolean);
@@ -557,6 +559,14 @@ client.on(Events.MessageCreate, async msg => {
         { cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true, env: process.env }).unref();
     } catch (e) { try { unlinkSync(path.join(WORKSPACE, '.restarting')); } catch {} await msg.reply('Restart failed (couldn\'t spawn relauncher): ' + String(e.message || e).slice(0, 200)); return; }
     setTimeout(() => process.exit(0), 1500);   // let Discord flush the reply, then exit so the lock frees
+    return;
+  }
+
+  // ---- doctor: run the setup self-check (Node, engine, model, config) and report ----
+  if (/^\s*\/?doctor\s*$/i.test(text)) {
+    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'doctor.mjs')], { cwd: __dirname, encoding: 'utf8', timeout: 60_000 });
+    const out = ((r.stdout || '') + (r.stderr || '')).trim() || 'doctor produced no output';
+    await msg.reply('```\n' + out.slice(0, 1900) + '\n```');
     return;
   }
 

@@ -16,6 +16,10 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { assertNode } from '../workspace/preflight/node-guard.mjs';
+
+// Fail fast with a clear message on too-old Node, instead of a cryptic node:sqlite crash deep in index.js.
+assertNode();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');   // repo root
 const PORT = parseInt(process.env.HELM_CLI_PORT || '4625', 10);
@@ -59,11 +63,12 @@ const sub = args[0];
 
 // ---- explicit subcommands ----
 if (sub === '--help' || sub === '-h' || sub === 'help') {
-  process.stdout.write(`helm — your personal AI agent\n\n  helm                 open the terminal chat (starts Helm if needed)\n  helm "message"       send one message and print the reply\n  echo "msg" | helm    one-shot from a pipe\n  helm start           run the brain in the foreground (service + bridge)\n  helm stop            stop a background brain that helm started\n  helm setup           run the setup wizard\n  helm --help          this help\n`);
+  process.stdout.write(`helm — your personal AI agent\n\n  helm                 open the terminal chat (starts Helm if needed)\n  helm "message"       send one message and print the reply\n  echo "msg" | helm    one-shot from a pipe\n  helm start           run the brain in the foreground (service + bridge)\n  helm stop            stop a background brain that helm started\n  helm setup           run the setup wizard\n  helm doctor          check your setup (Node, engine, model, config) and fix hints\n  helm --help          this help\n`);
   process.exit(0);
 }
 if (sub === 'start') { process.exit(run([path.join(ROOT, 'index.js')]).status ?? 0); }
 if (sub === 'setup' || sub === 'wizard') { process.exit(run([path.join(ROOT, 'scripts', 'wizard.mjs')]).status ?? 0); }
+if (sub === 'doctor') { process.exit(run([path.join(ROOT, 'workspace', 'doctor.mjs'), ...args.slice(1)]).status ?? 0); }
 if (sub === 'stop') {
   let pid; try { pid = parseInt(readFileSync(PIDFILE, 'utf8').trim(), 10); } catch {}
   if (pid) { try { process.kill(pid); process.stdout.write(`stopped Helm (pid ${pid}).\n`); } catch { process.stdout.write('no background Helm to stop (it may be running in another terminal or as a service).\n'); } }

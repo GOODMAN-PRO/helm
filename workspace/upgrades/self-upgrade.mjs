@@ -32,6 +32,10 @@ const AGENT_LOG = path.join(ROOT, 'agent.log');
 const ts = () => new Date().toISOString();
 const log = m => { const l = `[${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
+// On Windows npm is `npm.cmd`, and patched Node refuses to spawn a .cmd without a shell (ENOENT/EINVAL).
+// Route npm through the shell there so nightly self-upgrade doesn't silently fail to update deps.
+const IS_WIN = process.platform === 'win32';
+const npm = (args, opts = {}) => sh(IS_WIN ? 'npm.cmd' : 'npm', args, { shell: IS_WIN, timeout: 5 * 60_000, ...opts });
 const git = (...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', ...a]);
 const notify = msg => { try { sh(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
 
@@ -72,7 +76,7 @@ function rollback(base, why, summary) {
   log(`ROLLBACK (${why}) -> ${base}`);
   git('reset', '--hard', base);
   git('clean', '-fd'); // remove untracked files created by the aborted upgrade pass
-  sh('npm', ['ci', '--no-audit', '--no-fund'], { timeout: 5 * 60_000 }); // resync node_modules to restored lock
+  npm(['ci', '--no-audit', '--no-fund']); // resync node_modules to restored lock
   const healthy = restartAndHealth();
   appendHistory(`REVERTED (${why})`, base, base, summary);
   notify(`Helm self-upgrade reverted (${why}). Code restored to ${base.slice(0, 7)}${healthy ? '' : ' — WARNING: bot still unhealthy, check manually'}.`);
@@ -103,7 +107,7 @@ try {
   log(`base ${base}`);
 
   // 1. tooling update (deps; package-lock is tracked so it's revertable)
-  if (!DRYRUN) { const r = sh('npm', ['update', '--no-audit', '--no-fund'], { timeout: 5 * 60_000 }); log(`npm update exit ${r.status}`); }
+  if (!DRYRUN) { const r = npm(['update', '--no-audit', '--no-fund']); log(`npm update exit ${r.status}`); }
 
   // 2. self-improve via claude (no time cap)
   let summary = '(dryrun: no changes)';
@@ -152,10 +156,10 @@ try {
   }
 
   // 3. gate: node --check + smoke
-  const syntaxOk = ['index.js', 'imessage.js'].every(f => sh('node', ['--check', f]).status === 0);
+  const syntaxOk = ['index.js', 'imessage.js'].every(f => sh(process.execPath, ['--check', f]).status === 0);
   let smokeOk = true;
   if (!SKIP_SMOKE) {
-    const sm = sh('node', ['workspace/tests/smoke.mjs'], { timeout: 12 * 60_000 });
+    const sm = sh(process.execPath, ['workspace/tests/smoke.mjs'], { timeout: 12 * 60_000 });
     smokeOk = sm.status === 0;
     log((sm.stdout || '').trim().split('\n').slice(-2).join(' '));
   }

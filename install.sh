@@ -27,12 +27,14 @@ die()  { printf "%b\n" "  ${c_r}xx${c_0}  $1" >&2; exit 1; }
 # read from the terminal even when the script itself arrived on stdin (curl | bash)
 ask()  { local p="$1" d="${2:-}" v=""; if [ -r /dev/tty ]; then printf "%b" "$p" > /dev/tty; read -r v < /dev/tty || true; fi; echo "${v:-$d}"; }
 
-# Ensure Node 18+ is available — install it (Homebrew, or the official binary, no sudo) if missing.
+# Ensure Node 22.5+ is available — install it (Homebrew, or the official binary, no sudo) if missing.
+# 22.5 is the floor because Helm uses the built-in node:sqlite module, which only exists from 22.5.
 ensure_node() {
   if command -v node >/dev/null 2>&1; then
     maj="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-    [ "${maj:-0}" -ge 18 ] 2>/dev/null && return 0
-    say "Node ${maj} is too old (need 18+) — installing a current version..."
+    min="$(node -p 'process.versions.node.split(".")[1]' 2>/dev/null || echo 0)"
+    if [ "${maj:-0}" -gt 22 ] 2>/dev/null || { [ "${maj:-0}" -eq 22 ] && [ "${min:-0}" -ge 5 ]; } 2>/dev/null; then return 0; fi
+    say "Node $(node -v) is too old (need 22.5+) — installing a current version..."
   else
     say "Node not found — installing it for you..."
   fi
@@ -121,25 +123,39 @@ say "Installing dependencies (npm install)..."
 # Skip Playwright's heavy browser download (~hundreds of MB) — it's used lazily by the reverse tool
 # and installs browsers on first use. Massively speeds up install.
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-npm install --no-audit --no-fund >/dev/null 2>&1 && ok "dependencies installed" || die "npm install failed — run 'npm install' in $TARGET to see why."
+# Don't hide npm's output — if it fails the user needs to see why. Native deps (sharp, onnxruntime via
+# transformers) occasionally can't fetch a prebuilt binary; retry leaner before giving up.
+if npm install --no-audit --no-fund; then ok "dependencies installed"
+elif npm install --no-audit --no-fund --omit=optional; then ok "dependencies installed (without optional extras)"
+elif npm ci --no-audit --no-fund --omit=optional; then ok "dependencies installed (clean lockfile)"
+else die "npm install failed — scroll up for the error. Common causes: network/proxy blocking the npm registry, or out-of-date Node."
+fi
 
 # 4) sanity check -----------------------------------------------------------
-node --check index.js && ok "index.js syntax valid"
+# Real RUNTIME probe (node --check is parse-only and FALSE-passes a missing node:sqlite on old Node).
+node --input-type=module -e 'await import("node:sqlite")' 2>/dev/null || die "This Node can't load node:sqlite — Helm needs Node 22.5+ (have $(node -v)). Update Node and re-run."
+node --check index.js && ok "runtime + syntax valid"
+# register the `helm` command on PATH so users type `helm`, not `node index.js`
+if npm link >/dev/null 2>&1; then ok "linked the 'helm' command"; else warn "couldn't link 'helm' — start with: node \"$TARGET/index.js\""; fi
 
 # 5) configure --------------------------------------------------------------
-CLAUDE_PATH="$(command -v claude)"
+CLAUDE_PATH="$(command -v claude || echo claude)"
 if [ -f .env ]; then
   warn ".env already exists — leaving it untouched. (delete it and re-run to reconfigure)"
-  say ""
-  say "${c_b}Done.${c_0} Start it:  cd \"$TARGET\" && npm start"
 elif [ "$NONINTERACTIVE" = "1" ] || [ ! -r /dev/tty ]; then
   cp .env.example .env
   sed -i.bak "s#^CLAUDE_BIN=.*#CLAUDE_BIN=${CLAUDE_PATH}#" .env && rm -f .env.bak
-  warn "Non-interactive: wrote .env from template. Set DISCORD_TOKEN + OWNER_ID, then: npm start"
+  warn "Non-interactive: wrote .env from template. Set DISCORD_TOKEN + OWNER_ID, then run: helm"
 else
-  # hand off to the cool setup wizard (gateways, model, permissions, service)
+  # hand off to the cool setup wizard (gateways, model incl. FREE, permissions, service)
   node scripts/wizard.mjs < /dev/tty || {
-    warn "wizard unavailable — wrote .env from template; edit it then run: npm start"
+    warn "wizard unavailable — wrote .env from template; edit it then run: helm"
     [ -f .env ] || { cp .env.example .env; sed -i.bak "s#^CLAUDE_BIN=.*#CLAUDE_BIN=${CLAUDE_PATH}#" .env && rm -f .env.bak; }
   }
 fi
+
+say ""
+say "${c_b}Done.${c_0} Installed at: $TARGET"
+say "Start it:   helm            (if not found, reopen your terminal — or: node \"$TARGET/index.js\")"
+say "Check it:   helm doctor     (diagnoses Node / engine / model / config problems)"
+say "Reminder: one Discord token = one running instance. Stop any other copy first."

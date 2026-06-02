@@ -23,10 +23,10 @@ const has = cmd => spawnSync(process.platform === 'win32' ? 'where' : 'which', [
 
 say(`${c.b}== Helm installer ==${c.x}`);
 
-// 1) prerequisites
-if (!has('node')) die('Node 18+ not found (https://nodejs.org).');
-const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
-if (nodeMajor < 18) die(`Node ${process.version} is too old; need 18+.`);
+// 1) prerequisites — Helm needs Node 22.5+ (built-in node:sqlite). Check major AND minor.
+if (!has('node')) die('Node 22.5+ not found (https://nodejs.org).');
+const [nMaj, nMin] = process.versions.node.split('.').map(n => parseInt(n, 10));
+if (nMaj < 22 || (nMaj === 22 && nMin < 5)) die(`Node ${process.version} is too old; Helm needs 22.5+. Install the latest LTS from https://nodejs.org (or: winget install OpenJS.NodeJS.LTS / nvm install --lts), reopen your terminal, and re-run.`);
 // Claude Code is the engine Helm runs on — auto-install it if missing (don't dead-end).
 if (!has('claude')) {
   say("Claude Code (Helm's engine) not found — installing it with npm...");
@@ -92,13 +92,23 @@ say('Installing dependencies (npm install)...');
 // and avoids the DEP0190 warning that args-array + shell:true triggers. Args are static/safe.
 // PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: skip the ~hundreds-of-MB browser download — Playwright is used
 // lazily by the reverse tool and installs browsers on first use. Big speedup.
-if (spawnSync('npm install --no-audit --no-fund', { cwd: TARGET, stdio: 'inherit', shell: true, env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' } }).status !== 0)
-  die(`npm install failed — run 'npm install' in ${TARGET}.`);
+const npmEnv = { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' };
+const npmInstall = cmd => spawnSync(cmd, { cwd: TARGET, stdio: 'inherit', shell: true, env: npmEnv }).status === 0;
+// Don't hide output. Native deps (sharp, onnxruntime via transformers) sometimes can't fetch a
+// prebuilt binary — retry leaner before giving up.
+if (!npmInstall('npm install --no-audit --no-fund')
+  && !npmInstall('npm install --no-audit --no-fund --omit=optional')
+  && !npmInstall('npm ci --no-audit --no-fund --omit=optional'))
+  die('npm install failed — scroll up for the error. Common causes: network/proxy blocking the npm registry, or out-of-date Node.');
 ok('dependencies installed');
 
-// 4) sanity check
-if (spawnSync('node', ['--check', 'index.js'], { cwd: TARGET }).status !== 0) die('index.js failed syntax check');
-ok('index.js syntax valid');
+// 4) sanity check — real RUNTIME probe (node --check is parse-only and FALSE-passes a missing
+// node:sqlite on old Node), then a syntax check, then register the `helm` command on PATH.
+if (spawnSync(process.execPath, ['--input-type=module', '-e', 'await import("node:sqlite")'], { cwd: TARGET }).status !== 0)
+  die(`this Node can't load node:sqlite — Helm needs Node 22.5+ (have ${process.version}). Update Node and re-run.`);
+if (spawnSync(process.execPath, ['--check', 'index.js'], { cwd: TARGET }).status !== 0) die('index.js failed a syntax check (download may be corrupt — re-run).');
+ok('runtime + syntax valid');
+spawnSync('npm link', { cwd: TARGET, stdio: 'ignore', shell: true });
 
 // 5) configure
 const envPath = path.join(TARGET, '.env');
@@ -109,11 +119,11 @@ const claudePath = (process.platform === 'win32'
   ? (claudeHits.find(p => /\.(exe|cmd|bat)$/i.test(p)) || claudeHits[0])
   : claudeHits[0]) || 'claude';
 if (existsSync(envPath)) {
-  say(`  ${c.y}!!${c.x}  .env already exists — leaving it. Start with: npm start`);
+  say(`  ${c.y}!!${c.x}  .env already exists — leaving it. Start with: helm`);
 } else if (NONINTERACTIVE || !process.stdin.isTTY) {
   const tmpl = readFileSync(path.join(TARGET, '.env.example'), 'utf8').replace(/^CLAUDE_BIN=.*/m, `CLAUDE_BIN=${claudePath}`);
   writeFileSync(envPath, tmpl);
-  say(`  ${c.y}!!${c.x}  Wrote .env from template. Set DISCORD_TOKEN + OWNER_ID, then: npm start`);
+  say(`  ${c.y}!!${c.x}  Wrote .env from template. Set DISCORD_TOKEN + OWNER_ID, then run: helm`);
 } else {
   spawnSync('node', ['scripts/wizard.mjs'], { cwd: TARGET, stdio: 'inherit' });
   if (!existsSync(envPath)) {
@@ -124,5 +134,6 @@ if (existsSync(envPath)) {
 
 say('');
 say(`${c.cy}${c.b}Done.${c.x} Installed at: ${TARGET}`);
-say(`Start it:   cd "${TARGET}" && npm start`);
+say('Start it:   helm            (if not found, reopen your terminal)');
+say('Check it:   helm doctor     (diagnoses Node / engine / model / config problems)');
 say('Reminder: one Discord token = one running instance.');

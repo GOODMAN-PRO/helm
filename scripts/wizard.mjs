@@ -8,6 +8,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execSync, spawn } from 'node:child_process';
+import { assertNode } from '../workspace/preflight/node-guard.mjs';
+
+// Refuse to configure on a Node too old to run Helm (clear message instead of a later node:sqlite crash).
+assertNode();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IS_MAC = process.platform === 'darwin';
@@ -257,13 +261,18 @@ function buildEnv(cfg) {
     `GATEWAYS=${cfg.gateways.join(',')}`,
     `AUTH_MODE=${cfg.authMode}`,
     ...(cfg.authMode === 'apikey' ? [`ANTHROPIC_API_KEY=${cfg.apiKey}`] : []),
-    // free ONLINE model: configure the OpenAI-compatible provider; index.js auto-starts the proxy
-    // and points Claude Code (ANTHROPIC_BASE_URL) at it. No ANTHROPIC_* endpoint needed here.
+    // FREE model — ONLINE provider: route Claude Code through the local proxy (index.js auto-starts it
+    // and points Claude Code's ANTHROPIC_BASE_URL at it). The proxy translates Anthropic -> the
+    // provider's OpenAI-compatible /v1/chat/completions.
     ...(cfg.authMode === 'custom' && cfg.online
       ? [`OPENAI_BASE_URL=${cfg.openaiBase}`, `OPENAI_MODEL=${cfg.openaiModel}`, `OPENAI_API_KEY=${cfg.openaiKey || ''}`, 'PROXY_PORT=8787']
       : []),
-    // local / direct Anthropic-compatible endpoint (e.g. Ollama native API)
-    ...(cfg.authMode === 'custom' && !cfg.online ? [`ANTHROPIC_BASE_URL=${cfg.baseUrl}`, `ANTHROPIC_MODEL=${cfg.modelId}`, ...(cfg.apiKey ? [`ANTHROPIC_API_KEY=${cfg.apiKey}`] : [])] : []),
+    // FREE model — LOCAL Ollama: ALSO go through the proxy. Ollama serves /api/* and /v1/chat/completions
+    // but has NO /v1/messages, so pointing Claude Code straight at it (ANTHROPIC_BASE_URL) 404s every
+    // message. The proxy bridges Anthropic -> OpenAI -> Ollama's /v1/chat/completions.
+    ...(cfg.authMode === 'custom' && !cfg.online
+      ? [`OPENAI_BASE_URL=${String(cfg.baseUrl || 'http://localhost:11434').replace(/\/+$/, '').replace(/\/v1$/, '')}/v1`, `OPENAI_MODEL=${cfg.modelId}`, 'OPENAI_API_KEY=ollama', 'PROXY_PORT=8787']
+      : []),
     `MODEL=${cfg.model}`,
     `PERMISSION_MODE=${cfg.perm}`,
     `CLAUDE_BIN=${cfg.claudeBin}`,
@@ -286,7 +295,8 @@ function applyConfig(cfg) {
     if (r.status !== 0) console.log('!!  service install reported an issue — start manually with: npm start');
   }
   console.log('\nHelm is set up.');
-  console.log(cfg.svc ? `It's running in the background. Logs: ${ROOT}/agent.log` : `Start it:  cd "${ROOT}"  then  node index.js`);
+  console.log('Verify it:  helm doctor      (checks Node, engine, model + key, config — fix hints included)');
+  console.log(cfg.svc ? `It's running in the background. Logs: ${ROOT}/agent.log` : `Start it:   helm            (or: node "${ROOT}${path.sep}index.js")`);
   if (cfg.authMode === 'subscription') console.log("Backend: Claude subscription — make sure you've run 'claude' once and logged in.");
   else if (cfg.authMode === 'apikey') console.log('Backend: Anthropic API key (billed pay-as-you-go).');
   else if (cfg.online) console.log(`Backend: free online model ${cfg.openaiModel} (${cfg.openaiBase}) — Helm auto-starts a local proxy to translate to it.${cfg.openaiKey ? '' : '\n!!  No API key entered — add OPENAI_API_KEY to .env before starting.'}`);

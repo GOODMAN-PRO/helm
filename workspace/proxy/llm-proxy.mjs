@@ -43,12 +43,16 @@ function toOpenAI(a) {
       for (const tr of toolResults) messages.push({ role: 'tool', tool_call_id: tr.tool_call_id, content: tr.content });
     }
   }
-  const req = { model: MODEL, messages, stream: false, max_tokens: a.max_tokens || 4096 };
+  const req = { model: MODEL, messages, stream: false, max_tokens: a.max_tokens || 8192 };
   if (typeof a.temperature === 'number') req.temperature = a.temperature;
-  // Claude Code sends its full tool suite (hundreds of tools) — that overwhelms most free models and
-  // providers. By default we forward NONE (clean chat). Set PROXY_TOOLS=1 to pass them through.
-  if (process.env.PROXY_TOOLS === '1' && Array.isArray(a.tools) && a.tools.length) {
-    req.tools = a.tools.map(t => ({ type: 'function', function: { name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} } } }));
+  // Claude Code sends its full tool suite (dozens). Forwarding ALL overwhelms weak free models;
+  // forwarding NONE makes Helm a chatbot that only *claims* to act. Default = a curated CORE set so the
+  // free model is a real (if smaller) agent. PROXY_TOOLS=all forwards everything; =none/0 forwards none.
+  const mode = (process.env.PROXY_TOOLS || 'core').toLowerCase();
+  if (mode !== 'none' && mode !== '0' && Array.isArray(a.tools) && a.tools.length) {
+    const CORE = new Set(['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'LS', 'TodoWrite']);
+    const picked = (mode === 'all' || mode === '1') ? a.tools : a.tools.filter(t => CORE.has(t.name));
+    if (picked.length) req.tools = picked.map(t => ({ type: 'function', function: { name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} } } }));
   }
   return req;
 }
@@ -92,9 +96,14 @@ const server = http.createServer(async (req, res) => {
     console.error(`[helm-proxy][upstream] ${up.status}`);
     if (!up.ok) {
       const t = await up.text();
-      console.error(`[helm-proxy][upstream-err] ${t.slice(0, 300)}`);
+      console.error(`[helm-proxy][upstream-err] ${up.status} ${t.slice(0, 300)}`);
+      const hint = (up.status === 401 || up.status === 403)
+        ? `Provider rejected the API key (HTTP ${up.status}). Check OPENAI_API_KEY for ${BASE} — run \`helm doctor\`.`
+        : up.status === 404
+        ? `Provider 404 — model "${MODEL}" may not exist at ${BASE}. Run \`helm doctor\` to list valid models.`
+        : `${up.status}: ${t.slice(0, 600)}`;
       res.writeHead(502, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ type: 'error', error: { type: 'upstream_error', message: `${up.status}: ${t.slice(0, 600)}` } }));
+      res.end(JSON.stringify({ type: 'error', error: { type: 'upstream_error', message: hint } }));
       return;
     }
     const oai = await up.json();
@@ -128,5 +137,10 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(500, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ type: 'error', error: { type: 'proxy_error', message: String(e.message || e) } }));
   }
+});
+server.on('error', e => {
+  if (e.code === 'EADDRINUSE') console.error(`[helm-proxy] port ${PORT} is already in use — set PROXY_PORT to a free port in .env (run \`helm doctor\`).`);
+  else console.error('[helm-proxy] server error:', e.message);
+  process.exit(1);
 });
 server.listen(PORT, '127.0.0.1', () => console.log(`[helm-proxy] Anthropic -> OpenAI on http://localhost:${PORT}  ->  ${BASE} (${MODEL})`));
