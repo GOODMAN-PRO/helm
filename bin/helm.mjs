@@ -27,6 +27,15 @@ const PIDFILE = path.join(ROOT, 'workspace', '.helm-brain.pid');
 const node = process.execPath;
 const run = (args, opts = {}) => spawnSync(node, args, { cwd: ROOT, stdio: 'inherit', ...opts });
 
+// `npx github:GOODMAN-PRO/helm` runs THIS bin from npm's EPHEMERAL npx cache (…/_npx/…). Running the
+// agent/wizard there would write .env + a launchd/Task service into a temp dir npm later deletes, and
+// never put `helm` on PATH (exactly the broken install people hit). So when we detect we're in the npx
+// cache, hand off to the real installer, which copies to ~/helm, installs deps, links `helm`, and sets
+// up the service — i.e. `npx github:GOODMAN-PRO/helm` becomes a proper one-command install.
+if (/[\\/]_npx[\\/]/.test(ROOT)) {
+  process.exit(run([path.join(ROOT, 'bin', 'helm-install.mjs')]).status ?? 0);
+}
+
 // Is the brain's terminal bridge accepting connections right now?
 function brainUp(timeout = 600) {
   return new Promise(resolve => {

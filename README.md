@@ -40,7 +40,7 @@ zip/tarball download. They register the `helm` command and launch the setup wiza
 
 **Alternative — npx** (needs **git** *and* **Node 22.5+** already on your machine):
 ```bash
-npx github:GOODMAN-PRO/helm setup
+npx github:GOODMAN-PRO/helm
 ```
 > Windows note: a bare `npx` can fail with *"running scripts is disabled"*. Use
 > `npx.cmd github:GOODMAN-PRO/helm setup`, the PowerShell installer above, or once:
