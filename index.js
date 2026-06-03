@@ -5,7 +5,7 @@
 // No framework, no plugins, no gateway service. Read it top to bottom.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
@@ -188,6 +188,26 @@ function describePathway() {
 }
 // One-line summary for the persona / status.
 const pathwayLine = () => { const p = describePathway(); return `${p.label} · model ${p.model} · ${p.endpoint}`; };
+// Snapshot of background work for the desktop "Tasks" tab: scheduled jobs, in-flight tasks, projects,
+// recent runs and the nightly self-upgrade status. Returned as JSON so the UI can render it richly.
+function buildTasksReport() {
+  const out = { running: 0, scheduled: [], projects: [], recentRuns: [], nightly: null };
+  try { out.running = running.size; } catch {}
+  try {
+    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'tools/tools.mjs'), 'call', 'scheduler.list'], { cwd: __dirname, encoding: 'utf8', timeout: 6000 });
+    const j = JSON.parse(r.stdout || '[]');
+    const jobs = Array.isArray(j) ? j : (j.jobs || j.result || []);
+    out.scheduled = (Array.isArray(jobs) ? jobs : []).map(x => ({ name: x.name, cron: x.cron || x.schedule, enabled: x.enabled !== 0 && x.enabled !== false, next_run: x.next_run || x.nextRun || null })).slice(0, 50);
+  } catch {}
+  try {
+    const p = JSON.parse(readFileSync(path.join(WORKSPACE, 'projects.json'), 'utf8'));
+    const arr = Array.isArray(p) ? p : (p.projects || []);
+    out.projects = arr.map(x => ({ name: x.name, status: x.status || 'active' })).slice(0, 50);
+  } catch {}
+  try { out.recentRuns = readdirSync(path.join(WORKSPACE, 'runs')).sort().reverse().slice(0, 8); } catch {}
+  try { out.nightly = JSON.parse(readFileSync(path.join(__dirname, '.last-nightly-upgrade'), 'utf8')); } catch {}
+  return JSON.stringify(out);
+}
 // Multi-line report for the `pathway` command.
 function pathwayReport() {
   const p = describePathway();
@@ -1088,6 +1108,7 @@ startCliBridge(async (text, reply, convId) => {
   try { mirrorEcho(text, 'you (terminal)'); } catch {}
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); reply(n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'); return; }
   if (/^\s*\/?pathway\s*$/i.test(text)) { reply(pathwayReport()); return; }   // same command works in the terminal
+  if (/^\s*\/?tasks\s*$/i.test(text)) { reply(buildTasksReport()); return; }   // desktop Tasks tab (JSON)
   // Control commands over the bridge (terminal + desktop app), parity with the Discord gateway:
   const mModel = text.match(/^!model(?:\s+(\S+))?\s*$/i);
   if (mModel) { if (!mModel[1]) reply(`Model: ${getModelPref() || 'auto-route'}`); else { const ok = setModelPref(mModel[1]); reply(ok ? `Model set to ${mModel[1]}.` : `Unknown model "${mModel[1]}". Use opus | sonnet | haiku | auto.`); } return; }
