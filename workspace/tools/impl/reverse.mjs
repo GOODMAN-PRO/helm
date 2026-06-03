@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import os from 'node:os';
 import { analyzeSources, decodeInlineScripts, findSourceMapRef, parseSourceMap, traceTerms } from './reverse-code.mjs';
 
 const __dirname   = path.dirname(fileURLToPath(import.meta.url));
@@ -457,6 +458,7 @@ function scanApiForContent(requests) {
 
 async function analyzeWeb(url, name) {
   const slug = name || slugify(url);
+  const findings = { host: (() => { try { return new URL(url).hostname; } catch { return url; } })() };
   const lines = [
     `# Reverse Engineering Report: Web — ${url}`, '', ETHICS_NOTE, '',
     `## Target`, `- **URL:** ${url}`, `- **Date:** ${new Date().toISOString()}`, '',
@@ -472,6 +474,7 @@ async function analyzeWeb(url, name) {
   // LOGGED-OUT shell. The real app and its authenticated API never loaded — say so loudly so the report
   // isn't mistaken for the app. (instagram.com root serves login inline without redirecting.)
   const loggedOut = looksLoggedOut(resp.finalUrl, html);
+  findings.loggedOut = loggedOut;
   if (loggedOut) {
     lines.push('## ⚠ Capture Context — UNAUTHENTICATED',
       '> This is a **login / auth surface** (you were redirected to it, or it was served inline), so everything',
@@ -484,6 +487,7 @@ async function analyzeWeb(url, name) {
   // ============================ CONTENT (what's inside) ============================
   // The headline: the actual content of the page/reel — who made it, the caption, the media, the stats.
   const content = extractContent(html);
+  findings.content = content;   // same ref — later live-capture enrichment fills it in place
   const renderContent = (c, heading) => {
     const row = (label, val) => { if (val != null && String(val).trim()) lines.push(`- **${label}:** ${String(val).slice(0, 600)}`); };
     lines.push(heading);
@@ -524,6 +528,7 @@ async function analyzeWeb(url, name) {
 
   // Stack detection
   const stack = detectStack(html, headers, scripts, links);
+  findings.stack = stack;
   lines.push('## Detected Stack');
   if (stack.length) for (const s of stack) lines.push(`- ${s}`);
   else lines.push('- (none detected via static analysis)');
@@ -600,6 +605,7 @@ async function analyzeWeb(url, name) {
       if (!seen.has(key)) seen.set(key, s);
     }
     apiCalls = [...seen.values()];
+    findings.apiCalls = apiCalls;
     lines.push(`## API Surface (${apiCalls.length} distinct call${apiCalls.length === 1 ? '' : 's'})`);
     if (apiCalls.length) {
       for (const s of apiCalls.slice(0, 25)) {
@@ -656,6 +662,7 @@ async function analyzeWeb(url, name) {
 
     if (sources.length) {
       const code = analyzeSources(sources);
+      findings.code = code;
       lines.push('## Code Analysis (static, AST-based)');
       lines.push(`- **Bundles analyzed:** ${code.bundleCount} (${scriptBodies.length} external, ${inlineBlocks.length} inline-deduped)  ·  **~${(code.totalBytes / 1024).toFixed(0)} KB**  ·  **${code.totalFunctions} functions**`);
       if (code.moduleSystems.length) lines.push(`- **Module system:** ${code.moduleSystems.join(', ')}`);
@@ -758,7 +765,7 @@ async function analyzeWeb(url, name) {
     lines.push('```', '');
   }
 
-  return { slug, report: lines.join('\n'), title: `Reverse Engineering — ${pageTitle}` };
+  return { slug, kind: 'web', target: url, findings, report: lines.join('\n'), title: `Reverse Engineering — ${pageTitle}` };
 }
 
 // Keep only non-sensitive request headers that aid reverse engineering (operation names, app ids).
@@ -870,6 +877,7 @@ function inferFrameworks(strs) {
 async function analyzeApp(appPath, name) {
   const slug = name || slugify(path.basename(appPath));
   const label = path.basename(appPath);
+  const findings = { label, frameworks: [], entitlements: [], urlSchemes: [], endpoints: [] };
   const lines = [
     `# Reverse Engineering Report: App — ${label}`, '', ETHICS_NOTE, '',
     `## Target`, `- **Path:** ${appPath}`, `- **Platform:** ${process.platform}`, `- **Date:** ${new Date().toISOString()}`, '',
@@ -878,6 +886,7 @@ async function analyzeApp(appPath, name) {
   if (process.platform === 'darwin') {
     // ---- macOS-native bundle inspection (otool / plutil / codesign) ----
     const fileR = run('/usr/bin/file', [appPath]);
+    findings.format = fileR.stdout.trim().split(':').slice(1).join(':').trim() || null;
     lines.push('## File Type', '```', fileR.stdout.trim() || '(file command returned no output)', '```', '');
     const isBundle = appPath.endsWith('.app');
     let execPath = isBundle ? null : appPath;
@@ -885,8 +894,18 @@ async function analyzeApp(appPath, name) {
       const plistPath = path.join(appPath, 'Contents/Info.plist');
       if (existsSync(plistPath)) {
         const plR = run('/usr/bin/plutil', ['-p', plistPath]);
-        if (plR.status === 0) lines.push('## Info.plist', '```', plR.stdout.slice(0, 3000), '```', '');
-        const execName = run('/usr/bin/plutil', ['-extract', 'CFBundleExecutable', 'raw', plistPath]).stdout.trim();
+        if (plR.status === 0) {
+          lines.push('## Info.plist', '```', plR.stdout.slice(0, 3000), '```', '');
+          // URL schemes for deep-link detection; ATS-localhost exception flags a local helper/server.
+          const sm = plR.stdout.match(/CFBundleURLSchemes"\s*=>\s*\[([\s\S]*?)\]/);
+          if (sm) findings.urlSchemes = [...sm[1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+          findings.atsLocalhost = /127\.0\.0\.1|"localhost"|NSAllowsLocalNetworking"\s*=>\s*1/.test(plR.stdout);
+        }
+        const ex = k => run('/usr/bin/plutil', ['-extract', k, 'raw', plistPath]).stdout.trim();
+        findings.displayName = ex('CFBundleDisplayName') || ex('CFBundleName') || label.replace(/\.app$/, '');
+        findings.bundleId = ex('CFBundleIdentifier') || null;
+        findings.version = ex('CFBundleShortVersionString') || null;
+        const execName = ex('CFBundleExecutable');
         if (execName) execPath = path.join(appPath, 'Contents/MacOS', execName);
       }
     }
@@ -896,34 +915,41 @@ async function analyzeApp(appPath, name) {
         lines.push('## Shared Libraries (otool -L)', '```', otoolR.stdout.slice(0, 4000), '```', '');
         const libs = otoolR.stdout; const fwks = [];
         for (const [needle, label2] of [['AppKit', 'AppKit (macOS native)'], ['UIKit', 'UIKit'], ['SwiftUI', 'SwiftUI'], ['CoreData', 'CoreData'], ['WebKit', 'WebKit'], ['AVFoundation', 'AVFoundation'], ['ARKit', 'ARKit'], ['CoreML', 'CoreML'], ['Electron', 'Electron'], ['Flutter', 'Flutter']]) if (libs.includes(needle)) fwks.push(label2);
+        findings.frameworks = fwks;
         lines.push('## Inferred Frameworks');
         if (fwks.length) for (const f of fwks) lines.push(`- ${f}`); else lines.push('- (standard system frameworks only)');
         lines.push('');
       }
       try {
         const strs = extractStrings(readFileSync(execPath), { cap: 50 }).filter(s => /https?:\/\/|\.api\.|\/api\/|endpoint|baseURL|baseUrl/i.test(s));
-        if (strs.length) lines.push('## Interesting Strings (URLs + API hints)', '```', ...strs, '```', '');
+        if (strs.length) { findings.endpoints = strs.slice(0, 20); lines.push('## Interesting Strings (URLs + API hints)', '```', ...strs, '```', ''); }
       } catch {}
     }
     const entR = run('/usr/bin/codesign', ['-d', '--entitlements', '-', appPath], { timeout: 15_000 });
-    if (entR.status === 0 && entR.stdout.trim()) lines.push('## Entitlements', '```xml', entR.stdout.slice(0, 3000), '```', '');
+    if (entR.status === 0 && entR.stdout.trim()) {
+      findings.entitlements = [...new Set([...entR.stdout.matchAll(/\[Key\]\s+([\w.\-]+)/g)].map(m => m[1]))];
+      lines.push('## Entitlements', '```xml', entR.stdout.slice(0, 3000), '```', '');
+    }
   } else {
     // ---- generic binary analysis (Windows / Linux) ----
     lines.push(`> macOS bundle inspection (otool/plutil/codesign) only runs on macOS; on ${process.platform} this is a generic binary analysis.`, '');
     let buf;
-    try { buf = readFileSync(appPath); } catch (e) { lines.push(`(could not read: ${e.message})`); return { slug, report: lines.join('\n'), title: `Reverse Engineering — ${label}` }; }
+    try { buf = readFileSync(appPath); } catch (e) { lines.push(`(could not read: ${e.message})`); return { slug, kind: 'app', target: appPath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` }; }
     const sig8 = buf.subarray(0, 4).toString('hex');
-    lines.push('## Format Identification', `- **4-byte signature:** \`0x${sig8}\``, `- **Identified as:** ${identifyMagic(sig8, buf)}`, `- **Size:** ${buf.length.toLocaleString()} bytes`, '');
+    findings.format = identifyMagic(sig8, buf);
+    findings.size = `${buf.length.toLocaleString()} bytes`;
+    lines.push('## Format Identification', `- **4-byte signature:** \`0x${sig8}\``, `- **Identified as:** ${findings.format}`, `- **Size:** ${buf.length.toLocaleString()} bytes`, '');
     const strs = extractStrings(buf, { cap: 200 });
     const fwks = inferFrameworks(strs);
+    findings.frameworks = fwks;
     lines.push('## Inferred Frameworks / Runtime');
     if (fwks.length) for (const f of fwks) lines.push(`- ${f}`); else lines.push('- (no common framework signatures found in strings)');
     lines.push('');
     const hints = strs.filter(s => /https?:\/\/|\.api\.|\/api\/|endpoint|baseURL|baseUrl|\.dll|\.exe|version|build/i.test(s)).slice(0, 50);
-    if (hints.length) lines.push('## Interesting Strings (URLs / APIs / modules)', '```', ...hints, '```', '');
+    if (hints.length) { findings.endpoints = hints.filter(s => /https?:\/\//.test(s)).slice(0, 20); lines.push('## Interesting Strings (URLs / APIs / modules)', '```', ...hints, '```', ''); }
   }
 
-  return { slug, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
+  return { slug, kind: 'app', target: appPath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
 }
 
 // ---- file subcommand (pure-JS: magic ID + hexdump + strings; uses external `file` if available) ----
@@ -931,6 +957,7 @@ async function analyzeApp(appPath, name) {
 async function analyzeFile(filePath, name) {
   const slug = name || slugify(path.basename(filePath));
   const label = path.basename(filePath);
+  const findings = { label, frameworks: [], endpoints: [] };
   const lines = [
     `# Reverse Engineering Report: File — ${label}`, '', ETHICS_NOTE, '',
     `## Target`, `- **Path:** ${filePath}`, `- **Date:** ${new Date().toISOString()}`, '',
@@ -945,20 +972,172 @@ async function analyzeFile(filePath, name) {
 
   let buf;
   try { buf = readFileSync(filePath); }
-  catch (e) { lines.push(`(could not read file: ${e.message})`); return { slug, report: lines.join('\n'), title: `Reverse Engineering — ${label}` }; }
+  catch (e) { lines.push(`(could not read file: ${e.message})`); return { slug, kind: 'file', target: filePath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` }; }
 
   const sig8 = buf.subarray(0, 4).toString('hex');
   const hex32 = (buf.subarray(0, 32).toString('hex').match(/.{2}/g) ?? []).join(' ');
   const ascii32 = buf.subarray(0, 32).toString('latin1').replace(/[^\x20-\x7e]/g, '.');
+  findings.format = identifyMagic(sig8, buf);
+  findings.size = `${buf.length.toLocaleString()} bytes`;
   lines.push('## Magic Bytes (first 32 bytes)', '```', `hex:   ${hex32}`, `ascii: ${ascii32}`, '```', '');
-  lines.push('## Format Identification', `- **4-byte signature:** \`0x${sig8}\``, `- **Identified as:** ${identifyMagic(sig8, buf)}`, `- **Size:** ${buf.length.toLocaleString()} bytes`, '');
+  lines.push('## Format Identification', `- **4-byte signature:** \`0x${sig8}\``, `- **Identified as:** ${findings.format}`, `- **Size:** ${buf.length.toLocaleString()} bytes`, '');
 
   lines.push('## Hexdump (first 256 bytes)', '```', hexdump(buf, 256), '```', '');
 
   const strs = extractStrings(buf, { min: 6, max: 300, cap: 100 });
+  findings.frameworks = inferFrameworks(strs);
+  findings.endpoints = strs.filter(s => /https?:\/\//.test(s)).slice(0, 10);
   if (strs.length) lines.push(`## Strings (${strs.length} printable sequences)`, '```', ...strs, '```', '');
 
-  return { slug, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
+  return { slug, kind: 'file', target: filePath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
+}
+
+// ============================ SYNTHESIS ============================
+// A report must LEAD with an explanation, not a wall of raw data. From the structured findings each
+// analyzer collected, we synthesize a plain-language "Summary" + "How It Works" brief and splice it in
+// right after the Target block. Default is a deterministic, evidence-grounded synthesis (instant, never
+// invents). Set HELM_REVERSE_LLM=1 to have the local Claude engine write richer prose instead (it falls
+// back to the deterministic version if the engine is unavailable or returns nothing usable).
+
+const bullets = arr => arr.filter(Boolean).map(b => `- ${b}`).join('\n');
+
+function buildWebSummary(f) {
+  const host = f.host || 'the site';
+  const stack = f.stack || [];
+  const api = f.apiCalls || [];
+  const c = f.content || {};
+  const code = f.code;
+  const gql = api.filter(s => s.graphql);
+  const isNext = stack.some(s => /Next\.js/i.test(s));
+  const isReact = stack.some(s => /React/i.test(s));
+  const isVue = stack.some(s => /Vue|Nuxt/i.test(s));
+
+  const stackPhrase = isNext ? 'a Next.js (React) web application'
+    : isReact ? 'a React single-page application'
+    : isVue ? 'a Vue/Nuxt web application'
+    : stack.length ? `a web app built with ${stack.slice(0, 2).join(' + ')}`
+    : 'a web page';
+  const mediaKind = c.video ? 'a video/media post' : (c.type || c.caption || c.author) ? 'a content post' : '';
+  const sum = [`**${host}** is ${stackPhrase}${mediaKind ? ` — the captured page is ${mediaKind}` : ''}.`];
+  if (c.author || c.caption) sum.push(`${[c.author && `By ${c.author}`, c.caption && `"${String(c.caption).slice(0, 120)}"`].filter(Boolean).join(' — ')}.`);
+  if (api.length) sum.push(`Its data layer is ${gql.length ? 'a GraphQL API' : 'a REST/XHR API'} (${api.length} distinct call${api.length === 1 ? '' : 's'} captured).`);
+  if (f.loggedOut) sum.push('This was the **logged-out shell** — the authenticated app and its real API did not load.');
+
+  const how = [];
+  how.push(isNext ? 'Rendering — server-rendered React (Next.js), hydrated in the browser; pages are React components.'
+    : isReact ? 'Rendering — a client-side React SPA: the HTML shell boots JS bundles that build the UI in the browser.'
+    : isVue ? 'Rendering — a Vue/Nuxt app: components render client-side once the JS loads.'
+    : 'Rendering — largely static or server-rendered HTML.');
+  if (gql.length) {
+    const ops = gql.map(s => s.friendlyName || (s.graphql && (s.graphql.operationName || (s.graphql.doc_id && `doc_id ${s.graphql.doc_id}`)))).filter(Boolean).slice(0, 4);
+    how.push(`Data — a GraphQL endpoint using ${gql.some(s => s.graphql && s.graphql.doc_id) ? 'persisted queries (doc_id-keyed)' : 'named operations'}${ops.length ? `, e.g. ${ops.map(o => `\`${o}\``).join(', ')}` : ''}.`);
+  } else if (api.length) {
+    how.push(`Data — REST/XHR calls, e.g. ${api.slice(0, 4).map(s => `\`${s.method} ${s.path}\``).join(', ')}.`);
+  }
+  if (c.video || c.image) how.push('Media — video/images are served from a CDN (often as byte-range chunks), separate from the API surface.');
+  if (code) {
+    const ks = (code.keyFunctions || []).filter(fn => fn.flags && fn.flags.length).slice(0, 3).map(fn => `\`${fn.name || '(anon)'}\` (${fn.flags.join('/')})`);
+    how.push(`Client code — ${code.totalFunctions} functions across ${code.bundleCount} bundle(s)${code.moduleSystems && code.moduleSystems.length ? `, ${code.moduleSystems.join('/')} modules` : ''}${ks.length ? `; notable: ${ks.join(', ')}` : ''}.`);
+  }
+  if (f.loggedOut) how.push('Auth — a login wall gates the real app; everything captured is public bootstrap, telemetry and route-prefetch.');
+  if (how.length <= 1 && !api.length) how.push('No dynamic API surface was captured — the page is likely server-rendered or media-only.');
+
+  return `## Summary\n${sum.join(' ')}\n\n## How It Works\n${bullets(how)}`;
+}
+
+function buildAppSummary(f) {
+  const name = f.displayName || f.label;
+  const fw = f.frameworks || [];
+  const ents = f.entitlements || [];
+  const schemes = f.urlSchemes || [];
+  const isElectron = fw.some(x => /Electron/i.test(x));
+  const isFlutter = fw.some(x => /Flutter/i.test(x));
+  const nativeFw = fw.filter(x => /AppKit|SwiftUI|UIKit|WebKit/i.test(x));
+
+  const techPhrase = isElectron ? 'an Electron desktop app (a web UI running in a Chromium shell)'
+    : isFlutter ? 'a Flutter app (UI drawn by the Flutter/Skia engine from compiled Dart)'
+    : nativeFw.length ? `a native app using ${nativeFw.join(', ')}`
+    : fw.length ? `built with ${fw.join(', ')}`
+    : 'an application';
+  const ver = f.version ? ` v${f.version}` : '';
+  const idp = f.bundleId ? ` (\`${f.bundleId}\`)` : '';
+  const sum = [`**${name}**${ver}${idp} is ${techPhrase}.`];
+  if (f.format && !/^directory$/i.test(f.format)) sum.push(`Binary: ${f.format}.`);
+
+  const how = [];
+  if (isElectron) how.push('Architecture — Electron pairs a Chromium renderer (the UI, written in HTML/CSS/JS) with a Node.js main process for native/OS work; the UI code ships bundled in `Contents/Resources/app.asar`.');
+  else if (isFlutter) how.push('Architecture — Flutter renders its own widgets via the Skia engine from Dart code compiled into the binary; no system UI toolkit.');
+  else if (nativeFw.length) how.push(`Architecture — a native app built on ${nativeFw.join(', ')}.`);
+  if (fw.length) how.push(`Frameworks linked: ${fw.join(', ')}.`);
+  if (schemes.length) how.push(`Deep links — registers the \`${schemes.map(s => s + '://').join('`, `')}\` URL scheme(s) so other apps/links can drive it.`);
+  if (f.atsLocalhost) how.push('Networking — its ATS config permits insecure HTTP to `127.0.0.1`/`localhost`, so it likely runs or talks to a local helper/server.');
+  if (ents.length) how.push(`Capabilities (entitlements): ${ents.slice(0, 10).join(', ')}${ents.length > 10 ? ', …' : ''}.`);
+  if (f.endpoints && f.endpoints.length) how.push(`Network hints in the binary: ${f.endpoints.slice(0, 5).map(e => `\`${String(e).slice(0, 80)}\``).join(', ')}.`);
+  if (!how.length) how.push('Generic binary — no framework/runtime signatures or capabilities detected to explain its operation.');
+
+  return `## Summary\n${sum.join(' ')}\n\n## How It Works\n${bullets(how)}`;
+}
+
+function buildFileSummary(f) {
+  const sum = [`**${f.label}** is ${f.format ? `a ${f.format}` : 'a file'}${f.size ? `, ${f.size}` : ''}.`];
+  const how = [];
+  if (f.frameworks && f.frameworks.length) how.push(`Runtime/framework hints: ${f.frameworks.join(', ')}.`);
+  if (f.endpoints && f.endpoints.length) how.push(`Embedded URLs/APIs: ${f.endpoints.slice(0, 5).map(e => `\`${String(e).slice(0, 80)}\``).join(', ')}.`);
+  how.push('Identified by magic-byte signature; lower-level structure is in the hexdump and strings below.');
+  return `## Summary\n${sum.join(' ')}\n\n## How It Works\n${bullets(how)}`;
+}
+
+function deterministicSummary(result) {
+  const f = result.findings || {};
+  if (result.kind === 'web') return buildWebSummary(f);
+  if (result.kind === 'app') return buildAppSummary(f);
+  return buildFileSummary(f);
+}
+
+function resolveClaudeBin() {
+  const cands = [process.env.CLAUDE_BIN, path.join(os.homedir(), '.local/bin/claude'), path.join(os.homedir(), '.claude/local/claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'].filter(Boolean);
+  for (const c of cands) { try { if (existsSync(c)) return c; } catch {} }
+  return 'claude';
+}
+
+// Opt-in (HELM_REVERSE_LLM=1): hand the collected findings to the Claude engine for richer prose.
+function llmSummary(result) {
+  const prompt = `Write the executive brief for a reverse-engineering report on this ${result.kind} target: ${result.target}.
+Using ONLY the raw findings below, output GitHub Markdown with EXACTLY two sections and nothing else:
+
+## Summary
+2-4 plain-language sentences: what it is, what it's built with, its purpose.
+
+## How It Works
+4-8 concrete bullets walking through the architecture and runtime data flow — what talks to what, how data moves, the key mechanisms. Cite real evidence (actual frameworks, endpoints, function names). If something isn't known from the findings, say so; never invent.
+
+No preamble, no other sections.
+
+RAW FINDINGS:
+${result.report.slice(0, 14000)}`;
+  try {
+    const r = spawnSync(resolveClaudeBin(), ['-p', '--model', 'sonnet'], { input: prompt, encoding: 'utf8', timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+    const out = (r.stdout || '').trim();
+    if (r.status === 0 && /##\s*Summary/i.test(out) && out.length > 60) return out;
+  } catch {}
+  return null;
+}
+
+function buildReportSummary(result) {
+  if (process.env.HELM_REVERSE_LLM === '1') { const llm = llmSummary(result); if (llm) return llm; }
+  return deterministicSummary(result);
+}
+
+// Splice the summary in right after the "## Target" block so the report opens with the explanation.
+function insertSummary(report, summaryMd) {
+  if (!summaryMd) return report;
+  const lines = report.split('\n');
+  const ti = lines.findIndex(l => /^##\s+Target\s*$/.test(l));
+  if (ti < 0) return summaryMd + '\n\n' + report;
+  let j = ti + 1;
+  while (j < lines.length && !/^##\s/.test(lines[j])) j++;   // walk to the next "## " heading
+  lines.splice(j, 0, '', summaryMd, '');
+  return lines.join('\n');
 }
 
 // ---- main ----
@@ -978,6 +1157,9 @@ async function main() {
   else if (verb === 'app') result = await analyzeApp(target, name);
   else if (verb === 'file') result = await analyzeFile(target, name);
   else { console.error(`unknown subcommand: ${verb}. Use web, app, or file.`); process.exit(1); }
+
+  // Lead with a synthesized plain-language brief (what it is + how it works), built from the findings.
+  try { result.report = insertSummary(result.report, buildReportSummary(result)); } catch {}
 
   const mdPath = path.join(REVERSE_DIR, `${result.slug}-report.md`);
   writeFileSync(mdPath, result.report, 'utf8');
