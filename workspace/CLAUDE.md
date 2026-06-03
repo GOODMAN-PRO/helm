@@ -488,6 +488,14 @@ report to `workspace/reverse/<slug>-report.pdf` (+ `.md`). Cross-platform (macOS
 uses Node's built-in `fetch` and pure-JS binary inspection, not `/usr/bin/*` tools. Reports include an
 ethics disclaimer (authorized targets only). Show the PDF by ending the reply with `ATTACH: <pdf path>`.
 
+**Capture the DESIGN, not just internals.** App reports now include the design language + signature
+features (for known apps — e.g. Obsidian's graph view: notes as orbs connected by link "strings"), the
+product site's advertised features with an embedded screenshot, and a rendered screenshot for web targets.
+For the app's ACTUAL running UI, add `--live-app` (macOS): it launches the app and embeds a screenshot of
+its real window + a vision description. That needs Screen Recording + Accessibility permission for the
+process and the app to launch without crashing; if it can't read the app's window it says so (it never
+falls back to full-screen, to avoid capturing unrelated/private content).
+
 **ALWAYS RUN IT FRESH — never re-serve a previous report.** Every time the owner asks you to
 reverse-engineer a target (even the same one again), actually invoke the tool this turn and attach the
 newly generated PDF. Do NOT skip the run because a `<slug>-report.pdf` already exists and do NOT

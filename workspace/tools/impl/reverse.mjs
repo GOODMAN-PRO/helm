@@ -11,7 +11,7 @@
 //   node reverse.mjs file <path> [--name <slug>]
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
@@ -899,6 +899,62 @@ async function fetchProductSite(url) {
   return out;
 }
 
+// Live-app capture (macOS, opt-in via --live-app): launch the actual app, screenshot the running UI,
+// embed it in the report, and have the vision tool describe what's on screen — the only way to truly
+// "show the design" of a desktop app whose UI isn't statically introspectable. Best-effort, never throws.
+// Note: needs Screen Recording permission for the capturing process; a black image means it's not granted.
+async function captureLiveApp(appPath, label) {
+  const out = { shot: null, description: null, error: null };
+  if (process.platform !== 'darwin') { out.error = 'live capture is currently macOS-only'; return out; }
+  const slug = slugify(label);
+  const proc = path.basename(appPath).replace(/\.app$/i, '');                // process name for AppleScript
+  const png = path.join(os.tmpdir(), `helm-live-${slug}.png`);
+  const jpg = path.join(os.tmpdir(), `helm-live-${slug}.jpg`);
+  try {
+    run('/usr/bin/open', ['-a', appPath]);                                   // launch
+    run('/usr/bin/osascript', ['-e', `tell application "${proc}" to activate`], { timeout: 6000 });   // bring to front
+    await new Promise(r => setTimeout(r, 5000));                             // let it render
+    // Capture ONLY the target app's own front window — never the whole screen. Full-screen capture would
+    // grab unrelated apps and leak private content, and could screenshot the wrong (foreground) app. If we
+    // can't read the window bounds (Accessibility not granted, or the app didn't launch / crashed), we bail
+    // with a clear message rather than capture something misleading.
+    let region = null;
+    try {
+      const b = run('/usr/bin/osascript', ['-e', `tell application "System Events" to tell process "${proc}" to get position & size of front window`], { timeout: 8000 });
+      const m = (b.stdout || '').match(/(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      if (m && +m[3] > 50 && +m[4] > 50) region = `${m[1]},${m[2]},${m[3]},${m[4]}`;
+    } catch { /* handled below */ }
+    if (!region) {
+      out.error = `couldn't read ${proc}'s window — make sure the app launches (it isn't crashing) and grant the terminal/Helm Accessibility access in System Settings → Privacy & Security → Accessibility, then retry`;
+      return out;
+    }
+    const cap = run('/usr/sbin/screencapture', ['-x', '-R', region, png], { timeout: 20_000 });
+    if (!existsSync(png)) { out.error = 'screenshot failed' + (cap.stderr ? ': ' + cap.stderr.slice(0, 80) : ''); return out; }
+    out.scope = 'app window';
+    // Downscale to keep the embedded image small; fall back to the PNG if sips is unavailable.
+    run('/usr/bin/sips', ['-s', 'format', 'jpeg', '-Z', '1600', png, '--out', jpg], { timeout: 20_000 });
+    const imgPath = existsSync(jpg) ? jpg : png;
+    const buf = readFileSync(imgPath);
+    out.shot = `data:${imgPath.endsWith('.jpg') ? 'image/jpeg' : 'image/png'};base64,${buf.toString('base64')}`;
+    // Describe the running UI with the vision tool (uses the engine; best-effort + bounded).
+    try {
+      const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'tools/impl/image.read.mjs'),
+        '--path', imgPath,
+        '--question', `This is a screenshot of the desktop app "${label}". Describe its visual design and layout, and call out any signature UI features visible (sidebars, panes, tabs, a node/graph view, a canvas, toolbars, color/theme). If the app appears to have crashed or is not visible, say so. Be concrete.`],
+        { encoding: 'utf8', timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+      let text = '';
+      try { text = (JSON.parse(r.stdout || '{}').text || '').trim(); } catch { text = (r.stdout || '').trim(); }   // image.read prints JSON {text}
+      if (r.status === 0 && text) out.description = text.slice(0, 3000);
+    } catch { /* description optional */ }
+  } catch (e) {
+    out.error = String(e.message || e).slice(0, 160);
+  } finally {
+    try { unlinkSync(png); } catch {}
+    try { unlinkSync(jpg); } catch {}
+  }
+  return out;
+}
+
 // ---- binary format identification (shared by app + file) ----
 
 function identifyMagic(sig8, buf) {
@@ -940,7 +996,7 @@ function inferFrameworks(strs) {
 
 // ---- app subcommand (macOS bundle inspection; generic binary analysis elsewhere) ----
 
-async function analyzeApp(appPath, name) {
+async function analyzeApp(appPath, name, opts = {}) {
   const slug = name || slugify(path.basename(appPath));
   const label = path.basename(appPath);
   const findings = { label, frameworks: [], entitlements: [], urlSchemes: [], endpoints: [] };
@@ -1054,6 +1110,23 @@ async function analyzeApp(appPath, name) {
       if (site.shot || feats.length || site.description) lines.push('', ...sec);
     }
   } catch {}
+
+  // Live app (opt-in, macOS): launch the REAL app and screenshot its actual running UI — the only way to
+  // truly show the design (e.g. Obsidian's graph view on screen). Embedded + described by the vision tool.
+  if (opts.liveApp && (appPath.endsWith('.app') || process.platform === 'darwin')) {
+    try {
+      const live = await captureLiveApp(appPath, label);
+      if (live.shot || live.description) {
+        const sec = ['## Live App — Actual Running UI', '', `_Captured by launching the app and screenshotting its real interface (${live.scope || 'screen'})._`, ''];
+        if (live.shot) sec.push(`![${label} running](${live.shot})`, '');
+        if (live.description) sec.push('**What the screenshot shows (vision analysis):**', '', live.description, '');
+        lines.push('', ...sec);
+        findings.liveCaptured = true;
+      } else if (live.error) {
+        lines.push('', '## Live App — Actual Running UI', '', `> Live capture unavailable: ${live.error}.`, '');
+      }
+    } catch {}
+  }
 
   return { slug, kind: 'app', target: appPath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
 }
@@ -1337,14 +1410,19 @@ async function main() {
   const target = process.argv[3];
   const rest = process.argv.slice(4);
   const get = k => { const i = rest.indexOf(`--${k}`); return i !== -1 ? rest[i + 1] : null; };
+  const has = k => rest.includes(`--${k}`);
   const name = get('name');
+  // --live-app (alias --live): launch the real app and screenshot its running UI (macOS). The dispatcher
+  // passes booleans as `--live true`, so accept either the bare flag or a truthy value.
+  const truthy = v => v == null || /^(1|true|yes|on)$/i.test(String(v));
+  const liveApp = has('live-app') || (has('live') && truthy(get('live'))) || /^(1|true|yes|on)$/i.test(String(get('live-app') || ''));
 
-  if (!verb || !target) { console.error('usage: reverse.mjs <web|app|file> <target> [--name <slug>]'); process.exit(1); }
+  if (!verb || !target) { console.error('usage: reverse.mjs <web|app|file> <target> [--name <slug>] [--live-app]'); process.exit(1); }
   mkdirSync(REVERSE_DIR, { recursive: true });
 
   let result;
   if (verb === 'web') result = await analyzeWeb(target, name);
-  else if (verb === 'app') result = await analyzeApp(target, name);
+  else if (verb === 'app') result = await analyzeApp(target, name, { liveApp });
   else if (verb === 'file') result = await analyzeFile(target, name);
   else { console.error(`unknown subcommand: ${verb}. Use web, app, or file.`); process.exit(1); }
 

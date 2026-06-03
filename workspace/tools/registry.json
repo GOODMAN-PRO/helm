@@ -911,7 +911,7 @@
   },
   {
     "name": "reverse.app",
-    "summary": "Reverse-engineer an app/binary (cross-platform). Leads with a plain-language Summary / What It Does / How It Works, then deep internals. macOS .app: Info.plist, otool -L, entitlements (explained in plain language), plus a deep dive — Electron app.asar package.json/dependencies/main-entry/native-addons, embedded frameworks + versions, CPU architectures, code signing, helper apps, auto-update feed, declared capabilities. Windows PE/Linux ELF: header parse, imports/needed libs, runtime inference. ALWAYS writes a PDF (and .md) to workspace/reverse/<slug>-report.pdf.",
+    "summary": "Reverse-engineer an app/binary (cross-platform). Leads with a plain-language Summary / What It Does / How It Works, then deep internals + the DESIGN: known design language + signature features (e.g. Obsidian's graph view — notes as orbs connected by link 'strings'), the product site's advertised features with an embedded screenshot, and entitlements explained. macOS .app: Info.plist, otool -L, Electron app.asar package.json/dependencies/main-entry/native-addons, embedded frameworks + versions, CPU architectures, code signing, helper apps, auto-update feed, capabilities. Windows PE/Linux ELF: header parse, imports/needed libs, runtime inference. Pass live=true (macOS) to launch the real app and embed a screenshot of its ACTUAL running window + a vision description (needs Screen Recording + Accessibility permission). ALWAYS writes a PDF (and .md) to workspace/reverse/<slug>-report.pdf.",
     "exec": "node tools/impl/reverse.mjs app",
     "args_schema": {
       "path": {
@@ -922,6 +922,10 @@
       "name": {
         "type": "string",
         "description": "Optional slug for the report filename (default: derived from basename)"
+      },
+      "live": {
+        "type": "boolean",
+        "description": "macOS only: launch the real app and embed a screenshot of its actual running window + a vision description (needs Screen Recording + Accessibility permission; the app must launch without crashing)"
       }
     },
     "requires": [
