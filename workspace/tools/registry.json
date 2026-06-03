@@ -107,6 +107,70 @@
     "confirm": false
   },
   {
+    "name": "gui.scroll",
+    "summary": "Scroll the mouse wheel at the current cursor (or at x,y). amount = notches; negative = down, positive = up. Pass horizontal:true for sideways scroll.",
+    "exec": "node tools/impl/gui.scroll.mjs",
+    "args_schema": { "amount": { "type": "number", "default": -3 }, "x": { "type": "number" }, "y": { "type": "number" }, "horizontal": { "type": "boolean" } },
+    "side_effects": "scrolls",
+    "confirm": false
+  },
+  {
+    "name": "gui.drag",
+    "summary": "Press the left button at (x,y), drag to (x2,y2), and release — for selecting text, moving items, or drag-and-drop.",
+    "exec": "node tools/impl/gui.drag.mjs",
+    "args_schema": { "x": { "type": "number", "required": true }, "y": { "type": "number", "required": true }, "x2": { "type": "number", "required": true }, "y2": { "type": "number", "required": true } },
+    "side_effects": "drags the mouse",
+    "confirm": false
+  },
+  {
+    "name": "gui.hotkey",
+    "summary": "Press a keyboard shortcut / combo: ctrl+c, ctrl+v, ctrl+a, alt+tab, alt+f4, win+r, ctrl+shift+esc, etc. Modifiers (ctrl/alt/shift/win) are held correctly, including the Windows key.",
+    "exec": "node tools/impl/gui.hotkey.mjs",
+    "args_schema": { "combo": { "type": "string", "required": true } },
+    "side_effects": "presses keys",
+    "confirm": false
+  },
+  {
+    "name": "app.open",
+    "summary": "Launch an app by name (e.g. notepad, chrome), open a file/folder by path, or open a URL in the default browser.",
+    "exec": "node tools/impl/app.open.mjs",
+    "args_schema": { "target": { "type": "string", "required": true }, "args": { "type": "string" } },
+    "side_effects": "launches an app / opens a file or URL",
+    "confirm": false
+  },
+  {
+    "name": "window.list",
+    "summary": "List open windows as {pid, app, title}. Run this to get the exact title before window.focus.",
+    "exec": "node tools/impl/window.mjs list",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "window.focus",
+    "summary": "Bring a window to the front by a title substring (e.g. 'Chrome', 'Discord'). Use window.list first for exact titles.",
+    "exec": "node tools/impl/window.mjs focus",
+    "args_schema": { "title": { "type": "string", "required": true } },
+    "side_effects": "changes the foreground window",
+    "confirm": false
+  },
+  {
+    "name": "clipboard.get",
+    "summary": "Read the system clipboard text (what the owner last copied).",
+    "exec": "node tools/impl/clipboard.mjs get",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "clipboard.set",
+    "summary": "Write text to the system clipboard. Pair with gui.hotkey ctrl+v to paste long text reliably (more robust than gui.type).",
+    "exec": "node tools/impl/clipboard.mjs set",
+    "args_schema": { "text": { "type": "string", "required": true } },
+    "side_effects": "overwrites the clipboard",
+    "confirm": false
+  },
+  {
     "name": "gmail.send",
     "summary": "Send an email from the owner's Gmail over SMTP. Requires GMAIL_USER + GMAIL_APP_PASSWORD in the vault.",
     "exec": "node tools/impl/gmail.mjs send",

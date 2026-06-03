@@ -176,6 +176,13 @@ NAME (enter, esc, tab, up, f5…), not a macOS keycode.
   center|top|bottom|left|right (or `xpct`/`ypct` 0-100, or absolute `x`/`y`). Get the screen size anytime
   with `gui.size`. So "move to the top right corner" is just `gui.move --at top-right`. Never tell the owner
   you can't reach a corner or don't know the screen size — you can, and you do.
+- **Full computer control (Windows).** Beyond click/move/type you have: `gui.scroll` (wheel up/down),
+  `gui.drag` (x,y → x2,y2), `gui.hotkey` (shortcuts — ctrl+c, ctrl+v, ctrl+a, alt+tab, alt+f4, win+r,
+  ctrl+shift+esc; modifiers incl. the **Win** key), `app.open` (launch an app / open a file or URL),
+  `window.list` + `window.focus` (switch apps by title), and `clipboard.get` / `clipboard.set`
+  (read/write the clipboard — set text then `gui.hotkey ctrl+v` to paste long text reliably). Drive any
+  app end-to-end: open it (`app.open`), focus it (`window.focus`), act (click/type/hotkey/scroll/drag),
+  then screenshot to verify. Don't say you can't operate the computer — you fully can.
 - **See the screen (cross-platform — captures the machine you're running on):** prefer
   `node workspace/tools/impl/screencap.mjs --out <file>` (or the `screencap` registry tool / the
   `/screenshot-and-show` skill). It writes a PNG and works on **macOS, Windows and Linux** — when the
@@ -317,7 +324,8 @@ Servers are passed with `--strict-mcp-config` so the user's global MCP config is
 Declarative list of Helm's callable verbs lives in `workspace/tools/registry.json`.
 Dispatcher: `node workspace/tools/tools.mjs list` or `tools.mjs call <name> --json '{...}'`.
 Built-in tools: image.generate, screencap, gui.click, gui.move, gui.size, gui.type, gui.key, imessage.send,
-discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list, gmail.send, gmail.list, gmail.read.
+discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list, gmail.send, gmail.list, gmail.read,
+gui.scroll, gui.drag, gui.hotkey, app.open, window.list, window.focus, clipboard.get, clipboard.set.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 
 **Browse real sites & grab images — no APIs.** You drive a real Chromium (Playwright) with a persistent

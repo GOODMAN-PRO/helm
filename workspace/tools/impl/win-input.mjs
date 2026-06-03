@@ -28,6 +28,21 @@ const KEYMAP = {
   up: '{UP}', down: '{DOWN}', left: '{LEFT}', right: '{RIGHT}', home: '{HOME}', end: '{END}',
   pageup: '{PGUP}', pagedown: '{PGDN}', f1: '{F1}', f2: '{F2}', f3: '{F3}', f4: '{F4}', f5: '{F5}',
 };
+// Virtual-key codes for hotkey combos (keybd_event). Letters A-Z and digits 0-9 are computed in vkFor.
+const VK = {
+  ctrl: 0x11, control: 0x11, alt: 0x12, shift: 0x10, win: 0x5B, cmd: 0x5B, meta: 0x5B, super: 0x5B,
+  enter: 0x0D, return: 0x0D, esc: 0x1B, escape: 0x1B, tab: 0x09, space: 0x20, backspace: 0x08,
+  delete: 0x2E, del: 0x2E, up: 0x26, down: 0x28, left: 0x25, right: 0x27, home: 0x24, end: 0x23,
+  pageup: 0x21, pagedown: 0x22, insert: 0x2D,
+  f1: 0x70, f2: 0x71, f3: 0x72, f4: 0x73, f5: 0x74, f6: 0x75, f7: 0x76, f8: 0x77, f9: 0x78, f10: 0x79, f11: 0x7A, f12: 0x7B,
+};
+function vkFor(tok) {
+  tok = String(tok).toLowerCase();
+  if (VK[tok] != null) return VK[tok];
+  if (/^[a-z]$/.test(tok)) return tok.toUpperCase().charCodeAt(0); // A-Z = 0x41-0x5A
+  if (/^[0-9]$/.test(tok)) return tok.charCodeAt(0);               // 0-9 = 0x30-0x39
+  return null;
+}
 
 // Build the PowerShell that performs one action in THIS session, then prints the cursor position.
 function psFor(action) {
@@ -39,18 +54,42 @@ function psFor(action) {
     'public class HelmIn{',
     ' [DllImport("user32.dll")] public static extern bool SetCursorPos(int X,int Y);',
     ' [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint x,uint y,uint d,int e);',
+    ' [DllImport("user32.dll")] public static extern void keybd_event(byte bVk,byte bScan,uint dwFlags,int dwExtraInfo);',
     ' [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);',
     '}',
     'public struct POINT{public int X;public int Y;}',
     '"@',
   ];
   const body = [];
-  const { verb, x, y, text, code } = action;
+  const { verb, x, y, x2, y2, text, code, combo, amount, horizontal } = action;
   if (['click', 'doubleclick', 'rightclick', 'move'].includes(verb)) {
     body.push(`[HelmIn]::SetCursorPos(${x | 0},${y | 0}); Start-Sleep -Milliseconds 40`);
     if (verb === 'click') body.push('[HelmIn]::mouse_event(2,0,0,0,0);[HelmIn]::mouse_event(4,0,0,0,0)');
     else if (verb === 'rightclick') body.push('[HelmIn]::mouse_event(8,0,0,0,0);[HelmIn]::mouse_event(16,0,0,0,0)');
     else if (verb === 'doubleclick') body.push('[HelmIn]::mouse_event(2,0,0,0,0);[HelmIn]::mouse_event(4,0,0,0,0);Start-Sleep -Milliseconds 60;[HelmIn]::mouse_event(2,0,0,0,0);[HelmIn]::mouse_event(4,0,0,0,0)');
+  } else if (verb === 'scroll') {
+    // amount: notches; positive = up/right, negative = down/left. Each notch = 120.
+    const n = Math.round(Number(amount) || 0);
+    const data = n >= 0 ? n * 120 : (0x100000000 + n * 120); // signed wheel delta packed as uint
+    const flag = horizontal ? '0x01000' : '0x0800';          // MOUSEEVENTF_HWHEEL / MOUSEEVENTF_WHEEL
+    if (x != null && y != null) body.push(`[HelmIn]::SetCursorPos(${x | 0},${y | 0}); Start-Sleep -Milliseconds 30`);
+    body.push(`[HelmIn]::mouse_event(${flag},0,0,${data},0)`);
+  } else if (verb === 'drag') {
+    const sx = x | 0, sy = y | 0, ex = x2 | 0, ey = y2 | 0, steps = 14;
+    body.push(`[HelmIn]::SetCursorPos(${sx},${sy}); Start-Sleep -Milliseconds 50`);
+    body.push('[HelmIn]::mouse_event(2,0,0,0,0); Start-Sleep -Milliseconds 60'); // left down
+    for (let i = 1; i <= steps; i++) {
+      const ix = Math.round(sx + (ex - sx) * i / steps), iy = Math.round(sy + (ey - sy) * i / steps);
+      body.push(`[HelmIn]::SetCursorPos(${ix},${iy}); Start-Sleep -Milliseconds 12`);
+    }
+    body.push('Start-Sleep -Milliseconds 40; [HelmIn]::mouse_event(4,0,0,0,0)');  // left up
+  } else if (verb === 'hotkey') {
+    const vks = String(combo).split('+').map((s) => vkFor(s.trim()));
+    if (!vks.length || vks.some((v) => v == null)) body.push(`Write-Error 'bad hotkey: ${String(combo).replace(/[^a-zA-Z0-9+ ]/g, '')}'`);
+    else {
+      for (const v of vks) body.push(`[HelmIn]::keybd_event(${v},0,0,0); Start-Sleep -Milliseconds 25`);
+      for (const v of [...vks].reverse()) body.push(`[HelmIn]::keybd_event(${v},0,2,0); Start-Sleep -Milliseconds 15`);
+    }
   } else if (verb === 'type') {
     const lit = escSendKeys(text).replace(/'/g, "''");
     body.push(`[System.Windows.Forms.SendKeys]::SendWait('${lit}')`);
@@ -76,7 +115,7 @@ export function doInput(action) {
 
 // Run the action via the HelmInput scheduled task so it executes in the interactive desktop session
 // (required when driven over SSH). Returns { ok, error?, cursor? }.
-export function winInput(action, { timeout = 12_000 } = {}) {
+export function winInput(action, { timeout = 20_000 } = {}) {
   try { writeFileSync(ACTION_FILE, JSON.stringify(action)); } catch (e) { return { ok: false, error: 'cannot write action file: ' + e.message }; }
   try { unlinkSync(DONE_FILE); } catch {}
   // Launch node HIDDEN (no console window) so input never flashes a terminal or steals focus from the
