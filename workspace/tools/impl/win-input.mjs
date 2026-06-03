@@ -116,6 +116,15 @@ export function doInput(action) {
 // Run the action via the HelmInput scheduled task so it executes in the interactive desktop session
 // (required when driven over SSH). Returns { ok, error?, cursor? }.
 export function winInput(action, { timeout = 20_000 } = {}) {
+  // Fast path: when we're already in an interactive desktop session (the normal local case — the bot
+  // started via the Startup launcher / `helm` / Start-Process in the logged-on session), inject input
+  // directly in-process. It's instant and reliable; the scheduled-task path below has high, variable
+  // latency and was timing out (~20s) for keyboard combos. Only fall back to HelmInput when the direct
+  // call genuinely fails (headless / SSH / Session 0, where it can't reach the desktop).
+  try {
+    const direct = doInput(action);
+    if (direct && direct.ok) return direct;
+  } catch {}
   try { writeFileSync(ACTION_FILE, JSON.stringify(action)); } catch (e) { return { ok: false, error: 'cannot write action file: ' + e.message }; }
   try { unlinkSync(DONE_FILE); } catch {}
   // Launch node HIDDEN (no console window) so input never flashes a terminal or steals focus from the
