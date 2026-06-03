@@ -259,6 +259,54 @@ function analyzeElectron(asarPath, findings, lines, errors) {
       electron.mainRequires = extractRequires(src).slice(0, 40);
       electron.mainSignals = SOURCE_SIGNALS.filter(s => s.re.test(src)).map(s => s.label);
     }
+
+    // ---- bundle library scan ----
+    // Production Electron apps bundle their editor / Markdown / DB / search code into a minified app.js
+    // rather than listing them as npm deps, so dependency names alone miss what the app is built from
+    // (and a gap analysis based only on deps would be wrong). Scan the largest JS files for distinctive
+    // library signatures. Emits canonical tokens (codemirror, markdown, sqlite, yjs, …) that the
+    // domain-analysis layer recognizes. Capped reads keep this fast even on multi-MB bundles.
+    try {
+      const jsFiles = [];
+      (function walk(node, prefix) {
+        const kids = (node && node.files) || {};
+        for (const [name, child] of Object.entries(kids)) {
+          const p = prefix ? `${prefix}/${name}` : name;
+          if (child && child.files) walk(child, p);
+          else if (/\.(c?js|mjs)$/i.test(name) && child && child.size) jsFiles.push({ path: p, size: child.size });
+        }
+      })(asar.header, '');
+      jsFiles.sort((a, b) => b.size - a.size);
+      const SCAN = [
+        { re: /codemirror|cm-editor|cm-content/i, tok: 'codemirror' },
+        { re: /prosemirror/i, tok: 'prosemirror' },
+        { re: /\bmonaco\b/i, tok: 'monaco' },
+        { re: /\blexical\b/i, tok: 'lexical' },
+        { re: /\bquill\b/i, tok: 'quill' },
+        { re: /\bslate-react\b|\bslatejs\b/i, tok: 'slate' },
+        { re: /markdown|remark|micromark|commonmark/i, tok: 'markdown' },
+        { re: /\bsqlite\b|better-sqlite3/i, tok: 'sqlite' },
+        { re: /leveldb|level-js|classic-level/i, tok: 'leveldb' },
+        { re: /pouchdb/i, tok: 'pouchdb' },
+        { re: /\byjs\b|y-protocols|Y\.Doc/i, tok: 'yjs' },
+        { re: /automerge/i, tok: 'automerge' },
+        { re: /sharedb/i, tok: 'sharedb' },
+        { re: /lunr|flexsearch|minisearch|\borama\b|fuse\.js/i, tok: 'flexsearch' },
+        { re: /libsodium|tweetnacl|openpgp|crypto-js/i, tok: 'libsodium' },
+        { re: /\bopenai\b|anthropic/i, tok: 'openai' },
+        { re: /isomorphic-git|nodegit|simple-git/i, tok: 'isomorphic-git' },
+        { re: /turndown|readability|mercury-parser/i, tok: 'turndown' },
+        { re: /\[\[|backlink|wikilink|graph view/i, tok: 'wikilink' },
+      ];
+      const found = new Set();
+      for (const jf of jsFiles.slice(0, 3)) {
+        const buf = asarReadFile(asar, jf.path, 8 * 1024 * 1024);
+        if (!buf) continue;
+        const txt = buf.toString('latin1');   // latin1 is fast and preserves ASCII signature bytes
+        for (const s of SCAN) if (!found.has(s.tok) && s.re.test(txt)) found.add(s.tok);
+      }
+      electron.bundleSignals = [...found];
+    } catch (e) { errors.push(`bundle scan: ${e.message}`); }
   } catch (e) {
     errors.push(`electron analysis: ${e.message}`);
   } finally {
@@ -333,6 +381,12 @@ function analyzeElectron(asarPath, findings, lines, errors) {
   if (findings.subsystems.length) {
     lines.push('### Detected subsystems', '');
     lines.push(...findings.subsystems.map(s => `- ${s}`), '');
+  }
+  if (electron.bundleSignals && electron.bundleSignals.length) {
+    const pretty = { codemirror: 'CodeMirror editor', prosemirror: 'ProseMirror editor', monaco: 'Monaco editor', lexical: 'Lexical editor', quill: 'Quill editor', slate: 'Slate editor', markdown: 'Markdown engine', sqlite: 'SQLite', leveldb: 'LevelDB', pouchdb: 'PouchDB (syncable)', yjs: 'Yjs (CRDT collaboration)', automerge: 'Automerge (CRDT)', sharedb: 'ShareDB (OT)', flexsearch: 'full-text search index', libsodium: 'client-side encryption', openai: 'AI/LLM integration', 'isomorphic-git': 'Git-based versioning', turndown: 'web→Markdown capture', wikilink: 'wiki-links / backlinks' };
+    lines.push('### Libraries detected in the bundle', '');
+    lines.push('_Found by scanning the minified JS (not just package.json) — these reveal capabilities the app builds in even when they aren\'t listed as dependencies:_', '');
+    lines.push(...electron.bundleSignals.map(t => `- ${pretty[t] || t}`), '');
   }
   return true;
 }

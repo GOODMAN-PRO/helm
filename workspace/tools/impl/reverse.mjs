@@ -19,6 +19,7 @@ import { analyzeSources, decodeInlineScripts, findSourceMapRef, parseSourceMap, 
 import { appDeepDive } from './reverse-app-deep.mjs';     // Electron asar / PE / ELF deep dive
 import { webDeepDive } from './reverse-web-deep.mjs';      // third-party services, API catalog, data model, security
 import { explainEntitlement, explainFramework, explainMany } from './reverse-explain.mjs';   // plain-language glossary
+import { domainAnalysis } from './reverse-domain.mjs';     // category detection + note-taking mechanics + gap analysis
 
 const __dirname   = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE   = path.resolve(__dirname, '../..');
@@ -741,6 +742,14 @@ async function analyzeWeb(url, name) {
     Object.assign(findings, deep.findings || {});
   } catch (e) { lines.push(`> Deep behavioral analysis skipped: ${String(e.message || e).slice(0, 160)}`, ''); }
 
+  // Domain-aware pass: detect the app category and, for note-taking web apps, explain note mechanics +
+  // run a gap analysis (web signal is lighter than the app path, but features/services still help).
+  try {
+    const dom = domainAnalysis(findings, 'web');
+    if (dom.lines && dom.lines.length) lines.push('', ...dom.lines);
+    Object.assign(findings, dom.findings || {});
+  } catch {}
+
   // Clone scaffold outline — honest about what was actually extracted.
   lines.push('## Clone Scaffold Outline', '');
   if (stack.some(s => s.includes('Next.js'))) lines.push('```bash', 'npx create-next-app@latest clone', '# Rebuild app/page.tsx + app/layout.tsx; wire the API Surface calls above', '```');
@@ -976,6 +985,14 @@ async function analyzeApp(appPath, name) {
     if (explained.length) { lines.push('## Entitlements explained'); for (const e of explained) lines.push(`- \`${e.item}\` — ${e.explanation}`); lines.push(''); }
   }
 
+  // Domain-aware pass: detect what KIND of app this is (note-taking, code editor, …) and, for note apps,
+  // explain how it takes/stores notes + run a capability gap analysis. Never throws.
+  try {
+    const dom = domainAnalysis(findings, 'app');
+    if (dom.lines && dom.lines.length) lines.push('', ...dom.lines);
+    Object.assign(findings, dom.findings || {});
+  } catch {}
+
   return { slug, kind: 'app', target: appPath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
 }
 
@@ -1136,11 +1153,17 @@ function buildAppSummary(f) {
   const sum = [`**${name}**${ver}${idp} is ${techPhrase}.`];
   if (app.description && String(app.description).trim().toLowerCase() !== String(name).trim().toLowerCase())
     sum.push(String(app.description).slice(0, 200) + (String(app.description).length > 200 ? '…' : ''));
+  if (f.domain && f.domain.category && f.domain.category !== 'unknown') sum.push(`It's a ${f.domain.category.replace('-', ' ')} app.`);
   if (isElectron && elec.electronVersion) sum.push(`Built on Electron ${elec.electronVersion}.`);
   if (archs.length) sum.push(`Ships ${f.universal ? 'a universal binary' : 'a binary'} for ${archs.join(', ')}.`);
 
   // What it does — from the package description, the document types it opens, and detected subsystems.
   const what = [];
+  if (f.noteMechanics) {
+    const nm = f.noteMechanics;
+    const bits = [nm.format === 'markdown-files' ? 'stores notes as local Markdown files' : nm.format === 'database' ? 'stores notes in an embedded database' : nm.format === 'hybrid' ? 'stores notes as Markdown with a DB index' : null, nm.editor && `edits via ${nm.editor}`].filter(Boolean);
+    if (bits.length) what.push(`Takes notes — ${bits.join('; ')} (see "How It Takes Notes" below).`);
+  }
   if (app.homepage) what.push(`Project: ${app.homepage}`);
   const docTypes = (caps.documentTypes || []).map(asString).filter(Boolean).slice(0, 6);
   if (docTypes.length) what.push(`Opens document types: ${docTypes.join(', ')}.`);
