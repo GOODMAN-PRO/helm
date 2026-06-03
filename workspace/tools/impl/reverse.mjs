@@ -20,6 +20,10 @@ const __dirname   = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE   = path.resolve(__dirname, '../..');
 const REVERSE_DIR = path.join(WORKSPACE, 'reverse');
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+// The link-preview crawler UA: many sites (Instagram, TikTok, X) serve their PUBLIC Open Graph preview
+// (author, caption, thumbnail, video) to this UA for sharing/unfurling, even when a browser is redirected
+// to a login wall. This reads only the public preview the site publishes — not behind-auth data.
+const CRAWLER_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
 
 const ETHICS_NOTE = `> **Authorization required.** Use this tool only on targets you own or are
 > explicitly authorized to analyze. Unauthorized reverse engineering may violate
@@ -67,13 +71,13 @@ function whichTool(name) {
 }
 
 // ---- cross-platform page fetch (replaces curl) — Node's global fetch gives body + headers at once.
-async function fetchPage(url) {
+async function fetchPage(url, ua = UA) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30_000);
   try {
     const res = await fetch(url, {
       redirect: 'follow', signal: ctrl.signal,
-      headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+      headers: { 'User-Agent': ua, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
     });
     const headers = {};
     for (const [k, v] of res.headers) headers[k.toLowerCase()] = v;
@@ -360,6 +364,95 @@ function summarizeApiCall(req) {
   return out;
 }
 
+// ---- content extraction: WHAT'S ACTUALLY INSIDE the page/reel ----
+// Pull the real content (author, caption, video, audio, thumbnail, stats) from the public sources the
+// page exposes to everyone: Open Graph tags, Twitter cards, and JSON-LD. This is "what's in the reel",
+// not the code/network. (Reads only what the page serves; respect ToS/copyright — for your own analysis.)
+function decodeEntities(s) {
+  return String(s || '')
+    .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(+n); } catch { return _; } })
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return _; } });
+}
+function metaContent(html, key, attr = 'property') {
+  const k = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let m = html.match(new RegExp(`<meta[^>]+${attr}=["']${k}["'][^>]*?\\bcontent=["']([^"']*)["']`, 'i'));
+  if (m) return decodeEntities(m[1]);
+  m = html.match(new RegExp(`<meta[^>]+\\bcontent=["']([^"']*)["'][^>]*?${attr}=["']${k}["']`, 'i'));
+  return m ? decodeEntities(m[1]) : null;
+}
+function extractJsonLd(html) {
+  const out = [];
+  for (const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { const j = JSON.parse(m[1].trim()); out.push(...(Array.isArray(j) ? j : [j])); } catch {}
+  }
+  return out;
+}
+function extractContent(html) {
+  const og = k => metaContent(html, 'og:' + k, 'property');
+  const tw = k => metaContent(html, 'twitter:' + k, 'name');
+  const c = {
+    type: og('type'), site: og('site_name'),
+    title: og('title') || tw('title') || (html.match(/<title[^>]*>([^<]{0,200})<\/title>/i) || [])[1] || null,
+    description: og('description') || tw('description') || metaContent(html, 'description', 'name'),
+    image: og('image') || og('image:secure_url') || tw('image'),
+    video: og('video:secure_url') || og('video') || og('video:url') || tw('player:stream'),
+    audio: og('audio'), author: null, caption: null, published: null,
+    views: null, likes: null, comments: null, duration: null, hashtags: [],
+  };
+  // FIRST: Instagram/TikTok-style og parsing on the ORIGINAL og fields (before JSON-LD, which on IG
+  // carries a generic name like "Reel" that must not clobber the rich og:title).
+  //   og:title       = "Name on Instagram: \"caption\""
+  //   og:description = "12K likes, 340 comments - handle on date: caption"
+  const t = c.title || '', d = c.description || '';
+  const mAuthor = t.match(/^(.+?)\s+on\s+(?:Instagram|TikTok|Threads)/i); if (mAuthor) c.author = mAuthor[1].trim();
+  const mHandle = d.match(/-\s*([\w.]+)\s+on\s+/i); if (mHandle && !c.author) c.author = mHandle[1].trim();
+  const mStats = d.match(/([\d.,]+\s*[KMB]?)\s+likes?[,\s].*?([\d.,]+\s*[KMB]?)\s+comments?/i);
+  if (mStats) { c.likes = mStats[1].trim(); c.comments = mStats[2].trim(); }
+  const mCap = t.match(/:\s*["“](.+?)["”]\s*$/) || d.match(/:\s*["“](.+?)["”]?\s*$/); if (mCap) c.caption = mCap[1].trim();
+  // THEN: JSON-LD fills gaps only (||), but structured stats/media/dates win when present.
+  for (const j of extractJsonLd(html)) {
+    const ty0 = Array.isArray(j['@type']) ? j['@type'].join(',') : (j['@type'] || '');
+    if (!/Video|Media|Posting|Image|Article/i.test(ty0) && !j.contentUrl && !j.interactionStatistic) continue;
+    c.caption = c.caption || j.caption || j.articleBody || j.description;
+    c.video = j.contentUrl || (j.video && (j.video.contentUrl || j.video)) || c.video;
+    const thumb = j.thumbnailUrl || j.thumbnail; if (thumb) c.image = (Array.isArray(thumb) ? thumb[0] : (thumb.url || thumb)) || c.image;
+    c.published = c.published || j.uploadDate || j.datePublished;
+    c.duration = c.duration || j.duration;
+    const a = j.author || j.creator || j.publisher; if (a && !c.author) c.author = (typeof a === 'string' ? a : (a.alternateName || a.name)) || c.author;
+    for (const s of [].concat(j.interactionStatistic || [])) {
+      const ty = String((s.interactionType && (s.interactionType['@type'] || s.interactionType)) || '');
+      if (/Watch|View/i.test(ty) && s.userInteractionCount != null) c.views = s.userInteractionCount;
+      else if (/Like/i.test(ty) && s.userInteractionCount != null) c.likes = s.userInteractionCount;
+      else if (/Comment/i.test(ty) && s.userInteractionCount != null) c.comments = s.userInteractionCount;
+    }
+    if (j.commentCount != null) c.comments = j.commentCount;
+  }
+  if (!c.caption) c.caption = c.description;
+  const text = `${c.caption || ''} ${c.title || ''}`;
+  c.hashtags = [...new Set(text.match(/#[\p{L}\p{N}_]+/gu) || [])].slice(0, 30);
+  c.mentions = [...new Set(text.match(/@[\w.]+/g) || [])].slice(0, 30);
+  return c;
+}
+// Scan captured live API JSON (e.g. a logged-in GraphQL reel response) for the richest content fields.
+function scanApiForContent(requests) {
+  const out = {};
+  const want = { username: ['username', 'owner_username'], full_name: ['full_name'], caption: ['caption_text', 'caption'], like_count: ['like_count'], play_count: ['play_count', 'view_count', 'ig_play_count'], comment_count: ['comment_count'], video_url: ['video_url'], audio: ['original_sound_title', 'song_name', 'audio_asset_id', 'title'], code: ['code', 'shortcode'] };
+  for (const r of requests || []) {
+    if (!r.body || !/json|javascript/i.test(r.contentType || '')) continue;
+    let j; try { j = JSON.parse(r.body); } catch { continue; }
+    const seen = new Set(); const stack = [j]; let n = 0;
+    while (stack.length && n++ < 20000) {
+      const v = stack.pop(); if (!v || typeof v !== 'object' || seen.has(v)) continue; seen.add(v);
+      for (const [k, val] of Object.entries(v)) {
+        for (const [field, keys] of Object.entries(want)) if (keys.includes(k) && out[field] == null && (typeof val === 'string' || typeof val === 'number')) out[field] = val;
+        if (val && typeof val === 'object') stack.push(val);
+      }
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 // ---- web subcommand ----
 
 async function analyzeWeb(url, name) {
@@ -387,6 +480,40 @@ async function analyzeWeb(url, name) {
       '> module loader, not the product code. To analyze the real surface you would need to be signed in as a',
       '> user **you are authorized to act as**. This tool does not bypass the auth wall.', '');
   }
+
+  // ============================ CONTENT (what's inside) ============================
+  // The headline: the actual content of the page/reel — who made it, the caption, the media, the stats.
+  const content = extractContent(html);
+  const renderContent = (c, heading) => {
+    const row = (label, val) => { if (val != null && String(val).trim()) lines.push(`- **${label}:** ${String(val).slice(0, 600)}`); };
+    lines.push(heading);
+    row('Type', [c.site, c.type].filter(Boolean).join(' · '));
+    row('Author / creator', c.author);
+    row('Caption / text', c.caption);
+    row('Posted', c.published);
+    row('Duration', c.duration);
+    const stats = [c.views != null && `${c.views} views`, c.likes != null && `${c.likes} likes`, c.comments != null && `${c.comments} comments`].filter(Boolean).join(' · ');
+    row('Stats', stats);
+    row('Audio', c.audio);
+    if (c.hashtags && c.hashtags.length) row('Hashtags', c.hashtags.join(' '));
+    if (c.mentions && c.mentions.length) row('Mentions', c.mentions.join(' '));
+    if (c.video) lines.push(`- **Video:** \`${String(c.video).slice(0, 300)}\``);
+    if (c.image) lines.push(`- **Thumbnail:** \`${String(c.image).slice(0, 300)}\``);
+    lines.push('');
+  };
+  const hasContent = c => c && (c.author || c.caption || c.video || c.image || c.views || c.likes);
+  // Fallback: if a browser-UA fetch got gated to a login wall (no content), re-fetch as the link-preview
+  // crawler — sites publish the reel's PUBLIC og preview to that UA for sharing.
+  if (!hasContent(content)) {
+    try {
+      const r2 = await fetchPage(url, CRAWLER_UA);
+      const c2 = extractContent(r2.html || '');
+      for (const k of Object.keys(c2)) if (!content[k] && c2[k] && !(Array.isArray(c2[k]) && !c2[k].length)) content[k] = c2[k];
+      if (hasContent(c2)) content._viaCrawler = true;
+    } catch {}
+  }
+  if (hasContent(content)) renderContent(content, content._viaCrawler ? '## Content (public preview)' : '## Content');
+  else { lines.push('## Content', '- (no public content fields found — the page gates its Open Graph/JSON-LD behind login. To read a reel\'s real content, sign in once with `browser.login --url https://www.instagram.com`, then re-run on the specific reel URL.)', ''); }
 
   const titleM = html.match(/<title[^>]*>([^<]{0,200})<\/title>/i);
   const pageTitle = titleM ? titleM[1].trim() : new URL(url).hostname;
@@ -438,6 +565,20 @@ async function analyzeWeb(url, name) {
   // CLASSIFIED so genuine API calls are separated from CDN media chunks and static assets.
   let netData = null;
   try { netData = await captureNetwork(url); } catch (e) { lines.push(`> Network capture skipped: ${String(e.message || e).slice(0, 120)}`, ''); }
+
+  // Recover MORE content from the live capture: the rendered DOM (post-JS) often carries richer og/JSON-LD
+  // than the raw fetch, and a logged-in API JSON response holds the full reel (owner, caption, counts, video).
+  if (netData) {
+    const extras = [];
+    if (netData.html) { const dom = extractContent(netData.html); for (const k of ['author', 'caption', 'video', 'image', 'published', 'duration', 'views', 'likes', 'comments', 'audio']) if (!content[k] && dom[k]) { content[k] = dom[k]; extras.push(k); } }
+    const api = scanApiForContent(netData.requests);
+    if (api) {
+      const map = { author: api.username, caption: api.caption, video: api.video_url, likes: api.like_count, views: api.play_count, comments: api.comment_count, audio: api.audio };
+      for (const [k, v] of Object.entries(map)) if (v != null && !content[k]) { content[k] = v; extras.push(k); }
+      if (api.code) content.code = api.code;
+    }
+    if (extras.length && hasContent(content)) renderContent(content, `## Content — recovered from the live page/API (${[...new Set(extras)].join(', ')})`);
+  }
 
   let apiCalls = [];
   if (netData) {
@@ -657,17 +798,24 @@ async function captureNetwork(url) {
     m.contentLength = h['content-length'] ? Number(h['content-length']) : null;
     m.contentRange = h['content-range'] ?? null;
     const rt = m.type || res.request().resourceType();
-    if ((rt === 'script' || rt === 'document') && bodied < 30) {
+    const ct = m.contentType || '';
+    // Capture script/document bytes (for code analysis) AND API JSON bodies (for content extraction —
+    // a logged-in GraphQL reel response holds the caption, owner, counts, video_url, audio, etc.).
+    const grab = (rt === 'script' || rt === 'document') ? bodied < 30
+      : ((rt === 'fetch' || rt === 'xhr') && /json|javascript/i.test(ct)) ? bodied < 60 : false;
+    if (grab) {
       bodied++;
       bodyJobs.push((async () => {
         try { const buf = await res.body(); if (buf && buf.length <= 4_000_000) m.body = buf.toString('utf8'); } catch { /* body unavailable (cached/opaque) */ }
       })());
     }
   });
+  let domHtml = '';
   try { await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 }); } catch { /* timeout/nav error acceptable */ }
   try { await Promise.allSettled(bodyJobs); } catch { /* best effort */ }
+  try { domHtml = await page.content(); } catch { /* page closed/navigated */ }
   await browser.close();
-  return { requests };
+  return { requests, html: domHtml };
 }
 
 // ---- binary format identification (shared by app + file) ----
@@ -835,7 +983,7 @@ async function main() {
 }
 
 // Pure helpers exported for unit tests (no side effects on import).
-export { detectStack, classifyRequest, mediaKey, parseForm, summarizeApiCall, extractScripts, extractLinks };
+export { detectStack, classifyRequest, mediaKey, parseForm, summarizeApiCall, extractScripts, extractLinks, extractContent };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch(e => { console.error(e.message); process.exit(1); });
