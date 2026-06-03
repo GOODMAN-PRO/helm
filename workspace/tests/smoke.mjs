@@ -2042,6 +2042,54 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- computer-control: new native modules exist and parse ----
+{
+  const label = 'computer-control: uia/ocr/window/computer/macro impls exist and node --check clean';
+  try {
+    for (const f of ['uia.mjs','ocr.mjs','window.mjs','computer.mjs','macro.mjs']) {
+      const p = path.join(WORKSPACE, 'tools/impl', f);
+      if (!existsSync(p)) throw new Error('missing impl: ' + f);
+      const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' });
+      if (r.status !== 0) throw new Error('node --check failed for ' + f + ': ' + (r.stderr || '').trim().slice(0, 120));
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- computer-control: registry registers the new tools ----
+{
+  const label = 'computer-control: registry has uia/ocr/window/computer/macro tools with valid win32 exec';
+  try {
+    const reg = JSON.parse(readFileSync(path.join(WORKSPACE, 'tools/registry.json'), 'utf8'));
+    const byName = new Map(reg.map(t => [t.name, t]));
+    const want = ['uia.find','uia.invoke','uia.tree','ocr.find','ocr.read','window.state','window.move','window.resize','window.snap','window.close','macro.list','macro.save','macro.record','macro.replay','computer.click_element','computer.click_text'];
+    for (const n of want) {
+      const t = byName.get(n);
+      if (!t) throw new Error('registry missing tool: ' + n);
+      if (typeof t.exec !== 'string' || !t.exec.startsWith('node tools/impl/')) throw new Error('bad exec for ' + n);
+      if (t.platform !== 'win32') throw new Error('expected win32 platform for ' + n);
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- computer-control: key behaviors present in source ----
+{
+  const label = 'computer-control: window list/focus preserved; uia ranking; computer flag-parsing';
+  try {
+    const win = readFileSync(path.join(WORKSPACE, 'tools/impl/window.mjs'), 'utf8');
+    if (!win.includes("'list'") && !win.includes('"list"')) throw new Error('window.mjs lost list');
+    if (!win.includes("'focus'") && !win.includes('"focus"')) throw new Error('window.mjs lost focus');
+    for (const v of ['state','move','resize','snap','close']) if (!win.includes(v)) throw new Error('window.mjs missing verb: ' + v);
+    const uia = readFileSync(path.join(WORKSPACE, 'tools/impl/uia.mjs'), 'utf8');
+    if (!uia.includes('bestScore')) throw new Error('uia.mjs missing scored ranking (bestScore)');
+    const comp = readFileSync(path.join(WORKSPACE, 'tools/impl/computer.mjs'), 'utf8');
+    if (!comp.includes('parseFlags')) throw new Error('computer.mjs missing parseFlags (dispatcher compat)');
+    if (!comp.includes('click_element') || !comp.includes('click_text')) throw new Error('computer.mjs missing composite actions');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

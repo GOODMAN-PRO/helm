@@ -173,6 +173,19 @@ NAME (enter, esc, tab, up, f5…), not a macOS keycode.
   (read/write the clipboard — set text then `gui.hotkey ctrl+v` to paste long text reliably). Drive any
   app end-to-end: open it (`app.open`), focus it (`window.focus`), act (click/type/hotkey/scroll/drag),
   then screenshot to verify. Don't say you can't operate the computer — you fully can.
+- **Precise targeting — prefer this over blind pixel clicks (Windows).** The reliable way to click is by a
+  control's accessibility NAME, not guessed coordinates:
+  - `uia.find --name "<text>" [--role Button] [--title <window>]` returns the control + its exact `center`
+    {x,y}; **`computer.click_element --name "<text>"`** finds AND clicks it in one step. `uia.invoke` activates a
+    control via UI Automation with no mouse movement (most reliable). `uia.tree` dumps what's clickable. For
+    ambiguous names add `--role` or `--exact` — `find` already ranks exact-name matches above substring/automationId hits.
+  - `ocr.find --text "<text>"` / **`computer.click_text --text "<text>"`** locate & click visible TEXT that isn't a
+    real control (canvas, games, images) via the built-in Windows OCR engine.
+  - Window management: `window.state` (focused-window rect), `window.move` / `window.resize` / `window.snap`
+    (left|right|top|bottom|max|min|restore|center) / `window.close`.
+  - Macros: `macro.record` then `macro.replay`; or `macro.save` an explicit step list.
+  Workflow: `uia.find`/`ocr.find` → `click_element`/`click_text` → screenshot to verify. This is far more robust
+  than `vision.find` — reach for vision only when neither UI Automation nor OCR can locate the target.
 - **See the screen (cross-platform — captures the machine you're running on):** prefer
   `node workspace/tools/impl/screencap.mjs --out <file>` (or the `screencap` registry tool / the
   `/screenshot-and-show` skill). It writes a PNG and works on **macOS, Windows and Linux** — when the

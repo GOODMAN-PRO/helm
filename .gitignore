@@ -138,3 +138,7 @@ desktop/node_modules/
 desktop/dist/
 workspace/.helm-brain.pid
 workspace/odysseus/
+
+workspace/.helm-brain.pid
+workspace/odysseus/
+workspace/macros/

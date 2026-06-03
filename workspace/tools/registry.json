@@ -972,5 +972,311 @@
     ],
     "side_effects": "reads and updates notes in the HelmBrain vault",
     "confirm": false
+  },
+  {
+    "name": "uia.tree",
+    "summary": "Walk the UI Automation element tree of the foreground (or titled) window. Returns each control's name, controlType, automationId, and bounding rect + center in physical pixels. Use to discover what is clickable.",
+    "exec": "node tools/impl/uia.mjs tree",
+    "args_schema": {
+      "title": {
+        "type": "string",
+        "description": "Window title substring; omit for foreground window"
+      },
+      "max": {
+        "type": "number",
+        "description": "Max elements (default 200)"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "uia.find",
+    "summary": "Find a UI control by accessibility name/automationId (substring, case-insensitive). Returns the element and its center {x,y} in physical pixels — feed center straight to gui.click. Far more reliable than vision for real controls.",
+    "exec": "node tools/impl/uia.mjs find",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": "Text to match against the control Name or AutomationId"
+      },
+      "role": {
+        "type": "string",
+        "description": "ControlType filter: Button, Edit, MenuItem, CheckBox, ComboBox, Tab, List, ..."
+      },
+      "title": {
+        "type": "string",
+        "description": "Window title substring; omit for foreground window"
+      },
+      "exact": {
+        "type": "boolean",
+        "description": "Require exact match instead of substring"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "uia.invoke",
+    "summary": "Find a UI control and activate it via UI Automation patterns (Invoke/Toggle/Select) WITHOUT moving the mouse — the most reliable click. Falls back to returning center coords (invoked:false) if no pattern is supported.",
+    "exec": "node tools/impl/uia.mjs invoke",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": "Text to match against Name or AutomationId"
+      },
+      "role": {
+        "type": "string",
+        "description": "ControlType filter"
+      },
+      "title": {
+        "type": "string",
+        "description": "Window title substring"
+      },
+      "exact": {
+        "type": "boolean",
+        "description": "Require exact match"
+      }
+    },
+    "side_effects": "activates a UI control (click-equivalent, no mouse movement)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "ocr.read",
+    "summary": "Screenshot the screen and OCR it with the built-in Windows engine. Returns all visible text plus per-word/line boxes with absolute pixel coords. For reading text Helm cannot get from the DOM/UIA.",
+    "exec": "node tools/impl/ocr.mjs read",
+    "args_schema": {
+      "out": {
+        "type": "string",
+        "description": "Optional PNG output path"
+      }
+    },
+    "side_effects": "writes a temp screenshot PNG",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "ocr.find",
+    "summary": "Find visible on-screen text by substring and return its center {x,y} for gui.click. Use for canvas apps, games, images, or anything UI Automation cannot reach.",
+    "exec": "node tools/impl/ocr.mjs find",
+    "args_schema": {
+      "text": {
+        "type": "string",
+        "required": true,
+        "description": "Case-insensitive substring to locate"
+      },
+      "nth": {
+        "type": "number",
+        "description": "Which match (1-based) when several exist"
+      }
+    },
+    "side_effects": "writes a temp screenshot PNG",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "window.state",
+    "summary": "Get the foreground window's title, pid, app, rect {x,y,w,h}, and maximized/minimized state.",
+    "exec": "node tools/impl/window.mjs state",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "window.move",
+    "summary": "Move a window (matched by title substring) so its top-left is at (x,y).",
+    "exec": "node tools/impl/window.mjs move",
+    "args_schema": {
+      "title": {
+        "type": "string",
+        "required": true
+      },
+      "x": {
+        "type": "number",
+        "required": true
+      },
+      "y": {
+        "type": "number",
+        "required": true
+      }
+    },
+    "side_effects": "moves a window",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "window.resize",
+    "summary": "Resize a window (matched by title substring) to width w, height h, keeping its position.",
+    "exec": "node tools/impl/window.mjs resize",
+    "args_schema": {
+      "title": {
+        "type": "string",
+        "required": true
+      },
+      "w": {
+        "type": "number",
+        "required": true
+      },
+      "h": {
+        "type": "number",
+        "required": true
+      }
+    },
+    "side_effects": "resizes a window",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "window.snap",
+    "summary": "Snap/arrange a window on its current monitor: left|right|top|bottom half, max, min, restore, or center.",
+    "exec": "node tools/impl/window.mjs snap",
+    "args_schema": {
+      "title": {
+        "type": "string",
+        "required": true
+      },
+      "side": {
+        "type": "string",
+        "required": true,
+        "enum": [
+          "left",
+          "right",
+          "top",
+          "bottom",
+          "max",
+          "min",
+          "restore",
+          "center"
+        ]
+      }
+    },
+    "side_effects": "moves/resizes a window",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "window.close",
+    "summary": "Gracefully close a window (matched by title substring) via WM_CLOSE — the app may prompt to save. Does NOT force-kill.",
+    "exec": "node tools/impl/window.mjs close",
+    "args_schema": {
+      "title": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "requests a window to close",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "macro.list",
+    "summary": "List saved input macros.",
+    "exec": "node tools/impl/macro.mjs list",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "macro.save",
+    "summary": "Save an explicit macro: a JSON array of steps ({type:move|click|type|key|hotkey|scroll|drag|wait, ...}).",
+    "exec": "node tools/impl/macro.mjs save",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "json": {
+        "type": "string",
+        "required": true,
+        "description": "JSON array of step objects"
+      }
+    },
+    "side_effects": "writes a macro file under workspace/macros/",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "macro.record",
+    "summary": "Record a macro by sampling cursor position + mouse-button clicks for N seconds.",
+    "exec": "node tools/impl/macro.mjs record",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "seconds": {
+        "type": "number",
+        "description": "Duration (default 10)"
+      },
+      "interval": {
+        "type": "number",
+        "description": "Poll interval ms (default 80)"
+      }
+    },
+    "side_effects": "writes a macro file; read-only while recording",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "macro.replay",
+    "summary": "Replay a saved macro, injecting its recorded mouse/keyboard actions.",
+    "exec": "node tools/impl/macro.mjs replay",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "speed": {
+        "type": "number",
+        "description": "Speed multiplier (default 1)"
+      }
+    },
+    "side_effects": "injects real mouse/keyboard input",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "computer.click_element",
+    "summary": "One-step: find a UI control by name (UI Automation) and click its center. The reliable way to click a named button/menu/field. Returns {clicked, element}.",
+    "exec": "node tools/impl/computer.mjs click_element",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": "Control Name/AutomationId substring"
+      },
+      "role": {
+        "type": "string",
+        "description": "ControlType filter (Button, MenuItem, ...)"
+      },
+      "title": {
+        "type": "string",
+        "description": "Window title substring"
+      }
+    },
+    "side_effects": "moves mouse and clicks",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "computer.click_text",
+    "summary": "One-step: find visible on-screen text by substring (OCR) and click its center. For clicking labels/links not exposed to UI Automation.",
+    "exec": "node tools/impl/computer.mjs click_text",
+    "args_schema": {
+      "text": {
+        "type": "string",
+        "required": true,
+        "description": "Visible text substring to click"
+      }
+    },
+    "side_effects": "moves mouse and clicks",
+    "confirm": false,
+    "platform": "win32"
   }
 ]
