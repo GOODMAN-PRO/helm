@@ -90,16 +90,41 @@ const FILE_WATCH = ['chokidar', 'fs-extra', 'fswatcher', 'gaze', 'watchpack'];
 const KNOWN_APPS = [
   { match: /\bobsidian\b|md\.obsidian/i, category: 'note-taking',
     mech: { format: 'markdown-files', storage: 'local-files', editor: 'CodeMirror', linking: true, plugins: true, search: 'built-in', collaboration: null, cloudSync: null },
-    note: 'Obsidian stores each note as a local **Markdown file** in a "vault" folder on disk (no lock-in — readable/editable outside the app). Notes connect via `[[wiki-links]]` with backlinks and a graph view. It is extended through a large community **plugin** ecosystem. Live multi-user collaboration is not built in; cross-device **Sync** and **Publish** are paid add-ons, not part of the core app.' },
+    note: 'Obsidian stores each note as a local **Markdown file** in a "vault" folder on disk (no lock-in — readable/editable outside the app). Notes connect via `[[wiki-links]]` with backlinks and a graph view. It is extended through a large community **plugin** ecosystem. Live multi-user collaboration is not built in; cross-device **Sync** and **Publish** are paid add-ons, not part of the core app.',
+    design: 'Minimal, content-first and keyboard-driven, with a quiet chrome that gets out of the way. Dark theme by default. The whole UI is rearrangeable **panes** (split/stack/tab) with collapsible left/right sidebars. Deeply customizable through community themes and CSS snippets — it can look like almost anything.',
+    signature: [
+      '**Graph view** — the signature feature: every note is a **node (an orb)** and every `[[link]]` between notes is an **edge (a string)** connecting them; pan/zoom an interactive force-directed graph of the whole vault (global graph) or just one note\'s neighbours (local graph), with color groups, filters and physics controls. THIS is "every folder/note is an orb connected with a string."',
+      '**Canvas** — an infinite spatial whiteboard where notes, cards, images and media are placed freely and connected with arrows/edges.',
+      '**Bidirectional links & backlinks** — `[[wiki-links]]` with autocomplete; a backlinks pane shows every note linking here, plus "unlinked mentions".',
+      '**Live Preview** editing (Markdown renders inline as you type) plus a separate Reading view and raw source mode.',
+      '**Command palette** (Cmd/Ctrl-P) and fully remappable hotkeys — most actions are keyboard-first.',
+      '**Panes / tabs / split view** — open many notes side by side; drag to split; stack tabs.',
+      '**Community plugins + themes** — a large ecosystem that adds features (calendar, Dataview queries, Kanban, etc.) and reskins the app.',
+      'Daily notes, tags, outline, search, bookmarks, and quick switcher.',
+    ] },
   { match: /\blogseq\b/i, category: 'note-taking',
     mech: { format: 'markdown-files', storage: 'local-files', editor: 'CodeMirror', linking: true, plugins: true },
-    note: 'Logseq is an outliner that stores notes as local Markdown/Org files, block-referenced, with bidirectional links and a graph; plugin-extensible.' },
+    note: 'Logseq is an outliner that stores notes as local Markdown/Org files, block-referenced, with bidirectional links and a graph; plugin-extensible.',
+    design: 'Outliner-first: everything is a nestable bullet/block. Clean, slightly playful; light/dark themes; left sidebar for journals/pages, right sidebar for linked references.',
+    signature: [
+      '**Graph view** — pages are nodes (orbs) and links are edges (strings), like Obsidian.',
+      '**Block references & embeds** — link/transclude individual blocks, not just pages.',
+      '**Journals / daily notes** as the default capture surface.',
+      '**Queries** (Datalog) and a plugin ecosystem.',
+    ] },
   { match: /\bbear\b/i, category: 'note-taking',
     mech: { format: 'database', storage: 'local-db', collaboration: null },
     note: 'Bear stores notes in a local SQLite database and syncs across Apple devices via iCloud (CloudKit); Markdown-style markup, tag-based organization.' },
   { match: /\bnotion\b/i, category: 'note-taking',
     mech: { format: 'database', storage: 'cloud', collaboration: 'yjs', cloudSync: 'built-in', search: 'built-in' },
-    note: 'Notion stores content as cloud-hosted block trees (server is the source of truth); real-time multi-user collaboration and cross-device sync are built in; offline support is limited.' },
+    note: 'Notion stores content as cloud-hosted block trees (server is the source of truth); real-time multi-user collaboration and cross-device sync are built in; offline support is limited.',
+    design: 'Clean, modern, whitespace-heavy editorial look. Everything is a draggable **block**; a slash (/) menu inserts content types. Left sidebar tree of pages/workspaces; light default with subtle accents.',
+    signature: [
+      '**Block-based editor** — every paragraph, heading, image, toggle, etc. is a movable block; `/` command menu to insert.',
+      '**Databases** — tables/boards/calendars/galleries with the same data viewed many ways; relations & rollups.',
+      '**Real-time collaboration** — multiplayer cursors, comments, mentions, sharing/permissions.',
+      'Templates, synced blocks, and an API/integrations ecosystem.',
+    ] },
   { match: /\bjoplin\b/i, category: 'note-taking',
     mech: { format: 'hybrid', storage: 'local-db', search: 'built-in', plugins: true },
     note: 'Joplin keeps notes as Markdown in a local SQLite store and syncs to your choice of backend (Dropbox/OneDrive/WebDAV/Joplin Cloud); supports end-to-end encryption and plugins.' },
@@ -306,6 +331,20 @@ export function domainAnalysis(findings, kind = 'app') {
       out.gaps = gaps;
       const missing = gaps.filter(g => !g.present);
       if (missing.length) { lines.push('## Gaps & Opportunities', '', '_Capabilities not detected in the analyzed bundle:_'); for (const g of missing) lines.push(`- ${g.area}`); lines.push(''); }
+    }
+
+    // Design language + signature features (the actual look & feel — e.g. Obsidian's graph view).
+    const known = knownApp(findings);
+    if (known && (known.design || (known.signature && known.signature.length))) {
+      out.designLanguage = known.design || null;
+      out.signature = known.signature || [];
+      lines.push('## Design & Signature Features', '');
+      if (known.design) lines.push(`**Design language.** ${known.design}`, '');
+      if (known.signature && known.signature.length) {
+        lines.push('**Signature features (what makes it recognizable):**');
+        for (const s of known.signature) lines.push(`- ${s}`);
+        lines.push('');
+      }
     }
 
     return { lines, findings: out };

@@ -135,6 +135,7 @@ function mdToHtml(md, title = 'Reverse Engineering Report') {
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const inline = s => esc(s)
     .replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`)
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, a, u) => `<img alt="${a}" src="${u}">`)   // images (incl. data: URIs) — before links
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t, u) => `<a href="${u}">${t}</a>`);
 
@@ -197,7 +198,8 @@ function mdToHtml(md, title = 'Reverse Engineering Report') {
     blockquote{border-left:3px solid #ccc;margin:10px 0;padding:4px 12px;color:#555;background:#fafafa}
     a{color:#0366d6;text-decoration:none;word-break:break-all}
     hr{border:none;border-top:1px solid #ddd;margin:16px 0}
-    ul,ol{margin:8px 0;padding-left:22px}li{margin:2px 0}`;
+    ul,ol{margin:8px 0;padding-left:22px}li{margin:2px 0}
+    img{max-width:100%;height:auto;border:1px solid #ddd;border-radius:8px;margin:10px 0;display:block}`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>${html.join('\n')}</body></html>`;
 }
 
@@ -375,9 +377,11 @@ function summarizeApiCall(req) {
 // not the code/network. (Reads only what the page serves; respect ToS/copyright — for your own analysis.)
 function decodeEntities(s) {
   return String(s || '')
+    .replace(/&nbsp;/g, ' ').replace(/&(?:mdash|ndash);/g, '—').replace(/&hellip;/g, '…').replace(/&(?:rsquo|lsquo);/g, "'").replace(/&(?:rdquo|ldquo);/g, '"')
     .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(+n); } catch { return _; } })
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return _; } });
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return _; } })
+    .replace(/\s+/g, ' ').trim();
 }
 function metaContent(html, key, attr = 'property') {
   const k = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -574,6 +578,10 @@ async function analyzeWeb(url, name) {
   // CLASSIFIED so genuine API calls are separated from CDN media chunks and static assets.
   let netData = null;
   try { netData = await captureNetwork(url); } catch (e) { lines.push(`> Network capture skipped: ${String(e.message || e).slice(0, 120)}`, ''); }
+
+  // Show how the page actually LOOKS — the rendered screenshot is embedded in the PDF so the design is
+  // visible, not just described. (Logged-out pages screenshot the public shell.)
+  if (netData && netData.shot) lines.push('## Rendered Page (how it looks)', '', `![Rendered screenshot of ${new URL(url).hostname}](${netData.shot})`, '');
 
   // Recover MORE content from the live capture: the rendered DOM (post-JS) often carries richer og/JSON-LD
   // than the raw fetch, and a logged-in API JSON response holds the full reel (owner, caption, counts, video).
@@ -845,13 +853,50 @@ async function captureNetwork(url) {
       })());
     }
   });
-  let domHtml = '';
+  let domHtml = '', shot = null;
   try { await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 }); } catch { /* timeout/nav error acceptable */ }
   try { await Promise.allSettled(bodyJobs); } catch { /* best effort */ }
   try { domHtml = await page.content(); } catch { /* page closed/navigated */ }
+  // Capture how the page actually LOOKS — embedded into the report so the design is visible, not just described.
+  try { await page.setViewportSize({ width: 1440, height: 900 }); const buf = await page.screenshot({ type: 'jpeg', quality: 70 }); if (buf) shot = `data:image/jpeg;base64,${buf.toString('base64')}`; } catch { /* screenshot optional */ }
   try { await ctx.close(); } catch {}
   if (browser) { try { await browser.close(); } catch {} }
-  return { requests, html: domHtml };
+  return { requests, html: domHtml, shot };
+}
+
+// Fetch a product's marketing site (from package.json homepage) to capture how the app LOOKS and the
+// features it advertises — for desktop apps whose own UI can't be introspected statically (e.g. Obsidian
+// ships only a loader; its real UI + the graph view live elsewhere). Renders with Chromium for a real
+// screenshot + the JS-rendered feature copy; falls back to a plain fetch. Never throws.
+async function fetchProductSite(url) {
+  const out = { url, description: null, features: [], headings: [], shot: null, error: null };
+  if (!url) return out;
+  let html = '';
+  try {
+    const { chromium } = await import('playwright');
+    await ensureChromium(chromium);
+    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+    try {
+      const page = await browser.newPage({ userAgent: UA, viewport: { width: 1440, height: 900 } });
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+      html = await page.content();
+      out.finalUrl = page.url();
+      try { const buf = await page.screenshot({ type: 'jpeg', quality: 72 }); if (buf) out.shot = `data:image/jpeg;base64,${buf.toString('base64')}`; } catch {}
+    } finally { await browser.close(); }
+  } catch (e) {
+    out.error = String(e.message || e).slice(0, 120);
+    try { const r = await fetchPage(url, CRAWLER_UA); html = r.html || ''; } catch {}
+  }
+  try {
+    out.description = metaContent(html, 'og:description') || metaContent(html, 'description', 'name') || null;
+    // Headings = the marketing site's feature/section copy (this is where the graph view, canvas, etc. show up).
+    const heads = [...html.matchAll(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/gi)].map(m => decodeEntities(m[1].replace(/<[^>]+>/g, '').trim())).filter(s => s && s.length <= 90);
+    out.headings = [...new Set(heads)].slice(0, 24);
+    // Feature-ish bullet/sentence fragments.
+    const feats = [...html.matchAll(/<(?:li|h3)[^>]*>([\s\S]*?)<\/(?:li|h3)>/gi)].map(m => decodeEntities(m[1].replace(/<[^>]+>/g, '').trim())).filter(s => s && s.length >= 10 && s.length <= 140);
+    out.features = [...new Set(feats)].slice(0, 30);
+  } catch {}
+  return out;
 }
 
 // ---- binary format identification (shared by app + file) ----
@@ -985,12 +1030,29 @@ async function analyzeApp(appPath, name) {
     if (explained.length) { lines.push('## Entitlements explained'); for (const e of explained) lines.push(`- \`${e.item}\` — ${e.explanation}`); lines.push(''); }
   }
 
-  // Domain-aware pass: detect what KIND of app this is (note-taking, code editor, …) and, for note apps,
-  // explain how it takes/stores notes + run a capability gap analysis. Never throws.
+  // Domain-aware pass: detect what KIND of app this is (note-taking, code editor, …), explain how it
+  // works, run a gap analysis, AND surface the design language + signature features (e.g. Obsidian's graph
+  // view — notes as orbs connected by link "strings"). Never throws.
   try {
     const dom = domainAnalysis(findings, 'app');
     if (dom.lines && dom.lines.length) lines.push('', ...dom.lines);
     Object.assign(findings, dom.findings || {});
+  } catch {}
+
+  // Product site & visual design: a desktop app's real UI usually can't be introspected statically (e.g.
+  // Obsidian ships only a loader), so we pull the product's marketing site for the advertised features +
+  // an embedded screenshot — the closest we can get to "show the actual design" without launching the app.
+  try {
+    const homepage = findings.app?.homepage || null;
+    if (homepage) {
+      const site = await fetchProductSite(homepage);
+      const sec = ['## Product Design & Features (from the product site)', '', `Source: ${site.finalUrl || homepage}${site.error ? ` (render fallback: ${site.error})` : ''}`, ''];
+      if (site.description) sec.push(`**Tagline:** ${site.description}`, '');
+      if (site.shot) sec.push('**How it looks:**', '', `![${label} product site](${site.shot})`, '');
+      const feats = [...new Set([...(site.headings || []), ...(site.features || [])])].filter(Boolean).slice(0, 24);
+      if (feats.length) { sec.push('**Advertised features / sections:**'); for (const f of feats) sec.push(`- ${f}`); sec.push(''); }
+      if (site.shot || feats.length || site.description) lines.push('', ...sec);
+    }
   } catch {}
 
   return { slug, kind: 'app', target: appPath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
