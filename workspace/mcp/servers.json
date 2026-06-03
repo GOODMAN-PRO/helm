@@ -27,7 +27,8 @@
       "command": "node",
       "args": ["__HELM_ROOT__/workspace/mcp/wrap-google-workspace.mjs"],
       "healthCheck": "initialize",
-      "enabled": true
+      "comment": "Disabled: upstream npm package @modelcontextprotocol/server-google-workspace no longer exists (404). Gmail is handled by Helm's own gmail.* tools (workspace/tools/impl/gmail.mjs).",
+      "enabled": false
     },
     "brave-search": {
       "command": "node",

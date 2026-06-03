@@ -285,9 +285,11 @@ the server is marked DOWN — the bot still starts.
 - **github** — `@modelcontextprotocol/server-github`  |  Vault key: `GITHUB_PAT`
   `echo -n "ghp_..." | node workspace/secrets/secrets.mjs set GITHUB_PAT`
 
-- **google-workspace** — `@modelcontextprotocol/server-google-workspace`
-  Calendar + Gmail scopes only. Vault key: `GOOGLE_WORKSPACE_CREDS` (credentials JSON)
-  `cat creds.json | node workspace/secrets/secrets.mjs set GOOGLE_WORKSPACE_CREDS`
+- **Gmail** — handled by Helm's OWN tools (`gmail.send` / `gmail.list` / `gmail.read`; see
+  `workspace/tools/impl/gmail.mjs`), NOT an MCP server. Auth = a Gmail **App Password** stored in the vault:
+  `GMAIL_USER` (your address) + `GMAIL_APP_PASSWORD` (16-char app password from
+  myaccount.google.com/apppasswords — 2-Step Verification must be on). The old `google-workspace` MCP
+  server is disabled (its npm package no longer exists). Calendar is not wired yet.
 
 - **brave-search** — `@modelcontextprotocol/server-brave-search`  |  Vault key: `BRAVE_API_KEY`
   `echo -n "BSAk..." | node workspace/secrets/secrets.mjs set BRAVE_API_KEY`
@@ -312,7 +314,7 @@ Servers are passed with `--strict-mcp-config` so the user's global MCP config is
 Declarative list of Helm's callable verbs lives in `workspace/tools/registry.json`.
 Dispatcher: `node workspace/tools/tools.mjs list` or `tools.mjs call <name> --json '{...}'`.
 Built-in tools: image.generate, screencap, gui.click, gui.move, gui.size, gui.type, gui.key, imessage.send,
-discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list.
+discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list, gmail.send, gmail.list, gmail.read.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 
 **Browse real sites & grab images — no APIs.** You drive a real Chromium (Playwright) with a persistent

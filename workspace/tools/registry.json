@@ -107,6 +107,43 @@
     "confirm": false
   },
   {
+    "name": "gmail.send",
+    "summary": "Send an email from the owner's Gmail over SMTP. Requires GMAIL_USER + GMAIL_APP_PASSWORD in the vault.",
+    "exec": "node tools/impl/gmail.mjs send",
+    "args_schema": {
+      "to": { "type": "string", "required": true },
+      "subject": { "type": "string" },
+      "body": { "type": "string" },
+      "cc": { "type": "string" },
+      "bcc": { "type": "string" }
+    },
+    "side_effects": "sends an email",
+    "confirm": true
+  },
+  {
+    "name": "gmail.list",
+    "summary": "List recent emails from the owner's Gmail (or search subject/from/body with query). Returns uid, from, subject, date. Use gmail.read with a uid for the full message.",
+    "exec": "node tools/impl/gmail.mjs list",
+    "args_schema": {
+      "max": { "type": "number", "default": 10 },
+      "query": { "type": "string" },
+      "mailbox": { "type": "string", "default": "INBOX" }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "gmail.read",
+    "summary": "Read one email's full body by uid (from gmail.list). Returns from/to/subject/date/body.",
+    "exec": "node tools/impl/gmail.mjs read",
+    "args_schema": {
+      "uid": { "type": "number", "required": true },
+      "mailbox": { "type": "string", "default": "INBOX" }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
     "name": "gui.type",
     "summary": "Type text into the currently focused element.",
     "exec": "node tools/impl/gui.type.mjs",
