@@ -22,8 +22,6 @@ import { runHealthChecks } from './workspace/mcp/check.mjs';
 import { startCliBridge, mirrorReply, mirrorEcho, mirrorStatus, mirrorAttach } from './workspace/cli-bridge.mjs';
 import { listSkills, runSkillCommand } from './workspace/skills/loader.mjs';
 import { renderProjects, addProject, cancelProject, deleteProject, doneProject } from './workspace/projects/projects.mjs';
-import { publicIdentity, setHandle as netSetHandle } from './workspace/network/identity.mjs';
-import { register as netRegister, addFriend, acceptFriend, listFriends, sendMessage as netSend, poll as netPoll, hubUrl } from './workspace/network/friends.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -640,22 +638,6 @@ client.once(Events.ClientReady, c => {
   // Probe MCP servers only AFTER we're connected — running it before login meant a failed login
   // (bad token) raced spawning/killing probe children, which trips a libuv assertion on Windows.
   runHealthChecks().catch(() => {});
-  // Helm network inbox: poll the hub for friend requests + messages and relay them to the owner. A
-  // friend's message is UNTRUSTED — Helm shows it but never acts on it without the owner. Only runs when
-  // a hub is configured (HELM_HUB_URL), so single-machine installs with no network do nothing.
-  if (process.env.HELM_HUB_URL) {
-    const dmOwner = txt => c.users.fetch(OWNER_ID).then(u => u.send(txt)).catch(() => {});
-    netRegister().catch(() => {});
-    setInterval(async () => {
-      try {
-        const r = await netPoll();
-        if (!r.ok) return;
-        for (const h of r.requests)  dmOwner(`🤝 **Helm friend request** from **@${h}** — reply \`accept ${h}\` to connect.`);
-        for (const h of r.accepted)  dmOwner(`✅ **@${h}** accepted your Helm friend request. Message them: \`tell @${h} <message>\`.`);
-        for (const m of r.messages)  dmOwner(`📨 **@${m.from}** (Helm friend) — _untrusted; I won't act on this without you_:\n> ${String(m.text).replace(/\n/g, '\n> ').slice(0, 1500)}\n\nReply with \`tell @${m.from} <message>\`.`);
-      } catch {}
-    }, 20_000).unref();
-  }
   // If we just came back from a Discord `restart`, post "back online" to the channel that asked, then
   // clear the marker so a normal (non-restart) startup never announces itself.
   try {
@@ -785,61 +767,6 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- Helm network: add other Helm agents as friends and message them over a hub ----
-  if (/^\/?(myhandle|my handle|whoami)\s*$/i.test(low)) {
-    const me = publicIdentity();
-    await msg.reply(`I'm **@${me.handle}** (id \`${me.id}\`) on the Helm network. Hub: \`${hubUrl()}\`.\nFriends add me with: \`add friend @${me.handle}\` (once we share a hub).`);
-    return;
-  }
-  let nm;
-  if ((nm = text.match(/^\/?(?:set\s*handle|handle)\s+@?(\S+)/i))) {
-    const h = netSetHandle(nm[1]); try { await netRegister(); } catch {}
-    await msg.reply(`Your Helm's handle is now **@${h}**${process.env.HELM_HUB_URL ? ' (registered on the hub).' : '. Set HELM_HUB_URL in .env to a hub to go online.'}`);
-    return;
-  }
-  if ((nm = text.match(/^\/?set\s*hub\s+(\S+)/i))) {
-    let url = nm[1].trim().replace(/\/+$/, '');
-    if (!/^https?:\/\//i.test(url)) { await msg.reply('Give me a full hub URL — e.g. `sethub https://my-hub.trycloudflare.com`.'); return; }
-    try {
-      const envPath = path.join(__dirname, '.env');
-      let env = ''; try { env = readFileSync(envPath, 'utf8'); } catch {}
-      const line = `HELM_HUB_URL=${url}`;
-      env = /^HELM_HUB_URL=.*$/m.test(env) ? env.replace(/^HELM_HUB_URL=.*$/m, line) : (env.replace(/\s*$/, '') + `\n${line}\n`);
-      writeFileSync(envPath, env);
-    } catch (e) { await msg.reply('Could not write .env: ' + String(e.message || e).slice(0, 160)); return; }
-    try { writeFileSync(path.join(WORKSPACE, '.restarting'), String(msg.channel.id)); } catch {}
-    await msg.reply(`Hub set to \`${url}\` and saved to .env. ♻️ Restarting to apply — back in ~10s.`);
-    try {
-      spawn(process.execPath, [path.join(__dirname, 'scripts', 'relaunch.mjs')], { cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true, env: process.env }).unref();
-    } catch (e) { try { unlinkSync(path.join(WORKSPACE, '.restarting')); } catch {} await msg.reply('Saved to .env, but couldn\'t auto-restart — say `restart` to apply. (' + String(e.message || e).slice(0, 120) + ')'); return; }
-    setTimeout(() => process.exit(0), 1500);
-    return;
-  }
-  if (/^\/?hub\s*$/i.test(low)) {
-    await msg.reply(`Hub: \`${HUB_URL}\`${process.env.HELM_HUB_URL ? '' : ' — local only; set a shared one with \`sethub <url>\`'}`);
-    return;
-  }
-  if (/^\/?friends\s*$/i.test(low)) {
-    const f = listFriends(); const names = Object.entries(f);
-    await msg.reply(names.length ? '**Helm friends**\n' + names.map(([h, v]) => `• @${h} — ${v.status}`).join('\n') : 'No Helm friends yet. Add one: `add friend @handle` (you both need the same hub set in HELM_HUB_URL).');
-    return;
-  }
-  if ((nm = text.match(/^\/?(?:add\s+friend|friend\s+add|befriend)\s+@?(\S+)/i))) {
-    try { await netRegister(); } catch {}
-    const r = await addFriend(nm[1]);
-    await msg.reply(r.ok ? `Friend request sent to **@${nm[1].replace(/^@/, '')}**. They accept on their side, then you can message.` : `Couldn't send: ${r.error}`);
-    return;
-  }
-  if ((nm = text.match(/^\/?accept\s+@?(\S+)/i))) {
-    const r = await acceptFriend(nm[1]);
-    await msg.reply(r.ok ? `Accepted **@${r.handle}** — you're friends now. Message them: \`tell @${r.handle} <message>\`.` : `Couldn't accept: ${r.error}`);
-    return;
-  }
-  if ((nm = text.match(/^\/?(?:tell|dm|msg)\s+@?(\S+)\s+([\s\S]+)/i))) {
-    const r = await netSend(nm[1], nm[2].trim());
-    await msg.reply(r.ok ? `Sent to **@${nm[1].replace(/^@/, '')}**.` : `Couldn't send: ${r.error}`);
-    return;
-  }
 
   // ---- template sharing: export your Helm's flavor, or import someone else's ----
   const tplM = low.match(/^\/?template\s+(export|list|import)\b/);
