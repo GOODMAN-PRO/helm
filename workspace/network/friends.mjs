@@ -93,11 +93,16 @@ export async function poll() {
     // 3. if we already know this handle, the key must match (no impersonation)
     if (known && known.publicKey !== m.publicKey) continue;
     if (m.type === 'friend-request') {
-      if (!known || known.status !== 'accepted') db.friends[h] = { id: m.from, publicKey: m.publicKey, status: 'pending-in', since: new Date().toISOString() };
-      out.requests.push(h);
+      // Notify on a NEW incoming request only. A re-sent or re-fetched request (the hub keeps messages)
+      // must not re-DM the owner, and must never clobber an already-accepted friendship.
+      if (!known) { db.friends[h] = { id: m.from, publicKey: m.publicKey, status: 'pending-in', since: new Date().toISOString() }; out.requests.push(h); }
     } else if (m.type === 'friend-accept') {
-      if (known) { known.status = 'accepted'; }
-      out.accepted.push(h);
+      // Notify on the genuine transition to accepted only. A duplicate/re-fetched accept must not re-DM.
+      if (!known || known.status !== 'accepted') {
+        if (known) known.status = 'accepted';
+        else db.friends[h] = { id: m.from, publicKey: m.publicKey, status: 'accepted', since: new Date().toISOString() };
+        out.accepted.push(h);
+      }
     } else if (m.type === 'msg') {
       if (known && known.status === 'accepted') out.messages.push({ from: h, text: String(m.body || ''), at: m.ts, untrusted: true });
     }
