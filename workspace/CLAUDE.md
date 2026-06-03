@@ -442,6 +442,13 @@ report to `workspace/reverse/<slug>-report.pdf` (+ `.md`). Cross-platform (macOS
 uses Node's built-in `fetch` and pure-JS binary inspection, not `/usr/bin/*` tools. Reports include an
 ethics disclaimer (authorized targets only). Show the PDF by ending the reply with `ATTACH: <pdf path>`.
 
+**ALWAYS RUN IT FRESH — never re-serve a previous report.** Every time the owner asks you to
+reverse-engineer a target (even the same one again), actually invoke the tool this turn and attach the
+newly generated PDF. Do NOT skip the run because a `<slug>-report.pdf` already exists and do NOT
+re-attach an old report — the tool rewrites the report (with a leading **Summary** + **How It Works**
+section) on every run, and the gateway auto-attaches whatever was written this turn. Re-using a stale
+file means the owner sees an out-of-date report without the summary.
+
 **Three subcommands:**
 
 ```
