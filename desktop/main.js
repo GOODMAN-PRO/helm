@@ -75,12 +75,12 @@ function createTray() {
     const icon = nativeImage.createFromDataURL(TRAY_ICON).resize({ width: 18, height: 18 });
     icon.setTemplateImage(true);
     tray = new Tray(icon);
-    tray.setToolTip('Helm Dashboard');
+    tray.setToolTip('Helm');
     tray.setContextMenu(Menu.buildFromTemplate([
-      { label: 'Open Helm Dashboard', click: showWindow },
+      { label: 'Open Helm', click: showWindow },
       { label: 'New Chat', click: () => { showWindow(); toRenderer('menu', 'new'); } },
       { type: 'separator' },
-      { label: 'Quit Helm Dashboard', click: () => { quitting = true; app.quit(); } },
+      { label: 'Quit Helm', click: () => { quitting = true; app.quit(); } },
     ]));
     tray.on('click', showWindow);
   } catch {}
