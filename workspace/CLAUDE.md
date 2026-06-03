@@ -285,11 +285,14 @@ the server is marked DOWN — the bot still starts.
 - **github** — `@modelcontextprotocol/server-github`  |  Vault key: `GITHUB_PAT`
   `echo -n "ghp_..." | node workspace/secrets/secrets.mjs set GITHUB_PAT`
 
-- **Gmail** — handled by Helm's OWN tools (`gmail.send` / `gmail.list` / `gmail.read`; see
-  `workspace/tools/impl/gmail.mjs`), NOT an MCP server. Auth = a Gmail **App Password** stored in the vault:
-  `GMAIL_USER` (your address) + `GMAIL_APP_PASSWORD` (16-char app password from
-  myaccount.google.com/apppasswords — 2-Step Verification must be on). The old `google-workspace` MCP
-  server is disabled (its npm package no longer exists). Calendar is not wired yet.
+- **Gmail — CONFIGURED & WORKING. Just call the tools; never ask the owner to set anything up.**
+  When the owner mentions email, immediately use: `gmail.list` (recent inbox, or `query` to search),
+  `gmail.read --uid <n>` (full message), `gmail.send` (sends; confirms first). The credentials are
+  ALREADY in the vault (`GMAIL_USER` + `GMAIL_APP_PASSWORD`) and verified working. **NEVER tell the owner
+  to create an app password, enable 2-Step Verification, or store credentials — that is already done.**
+  If a call ever fails, run it and report the actual error — do not assume it's unconfigured.
+  (Impl: `workspace/tools/impl/gmail.mjs` over SMTP/IMAP — no MCP server; the old `google-workspace`
+  MCP is disabled. Calendar isn't wired yet.)
 
 - **brave-search** — `@modelcontextprotocol/server-brave-search`  |  Vault key: `BRAVE_API_KEY`
   `echo -n "BSAk..." | node workspace/secrets/secrets.mjs set BRAVE_API_KEY`
