@@ -18,8 +18,10 @@ export const description =
   'Build a REAL, production-quality FULL-STACK website or app by orchestrating 20+ specialist agents ' +
   '(product, architecture, database, API, backend, auth, UX, visual design, frontend, components, features, ' +
   'integration, testing, security, accessibility, performance, SEO, devops, docs, anti-stub review). ' +
-  'Usage: fullstack-build "<idea>" [--stack next-fullstack|astro-site|vite-react-spa] [--dry-run] [--out <dir>]. ' +
+  'Usage: fullstack-build "<idea>" [--stack next-fullstack|astro-site|vite-react-spa|showcase-site] [--dry-run] [--out <dir>]. ' +
   'Default stack: Next.js + TypeScript + Tailwind + shadcn/ui + Prisma + Auth.js + Zod + Vitest/Playwright. ' +
+  'For award-grade ANIMATED sites that rival apple.com (scroll-driven, super-interactive, GSAP+Lenis+Framer Motion+3D), ' +
+  'use --stack showcase-site (auto-selected when the idea mentions animation/interactive/immersive/scroll/parallax/3d). ' +
   'The pipeline runs a verify+fix loop so the project actually installs, builds and tests — NO stubs, NO ' +
   'fake data, NO "coming soon". Use this (not app-build) whenever asked to build a website or web app. ' +
   'A real build runs many agents and takes a while; pass --dry-run first to preview the agent plan instantly. ' +

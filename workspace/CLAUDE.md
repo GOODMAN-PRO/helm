@@ -445,14 +445,23 @@ executing the returned step's `tool_or_cmd`.
 ## Full-stack builder (multi-agent)
 
 When the owner asks you to **build a website or a (web) app / SaaS / full-stack app**, use the
-multi-agent builder — NOT a hand-rolled shell. It orchestrates **20+ specialist agents** (product
-manager, requirements analyst, solutions architect, database architect/engineer, API designer, backend
-engineer, auth engineer, UX designer, UI/visual designer, design-system engineer, project scaffolder,
-frontend architect, component engineer, feature engineer, integration engineer, test engineer, security
-auditor, accessibility specialist, performance engineer, SEO specialist, code reviewer/anti-stub critic,
-devops engineer, technical writer) across phases discovery → architecture → design → scaffold → data →
-backend → auth → frontend → integration → quality → finalize, then runs a **verify+fix loop** so the
-project actually installs, builds and tests. No stubs, no fake data, no "coming soon".
+multi-agent builder — NOT a hand-rolled shell. It orchestrates **40 specialist agents** across phases
+discovery → architecture → design → scaffold → data → backend → auth → frontend → integration → quality
+→ finalize, then runs a **verify+fix loop** so the project actually installs, builds and tests. No stubs,
+no fake data, no "coming soon". Roles include: product manager, requirements analyst, solutions
+architect, database architect/engineer, API designer, backend engineer, auth engineer, UX designer,
+UI/visual designer, design-system engineer, project scaffolder, frontend architect, component engineer,
+feature engineer, integration engineer, test engineer, security auditor, accessibility specialist,
+performance engineer, SEO specialist, code reviewer/anti-stub critic, devops engineer, technical writer.
+
+**Award-grade animated sites (rivals apple.com).** The builder targets an apple.com / Awwwards
+Site-of-the-Day bar: a creative director + motion designer + art director set the vision and a shared
+**motion-system**, then scroll-animation, micro-interaction, hero/showcase, page-transition, kinetic-type,
+cursor-FX, WebGL/3D, parallax, loading-experience, responsive-motion and animation-performance engineers
+build scroll-driven, super-interactive, 60fps experiences (GSAP + ScrollTrigger + Lenis + Framer Motion,
+optional React Three Fiber), with a final visual-polish critic. `prefers-reduced-motion` is always
+honored. Briefs that mention animated/interactive/immersive/scroll/parallax/3d auto-route to the
+`showcase-site` stack; pick it explicitly with `--stack showcase-site` for a marketing/product site.
 
 - From chat: `fullstack-build "<idea>" [--stack next-fullstack|astro-site|vite-react-spa] [--dry-run]`
   (skill), or the registry tool `builder.fullstack`, or directly:

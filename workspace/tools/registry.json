@@ -954,7 +954,7 @@
   },
   {
     "name": "builder.fullstack",
-    "summary": "Build a REAL, production-quality FULL-STACK website or app by orchestrating 20+ specialist agents (PM, architect, DB, API, backend, auth, UX, visual design, frontend, components, features, integration, testing, security, a11y, performance, SEO, devops, docs, anti-stub reviewer). Default stack Next.js+TS+Tailwind+shadcn/ui+Prisma+Auth.js+Zod+Vitest/Playwright. Runs a verify+fix loop so the project actually installs/builds/tests — no stubs. Use --dry-run to preview the agent plan instantly. Output project + report in workspace/builder/out/<slug>/.",
+    "summary": "Build a REAL, production-quality FULL-STACK website or app by orchestrating 40 specialist agents (PM, architect, DB, API, backend, auth, UX, visual+art direction, design-system, scaffolder, frontend, components, features, integration, testing, security, a11y, performance, SEO, devops, docs, anti-stub reviewer — plus creative director, motion designer, scroll-animation/interaction/hero/page-transition/kinetic-type/cursor/WebGL-3D/parallax/loading/responsive-motion/animation-performance engineers and an award-grade visual-polish critic). Targets an apple.com / Awwwards bar: scroll-driven, super-interactive, 60fps, prefers-reduced-motion. Default stack Next.js+TS+Tailwind+shadcn/ui+Prisma+Auth.js+Zod; use stack=showcase-site (GSAP+Lenis+Framer Motion+R3F) for animated marketing/product sites. Runs a verify+fix loop so the project actually installs/builds/tests — no stubs. Use --dry-run to preview the agent plan instantly. Output project + report in workspace/builder/out/<slug>/.",
     "exec": "node builder/cli.mjs",
     "args_schema": {
       "brief": {
@@ -964,12 +964,12 @@
       },
       "stack": {
         "type": "string",
-        "enum": ["next-fullstack", "astro-site", "vite-react-spa"],
-        "description": "Tech stack preset (default next-fullstack; astro-site for marketing/blog/docs, vite-react-spa for client-only dashboards)"
+        "enum": ["next-fullstack", "astro-site", "vite-react-spa", "showcase-site"],
+        "description": "Tech stack preset (default next-fullstack; astro-site for marketing/blog/docs; vite-react-spa for client-only dashboards; showcase-site for award-grade animated sites that rival apple.com — scroll animations, super-interactive, GSAP+Lenis+Framer Motion+3D)"
       },
       "dryRun": {
         "type": "boolean",
-        "description": "Plan only — print the 20+ agent pipeline without spawning agents or scaffolding"
+        "description": "Plan only — print the 40-agent pipeline without spawning agents or scaffolding"
       }
     },
     "requires": [

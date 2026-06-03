@@ -2152,6 +2152,26 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- full-stack builder: award-grade animation upgrade wired ----
+{
+  const label = 'builder: animation roles + showcase stack + award standard + animation gate present';
+  try {
+    const { getAllRoles } = await imp(path.join(WORKSPACE, 'builder/roles.mjs'));
+    const ids = new Set(getAllRoles().map(r => r.id));
+    for (const need of ['creative-director', 'motion-designer', 'scroll-animation-engineer', 'interaction-engineer', 'hero-showcase-engineer', 'webgl-3d-engineer', 'visual-polish-critic']) {
+      if (!ids.has(need)) throw new Error('missing animation role: ' + need);
+    }
+    const { resolveStack, STACKS } = await imp(path.join(WORKSPACE, 'builder/stack.mjs'));
+    if (!STACKS['showcase-site']) throw new Error('showcase-site stack missing');
+    if (resolveStack('a site with scroll animations like apple').id !== 'showcase-site') throw new Error('animated brief did not route to showcase-site');
+    const { AWARD_STANDARD } = await imp(path.join(WORKSPACE, 'builder/motion/reference-standard.mjs'));
+    if (typeof AWARD_STANDARD !== 'string' || AWARD_STANDARD.length < 100) throw new Error('AWARD_STANDARD missing');
+    const { animationGate } = await imp(path.join(WORKSPACE, 'builder/quality/animation-gate.mjs'));
+    if (typeof animationGate !== 'function') throw new Error('animationGate not a function');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

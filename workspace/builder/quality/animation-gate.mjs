@@ -1,0 +1,480 @@
+// animation-gate.mjs — static gate: checks a generated project delivers premium, accessible animation.
+// Contract: §7 + §8 of CONTRACT.md. Gate shape: { name:'animation', ok, details }.
+// ok = false only on CRITICAL failure (animation libs present but NO reduced-motion handling).
+// Never throws. Static, fast, no network.
+
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+// ---------------------------------------------------------------------------
+// Constants — kept in sync with quality-gates.mjs conventions
+// ---------------------------------------------------------------------------
+
+const MAX_FILES      = 2000;
+const MAX_FILE_BYTES = 512 * 1024; // 512 KB
+
+const SKIP_DIRS = new Set([
+  'node_modules', '.next', 'dist', 'build', '.git', '.helm-build',
+  '.turbo', '.vercel', 'out', '.output', '.nuxt', '.svelte-kit',
+]);
+
+// Source extensions to walk for TS/JS/CSS checks
+const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.css', '.scss', '.sass']);
+
+// Animation libs we care about (§8 of CONTRACT)
+const ANIMATION_LIBS = ['gsap', 'framer-motion', 'lenis', 'three'];
+
+// Layout-affecting props that cause jank when animated directly instead of via transform/opacity.
+// These are the classic CPU-repaint triggers.
+const JANK_PROPS = ['width', 'height', 'top', 'left', 'bottom', 'right', 'margin', 'padding'];
+
+// Regex: matches layout-prop in a Framer Motion animate/transition object or a gsap.to/from call.
+// E.g.: animate={{ width: ... }}  /  gsap.to(el, { width: ... })
+// We use a reasonably tight pattern — not foolproof, but worth flagging.
+const JANK_RE = new RegExp(
+  `(?:animate|transition|gsap\\.(?:to|from|fromTo|set))\\s*[({][^;{]*?\\b(${JANK_PROPS.join('|')})\\s*:`,
+  'g',
+);
+
+// ---------------------------------------------------------------------------
+// File walker — yields absolute paths
+// ---------------------------------------------------------------------------
+
+function* walkFiles(dir, exts) {
+  const stack = [dir];
+  let count = 0;
+  while (stack.length) {
+    const current = stack.pop();
+    let entries;
+    try { entries = readdirSync(current, { withFileTypes: true }); }
+    catch { continue; }
+
+    for (const e of entries) {
+      const full = path.join(current, e.name);
+      if (e.isDirectory()) {
+        if (!SKIP_DIRS.has(e.name)) stack.push(full);
+        continue;
+      }
+      if (!e.isFile()) continue;
+      if (exts && !exts.has(path.extname(e.name).toLowerCase())) continue;
+      if (++count > MAX_FILES) return;
+      yield full;
+    }
+  }
+}
+
+// Read safely, honouring the size cap. Returns null on error or oversize.
+function safeRead(filePath) {
+  try {
+    const st = statSync(filePath);
+    if (st.size > MAX_FILE_BYTES) return null;
+    return readFileSync(filePath, 'utf8');
+  } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------
+// Check 1 — animation libs in package.json
+// ---------------------------------------------------------------------------
+
+function checkAnimationLibs(projectDir) {
+  const pkgPath = path.join(projectDir, 'package.json');
+  if (!existsSync(pkgPath)) {
+    return { present: [], advisory: 'No package.json found — library check skipped.' };
+  }
+
+  let pkg;
+  try { pkg = JSON.parse(readFileSync(pkgPath, 'utf8')); }
+  catch (e) { return { present: [], advisory: `package.json parse error: ${e.message}` }; }
+
+  const allDeps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+  // Match libs: dependency starts with or equals the lib name
+  const present = ANIMATION_LIBS.filter(lib => allDeps.some(d => d === lib || d.startsWith(lib + '/')));
+
+  const msg = present.length
+    ? `Animation libs present: ${present.join(', ')}.`
+    : `No premium animation libs found (${ANIMATION_LIBS.join(', ')} not in package.json) — advisory.`;
+
+  return { present, advisory: msg };
+}
+
+// ---------------------------------------------------------------------------
+// Check 2 — prefers-reduced-motion honored
+// ---------------------------------------------------------------------------
+
+function checkReducedMotion(projectDir) {
+  // Pattern A: CSS media query
+  const cssRe = /prefers-reduced-motion/;
+  // Pattern B: matchMedia call in JS/TS
+  const matchMediaRe = /matchMedia\s*\(\s*['"].*prefers-reduced-motion/;
+  // Pattern C: hook import — useReducedMotion (framer-motion / custom)
+  const hookRe = /useReducedMotion/;
+
+  for (const filePath of walkFiles(projectDir, SOURCE_EXTS)) {
+    const content = safeRead(filePath);
+    if (!content) continue;
+    if (cssRe.test(content) || matchMediaRe.test(content) || hookRe.test(content)) {
+      return { honored: true, file: path.relative(projectDir, filePath) };
+    }
+  }
+  return { honored: false };
+}
+
+// ---------------------------------------------------------------------------
+// Check 3 — smooth scroll / scroll choreography
+// ---------------------------------------------------------------------------
+
+function checkScrollChoreography(projectDir) {
+  let lenisFound = false;
+  let scrollTriggerFound = false;
+
+  for (const filePath of walkFiles(projectDir, SOURCE_EXTS)) {
+    const content = safeRead(filePath);
+    if (!content) continue;
+    // Lenis import or instantiation
+    if (!lenisFound && /\blenis\b/i.test(content)) lenisFound = true;
+    // GSAP ScrollTrigger registration or usage
+    if (!scrollTriggerFound && /ScrollTrigger/i.test(content)) scrollTriggerFound = true;
+    // Short-circuit once both found
+    if (lenisFound && scrollTriggerFound) break;
+  }
+
+  const parts = [];
+  if (lenisFound) parts.push('Lenis smooth scroll');
+  if (scrollTriggerFound) parts.push('ScrollTrigger');
+
+  return {
+    lenisFound,
+    scrollTriggerFound,
+    advisory: parts.length
+      ? `Scroll choreography wired: ${parts.join(' + ')}.`
+      : 'No Lenis or ScrollTrigger usage found — advisory (add for premium scroll storytelling).',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Check 4 — jank risk: layout-affecting props animated
+// ---------------------------------------------------------------------------
+
+function checkJankRisk(projectDir) {
+  // Collect up to 5 sample findings { file, line, excerpt }
+  const samples = [];
+
+  outer:
+  for (const filePath of walkFiles(projectDir, SOURCE_EXTS)) {
+    // Only JS/TS — CSS transitions are a separate concern
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.css' || ext === '.scss' || ext === '.sass') continue;
+
+    const content = safeRead(filePath);
+    if (!content) continue;
+
+    const lines = content.split('\n');
+    const rel = path.relative(projectDir, filePath);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (JANK_RE.test(line)) {
+        // Reset lastIndex after the global regex test
+        JANK_RE.lastIndex = 0;
+        samples.push({ file: rel, line: i + 1, excerpt: line.trim().slice(0, 100) });
+        if (samples.length >= 5) break outer;
+      }
+      JANK_RE.lastIndex = 0;
+    }
+  }
+
+  const advisory = samples.length
+    ? `Jank risk: ${samples.length} location(s) animate layout-affecting props (width/height/top/left/…). ` +
+      `Use transform/opacity for 60 fps. Samples: ` +
+      samples.map(s => `${s.file}:${s.line}`).join(', ') + '.'
+    : 'No layout-prop animation detected.';
+
+  return { samples, advisory };
+}
+
+// ---------------------------------------------------------------------------
+// Check 5 — heavy-asset laziness
+// ---------------------------------------------------------------------------
+
+function checkHeavyAssets(projectDir) {
+  // Look for Three / @react-three/fiber or large image/video imports that aren't dynamic()
+  // Heuristic: static `import` of 'three' or '@react-three/fiber' in non-lazy files (no dynamic import nearby)
+  const heavyLibs = ['three', '@react-three/fiber', '@react-three/drei'];
+  const staticImportRe = /^import\s+/;
+  // Dynamic import pattern (lazy loading)
+  const dynamicRe = /dynamic\s*\(\s*\(\s*\)\s*=>|import\s*\(|React\.lazy/;
+
+  const nonLazyFiles = [];
+
+  for (const filePath of walkFiles(projectDir, SOURCE_EXTS)) {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.css' || ext === '.scss' || ext === '.sass') continue;
+
+    const content = safeRead(filePath);
+    if (!content) continue;
+
+    const hasHeavy = heavyLibs.some(lib => content.includes(`'${lib}'`) || content.includes(`"${lib}"`));
+    if (!hasHeavy) continue;
+
+    // Check whether the file has any dynamic import — if so, it's fine
+    if (!dynamicRe.test(content)) {
+      // Also confirm it's a static import of the lib (not just a string mention in a comment)
+      const lines = content.split('\n');
+      for (const line of lines) {
+        if (staticImportRe.test(line) && heavyLibs.some(lib => line.includes(lib))) {
+          nonLazyFiles.push(path.relative(projectDir, filePath));
+          break;
+        }
+      }
+    }
+  }
+
+  const advisory = nonLazyFiles.length
+    ? `Heavy-asset laziness: ${nonLazyFiles.length} file(s) statically import 3D/heavy libs without dynamic() / React.lazy. ` +
+      `Consider code-splitting. Files: ${nonLazyFiles.slice(0, 3).join(', ')}.`
+    : 'No heavy 3D assets found, or they are dynamically imported.';
+
+  return { nonLazyFiles, advisory };
+}
+
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
+
+/**
+ * animationGate — static quality gate for animation health.
+ *
+ * @param {string} projectDir  Absolute path to the generated project root.
+ * @returns {{ name: 'animation', ok: boolean, details: string }}
+ *   ok = false only on CRITICAL failure: animation libs present but NO prefers-reduced-motion handling.
+ *   Never throws.
+ */
+export function animationGate(projectDir) {
+  try {
+    // --- Run all checks ---
+    const libCheck      = checkAnimationLibs(projectDir);
+    const rmCheck       = checkReducedMotion(projectDir);
+    const scrollCheck   = checkScrollChoreography(projectDir);
+    const jankCheck     = checkJankRisk(projectDir);
+    const heavyCheck    = checkHeavyAssets(projectDir);
+
+    // --- Determine CRITICAL failure ---
+    // Only critical when libs are installed but reduced-motion is completely absent.
+    const hasCriticalFail = libCheck.present.length > 0 && !rmCheck.honored;
+
+    // --- Build details string ---
+    const lines = [];
+
+    // 1. Libs
+    lines.push(`[LIBS] ${libCheck.advisory}`);
+
+    // 2. Reduced-motion
+    if (rmCheck.honored) {
+      lines.push(`[REDUCED-MOTION] Honored (found in ${rmCheck.file}).`);
+    } else if (libCheck.present.length > 0) {
+      lines.push(`[REDUCED-MOTION] CRITICAL — animation libs present (${libCheck.present.join(', ')}) but no prefers-reduced-motion handling found. Add a CSS media query, matchMedia check, or useReducedMotion hook.`);
+    } else {
+      lines.push(`[REDUCED-MOTION] Not found — advisory (no animation libs detected).`);
+    }
+
+    // 3. Scroll choreography
+    lines.push(`[SCROLL] ${scrollCheck.advisory}`);
+
+    // 4. Jank risk
+    lines.push(`[JANK] ${jankCheck.advisory}`);
+
+    // 5. Heavy assets
+    lines.push(`[HEAVY-ASSETS] ${heavyCheck.advisory}`);
+
+    return {
+      name: 'animation',
+      ok: !hasCriticalFail,
+      details: lines.join('\n'),
+    };
+  } catch (err) {
+    // Gate must never throw — surface as advisory failure
+    return {
+      name: 'animation',
+      ok: true, // don't fail a build on our own internal error
+      details: `[INTERNAL-ERROR] animationGate threw unexpectedly: ${err?.message ?? String(err)}`,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Self-test — only runs when executed directly
+// ---------------------------------------------------------------------------
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const os = await import('node:os');
+
+  let pass = true;
+
+  function assert(cond, msg) {
+    if (!cond) { console.error(`  FAIL: ${msg}`); pass = false; }
+    else        { console.log (`  PASS: ${msg}`); }
+  }
+
+  // Helper: write files into a temp dir
+  function mkProject(files) {
+    const dir = mkdtempSync(path.join(os.default.tmpdir(), 'anim-gate-test-'));
+    for (const [rel, content] of Object.entries(files)) {
+      const full = path.join(dir, rel);
+      mkdirSync(path.dirname(full), { recursive: true });
+      writeFileSync(full, content, 'utf8');
+    }
+    return dir;
+  }
+
+  // -------------------------------------------------------------------------
+  // Test A — framer-motion present, NO prefers-reduced-motion → ok:false
+  // -------------------------------------------------------------------------
+  const dirA = mkProject({
+    'package.json': JSON.stringify({
+      dependencies: { 'framer-motion': '^11.0.0', react: '^18' },
+      scripts: { build: 'next build' },
+    }),
+    'components/Hero.tsx': `
+import { motion } from 'framer-motion';
+export function Hero() {
+  return <motion.div animate={{ opacity: 1 }}>Hello</motion.div>;
+}
+`,
+    'styles/global.css': `
+body { margin: 0; }
+.fade-in { opacity: 1; }
+`,
+  });
+
+  try {
+    const resultA = animationGate(dirA);
+    assert(resultA.name === 'animation', 'Test A: gate name is "animation"');
+    assert(typeof resultA.ok === 'boolean', 'Test A: ok is boolean');
+    assert(typeof resultA.details === 'string', 'Test A: details is string');
+    assert(resultA.ok === false, 'Test A: ok is false (framer-motion present, no reduced-motion)');
+    assert(resultA.details.includes('CRITICAL'), 'Test A: details mentions CRITICAL');
+    assert(resultA.details.includes('framer-motion'), 'Test A: details names the lib');
+  } finally {
+    try { rmSync(dirA, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+
+  // -------------------------------------------------------------------------
+  // Test B — framer-motion present, CSS prefers-reduced-motion present → ok:true
+  // -------------------------------------------------------------------------
+  const dirB = mkProject({
+    'package.json': JSON.stringify({
+      dependencies: { 'framer-motion': '^11.0.0', react: '^18' },
+      scripts: { build: 'next build' },
+    }),
+    'components/Hero.tsx': `
+import { motion } from 'framer-motion';
+export function Hero() {
+  return <motion.div animate={{ opacity: 1 }}>Hello</motion.div>;
+}
+`,
+    'styles/global.css': `
+body { margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+`,
+  });
+
+  try {
+    const resultB = animationGate(dirB);
+    assert(resultB.name === 'animation', 'Test B: gate name is "animation"');
+    assert(resultB.ok === true, 'Test B: ok is true (reduced-motion honored in CSS)');
+    assert(resultB.details.includes('Honored'), 'Test B: details mentions Honored');
+  } finally {
+    try { rmSync(dirB, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+
+  // -------------------------------------------------------------------------
+  // Test C — framer-motion present, useReducedMotion hook used → ok:true
+  // -------------------------------------------------------------------------
+  const dirC = mkProject({
+    'package.json': JSON.stringify({
+      dependencies: { 'framer-motion': '^11.0.0', react: '^18' },
+      scripts: { build: 'next build' },
+    }),
+    'hooks/useMotion.ts': `
+import { useReducedMotion } from 'framer-motion';
+export function useMotion() {
+  const reduce = useReducedMotion();
+  return reduce ? {} : { opacity: 1 };
+}
+`,
+  });
+
+  try {
+    const resultC = animationGate(dirC);
+    assert(resultC.ok === true, 'Test C: ok is true (useReducedMotion hook found)');
+  } finally {
+    try { rmSync(dirC, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+
+  // -------------------------------------------------------------------------
+  // Test D — no animation libs at all → ok:true (advisory only)
+  // -------------------------------------------------------------------------
+  const dirD = mkProject({
+    'package.json': JSON.stringify({
+      dependencies: { react: '^18' },
+      scripts: { build: 'next build' },
+    }),
+    'pages/index.tsx': `export default function Home() { return <h1>Hello</h1>; }`,
+  });
+
+  try {
+    const resultD = animationGate(dirD);
+    assert(resultD.ok === true, 'Test D: ok is true (no animation libs — advisory)');
+    assert(!resultD.details.includes('CRITICAL'), 'Test D: no CRITICAL in details');
+  } finally {
+    try { rmSync(dirD, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+
+  // -------------------------------------------------------------------------
+  // Test E — non-existent dir → never throws, ok:true (internal guard)
+  // -------------------------------------------------------------------------
+  try {
+    const resultE = animationGate('/tmp/helm-anim-gate-nonexistent-99xyz');
+    assert(typeof resultE.ok === 'boolean', 'Test E: ok is boolean for missing dir');
+    assert(typeof resultE.details === 'string', 'Test E: details is string for missing dir');
+    // Missing dir means no libs detected, so ok:true (no critical failure possible)
+    assert(resultE.ok === true, 'Test E: ok is true for missing dir (nothing to fail on)');
+  } catch {
+    assert(false, 'Test E: animationGate must not throw for missing dir');
+  }
+
+  // -------------------------------------------------------------------------
+  // Test F — GSAP + ScrollTrigger wired, with lenis → details reflect it
+  // -------------------------------------------------------------------------
+  const dirF = mkProject({
+    'package.json': JSON.stringify({
+      dependencies: { gsap: '^3.12.0', lenis: '^1.0.0' },
+      scripts: { build: 'vite build' },
+    }),
+    'src/scroll.ts': `
+import Lenis from 'lenis';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+const lenis = new Lenis();
+ScrollTrigger.create({ trigger: '.hero', start: 'top top' });
+`,
+    'src/global.css': `
+@media (prefers-reduced-motion: reduce) { * { animation: none; } }
+`,
+  });
+
+  try {
+    const resultF = animationGate(dirF);
+    assert(resultF.ok === true, 'Test F: ok is true (gsap+lenis with reduced-motion)');
+    assert(resultF.details.includes('Lenis'), 'Test F: Lenis mentioned in details');
+    assert(resultF.details.includes('ScrollTrigger'), 'Test F: ScrollTrigger mentioned in details');
+  } finally {
+    try { rmSync(dirF, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+
+  console.log(`\n${pass ? 'ALL TESTS PASSED' : 'SOME TESTS FAILED'}`);
+  process.exitCode = pass ? 0 : 1;
+}

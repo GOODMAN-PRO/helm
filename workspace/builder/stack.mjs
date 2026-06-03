@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { showcaseStack } from './stack-showcase.mjs';   // award-grade animated showcase preset
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -209,6 +210,9 @@ export const STACKS = {
       );
     },
   },
+
+  // 4. showcase-site — award-grade, highly-animated marketing/showcase sites (rivals apple.com)
+  'showcase-site': showcaseStack,
 };
 
 // ---------------------------------------------------------------------------
@@ -219,8 +223,13 @@ export const STACKS = {
 // More-specific patterns first; default falls through to next-fullstack.
 const KEYWORD_RULES = [
   {
+    // Award-grade, highly-animated/interactive/immersive sites → showcase-site (checked FIRST)
+    pattern: /animat|interactive|immersive|award|apple[\s-]?grade|awwwards|scroll[\s-]?(animation|driven|telling)|parallax|3d|webgl|cinematic|product\s+(launch|showcase|reveal)|motion/i,
+    id: 'showcase-site',
+  },
+  {
     // Static/content sites → astro
-    pattern: /landing|marketing|blog|portfolio|docs|static|brochure|showcase|content[\s-]site/i,
+    pattern: /landing|marketing|blog|portfolio|docs|static|brochure|content[\s-]site/i,
     id: 'astro-site',
   },
   {

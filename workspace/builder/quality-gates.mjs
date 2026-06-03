@@ -5,6 +5,7 @@
 import { readdirSync, readFileSync, existsSync, statSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { animationGate } from './quality/animation-gate.mjs';   // premium-animation + reduced-motion gate
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -389,6 +390,7 @@ export async function runQualityGates(projectDir, ctx) {
     gates.push(gateA11yBasics(projectDir));
     gates.push(gateSeoBasics(projectDir));
     gates.push(gateDeplsSane(projectDir));
+    try { gates.push(animationGate(projectDir)); } catch { /* gate is best-effort */ }
   } catch (err) {
     // Defensive: if something above throws despite guards, surface it as a gate entry
     gates.push({

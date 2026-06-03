@@ -168,3 +168,26 @@ Never throw.
 ## Integration (done by the integrator, not you): a `roles.mjs` aggregator exporting `getAllRoles()` that
 imports every `roles/*.mjs` and concatenates their `roles`; a `cli.mjs`; a Helm skill; a tool-registry
 entry; CLAUDE.md docs. Build your assigned file to the contract above and it will slot in.
+
+---
+
+## 8. Award-grade web standard (READ if you build or touch the frontend/design)
+The bar is **apple.com / Awwwards Site of the Day / Stripe / Linear** — not a generic template. Sites
+this builder produces must feel premium, intentional, and alive:
+- **Scroll-driven storytelling:** content reveals, pins, parallax and scene transitions tied to scroll
+  position. Use **GSAP + ScrollTrigger** for scroll choreography and **Lenis** for smooth/inertia scroll.
+- **Motion language:** **Framer Motion** (`motion`) for component/enter/exit/layout animations and page
+  transitions; consistent easing + timing tokens (a shared motion system), staggered reveals, springy
+  micro-interactions (magnetic buttons, hover states, cursor effects).
+- **Depth & richness where it fits:** tasteful **Three.js / React Three Fiber** hero or product scenes,
+  WebGL/shader accents — only when they serve the story, never gratuitous.
+- **Craft:** impeccable type scale + kerning, generous whitespace, art-directed imagery, a real preloader/
+  reveal, kinetic typography, polished empty/loading states.
+- **Performance is part of quality:** 60fps, GPU-friendly transforms (transform/opacity, not layout),
+  lazy-load heavy assets, code-split 3D/animation bundles, no jank or CLS.
+- **Accessibility is non-negotiable:** fully honor `prefers-reduced-motion` (provide a calm fallback),
+  keep content usable without JS where feasible, keyboard + screen-reader friendly.
+- **No stubs, no Lorem, no "coming soon":** real copy, real imagery handling, every interaction works.
+Animation deps to assume available (install them if missing): `gsap`, `lenis`, `framer-motion`, and for
+3D `three` + `@react-three/fiber` + `@react-three/drei`. A shared **motion-system** artifact (easings,
+durations, principles) is produced in the design phase — read it and stay consistent with it.

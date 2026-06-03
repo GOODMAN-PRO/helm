@@ -6,6 +6,8 @@ import { spawn }         from 'node:child_process';
 import { existsSync }    from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os                from 'node:os';
+import { AWARD_STANDARD } from './motion/reference-standard.mjs';   // the apple.com/Awwwards quality bar
+import { ANIMATION_STACK } from './motion/animation-libs.mjs';      // GSAP/Lenis/Framer/R3F toolkit guidance
 
 // ---------------------------------------------------------------------------
 // ANTI_STUB_RULES — appended to every agent prompt to enforce production quality
@@ -113,6 +115,12 @@ export async function runRole(role, ctx, opts = {}) {
     role.system,
     '',
     stackHeader,
+    '',
+    '## QUALITY BAR (every build aims here)',
+    AWARD_STANDARD,
+    '',
+    '## ANIMATION TOOLKIT (use these idioms when you touch the frontend)',
+    ANIMATION_STACK,
     '',
     '## YOUR TASK',
     role.task(ctx),
