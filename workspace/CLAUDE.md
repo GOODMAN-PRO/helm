@@ -331,6 +331,13 @@ discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list, g
 gui.scroll, gui.drag, gui.hotkey, app.open, window.list, window.focus, clipboard.get, clipboard.set.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 
+**Power tools (advanced — native, zero paid keys).** Call via the dispatcher (`tools.mjs call <name> --json {...}`) or directly (`node tools/impl/<file> <verb> --flags`):
+- **Think & communicate:** `solve` (elite decompose→approaches→critique→solution, engine-backed) · `research` (deep multi-source web research with citations → markdown report) · `translate` (any language).
+- **Create media (no API key):** `video.generate` (text→mp4: AI scenes + Ken Burns + crossfades, optional narration) · `image.resize/crop/rotate/flip/convert/grayscale/annotate/info` (edit any image) · `audio.say` (TTS→WAV via Windows voices) + `audio.voices/convert/trim/info/transcribe` · `screen.record.start/stop/status/gif` (record the screen to mp4/GIF).
+- **Documents & data:** `doc.topdf/extract/info/merge/split` (PDFs) · `data.summary/query/agg/chart` (analyze CSV/JSON + render charts) · `files.find/tree/big/dupes/organize/rename/zip/unzip` (elite file management; organize/rename/unzip are dry-run unless `apply=true`).
+- **Automate & operate the machine:** `flow.save/run/list/show/delete` (chain tools + shell with variables & conditionals — full automation) · `system.stats/top/ps/net/disk/kill` (monitor & control processes; kill refuses system-critical).
+Media/system tools are Windows-native (System.Drawing / SAPI / CIM / ffmpeg / gdigrab); solve/research/translate/doc/data/flow/files are cross-platform. None require a paid API key.
+
 **Browse real sites & grab images — no APIs.** You drive a real Chromium (Playwright) with a persistent
 profile, so you can read pages and pull images straight off them without any site API or key:
 - `browser.open --url <url>` / `browser.read` — navigate and get page text.

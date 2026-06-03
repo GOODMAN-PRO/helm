@@ -1278,5 +1278,999 @@
     "side_effects": "moves mouse and clicks",
     "confirm": false,
     "platform": "win32"
+  },
+  {
+    "name": "solve",
+    "summary": "Elite structured problem-solver: decompose -> 2-3 approaches -> critique -> best solution with concrete steps, assumptions, risks, confidence. Engine-backed.",
+    "exec": "node tools/impl/solve.mjs",
+    "args_schema": {
+      "problem": {
+        "type": "string",
+        "required": true,
+        "description": "the problem to solve"
+      },
+      "mode": {
+        "type": "string",
+        "description": "quick (1 LLM call, default) or deep (4 calls, higher quality)"
+      },
+      "constraints": {
+        "type": "string"
+      }
+    },
+    "side_effects": "none (calls the claude engine)",
+    "confirm": false
+  },
+  {
+    "name": "video.generate",
+    "summary": "Text-to-video: expand a prompt into N scenes, generate AI images, assemble an H.264 mp4 with Ken Burns motion + crossfades; optional voice narration.",
+    "exec": "node tools/impl/video.gen.mjs",
+    "args_schema": {
+      "prompt": {
+        "type": "string",
+        "required": true,
+        "description": "story/scene description"
+      },
+      "scenes": {
+        "type": "number",
+        "description": "number of scenes (default 4)"
+      },
+      "secs": {
+        "type": "number",
+        "description": "seconds per scene (default 3)"
+      },
+      "out": {
+        "type": "string",
+        "description": "output mp4 path"
+      },
+      "narrate": {
+        "type": "boolean",
+        "description": "add SAPI voice narration"
+      },
+      "size": {
+        "type": "string",
+        "description": "WxH, default 1280x720"
+      }
+    },
+    "side_effects": "writes an mp4 (image gen + ffmpeg)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "flow.list",
+    "summary": "List saved automation flows.",
+    "exec": "node tools/impl/flow.mjs list",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "flow.show",
+    "summary": "Show a saved flow's steps.",
+    "exec": "node tools/impl/flow.mjs show",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "flow.save",
+    "summary": "Save an automation flow: an array of steps (tool/args or exec, with saveAs vars + when conditions).",
+    "exec": "node tools/impl/flow.mjs save",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "json": {
+        "type": "string",
+        "description": "JSON array of steps"
+      },
+      "json-file": {
+        "type": "string",
+        "description": "path to a JSON file of steps"
+      }
+    },
+    "side_effects": "writes workspace/flows/<name>.json",
+    "confirm": false
+  },
+  {
+    "name": "flow.run",
+    "summary": "Run a saved flow: interpolate {{vars}}, evaluate when-conditions, chain tool/shell steps.",
+    "exec": "node tools/impl/flow.mjs run",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true
+      },
+      "vars": {
+        "type": "string",
+        "description": "initial vars JSON"
+      },
+      "vars-file": {
+        "type": "string",
+        "description": "path to vars JSON"
+      }
+    },
+    "side_effects": "executes each step (tools/shell)",
+    "confirm": false
+  },
+  {
+    "name": "flow.delete",
+    "summary": "Delete a saved flow.",
+    "exec": "node tools/impl/flow.mjs delete",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "deletes a flow file",
+    "confirm": true
+  },
+  {
+    "name": "files.find",
+    "summary": "Recursively find files by name glob, content substring, age (days), or min size. Skips node_modules/.git.",
+    "exec": "node tools/impl/files.mjs find",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "root dir"
+      },
+      "name": {
+        "type": "string",
+        "description": "glob, e.g. *.log"
+      },
+      "content": {
+        "type": "string",
+        "description": "substring in file text"
+      },
+      "days": {
+        "type": "number",
+        "description": "modified within N days"
+      },
+      "minsize": {
+        "type": "number",
+        "description": "min bytes"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "files.tree",
+    "summary": "Compact directory tree.",
+    "exec": "node tools/impl/files.mjs tree",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "depth": {
+        "type": "number",
+        "description": "default 3"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "files.big",
+    "summary": "List the N largest files under a directory.",
+    "exec": "node tools/impl/files.mjs big",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "top": {
+        "type": "number",
+        "description": "default 20"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "files.dupes",
+    "summary": "Find byte-identical duplicate files (sha256) + wasted bytes.",
+    "exec": "node tools/impl/files.mjs dupes",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "files.organize",
+    "summary": "Plan/apply moving files into subfolders by type or YYYY-MM date. Dry-run unless apply=true.",
+    "exec": "node tools/impl/files.mjs organize",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "by": {
+        "type": "string",
+        "description": "type|date"
+      },
+      "apply": {
+        "type": "string",
+        "description": "true to move; default false (preview)"
+      }
+    },
+    "side_effects": "moves files when apply=true (dry-run by default)",
+    "confirm": true
+  },
+  {
+    "name": "files.rename",
+    "summary": "Bulk rename via regex match + replacement ($1..). Dry-run unless apply=true.",
+    "exec": "node tools/impl/files.mjs rename",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "match": {
+        "type": "string",
+        "required": true,
+        "description": "JS regex"
+      },
+      "to": {
+        "type": "string",
+        "required": true,
+        "description": "replacement, $1.. backrefs"
+      },
+      "apply": {
+        "type": "string",
+        "description": "true to apply; default false"
+      }
+    },
+    "side_effects": "renames files when apply=true (dry-run by default)",
+    "confirm": true
+  },
+  {
+    "name": "files.zip",
+    "summary": "Compress a file/folder into a .zip (Compress-Archive).",
+    "exec": "node tools/impl/files.mjs zip",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true,
+        "description": ".zip path"
+      }
+    },
+    "side_effects": "writes a .zip",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "files.unzip",
+    "summary": "Extract a .zip (Expand-Archive). Dry-run lists contents unless apply=true.",
+    "exec": "node tools/impl/files.mjs unzip",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true,
+        "description": ".zip"
+      },
+      "out": {
+        "type": "string",
+        "required": true,
+        "description": "dest dir"
+      },
+      "apply": {
+        "type": "string",
+        "description": "true to extract; default false"
+      }
+    },
+    "side_effects": "extracts files when apply=true",
+    "confirm": true,
+    "platform": "win32"
+  },
+  {
+    "name": "doc.info",
+    "summary": "PDF metadata: page count, title, author.",
+    "exec": "node tools/impl/doc.mjs info",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "pdf"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "doc.extract",
+    "summary": "Extract text from a PDF.",
+    "exec": "node tools/impl/doc.mjs extract",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "pdf"
+      },
+      "out": {
+        "type": "string",
+        "description": "optional .txt out"
+      }
+    },
+    "side_effects": "reads pdf; optional txt write",
+    "confirm": false
+  },
+  {
+    "name": "doc.merge",
+    "summary": "Merge multiple PDFs into one.",
+    "exec": "node tools/impl/doc.mjs merge",
+    "args_schema": {
+      "out": {
+        "type": "string",
+        "required": true,
+        "description": "output pdf"
+      },
+      "inputs": {
+        "type": "string",
+        "required": true,
+        "description": "comma-separated pdf paths"
+      }
+    },
+    "side_effects": "writes a merged pdf",
+    "confirm": false
+  },
+  {
+    "name": "doc.split",
+    "summary": "Split a PDF into one file per page.",
+    "exec": "node tools/impl/doc.mjs split",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "pdf"
+      },
+      "out": {
+        "type": "string",
+        "required": true,
+        "description": "output dir"
+      }
+    },
+    "side_effects": "writes per-page pdfs",
+    "confirm": false
+  },
+  {
+    "name": "doc.topdf",
+    "summary": "Render txt/markdown/html to a PDF (Chromium).",
+    "exec": "node tools/impl/doc.mjs topdf",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "txt|md|html"
+      },
+      "out": {
+        "type": "string",
+        "description": "output pdf"
+      }
+    },
+    "side_effects": "writes a pdf",
+    "confirm": false
+  },
+  {
+    "name": "data.summary",
+    "summary": "Profile a CSV/JSON: rows + per-column type & stats.",
+    "exec": "node tools/impl/data.mjs summary",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true,
+        "description": "csv|json"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "data.query",
+    "summary": "Filter/select/sort/limit rows from CSV/JSON (ops = != > >= < <= contains).",
+    "exec": "node tools/impl/data.mjs query",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "where": {
+        "type": "string",
+        "description": "e.g. sales>100"
+      },
+      "select": {
+        "type": "string",
+        "description": "cols csv"
+      },
+      "sort": {
+        "type": "string"
+      },
+      "desc": {
+        "type": "boolean"
+      },
+      "limit": {
+        "type": "number"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "data.agg",
+    "summary": "Group-by aggregation (sum/avg/count/min/max).",
+    "exec": "node tools/impl/data.mjs agg",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "group": {
+        "type": "string",
+        "required": true,
+        "description": "group col"
+      },
+      "metric": {
+        "type": "string",
+        "description": "numeric col"
+      },
+      "op": {
+        "type": "string",
+        "required": true,
+        "description": "sum|avg|count|min|max"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "data.chart",
+    "summary": "Render a bar/line/pie chart PNG from CSV/JSON via QuickChart (free, no key).",
+    "exec": "node tools/impl/data.mjs chart",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      },
+      "x": {
+        "type": "string",
+        "required": true,
+        "description": "x col / labels"
+      },
+      "y": {
+        "type": "string",
+        "required": true,
+        "description": "y numeric col"
+      },
+      "type": {
+        "type": "string",
+        "description": "bar|line|pie"
+      },
+      "out": {
+        "type": "string",
+        "description": "png path"
+      }
+    },
+    "side_effects": "writes a png; web request",
+    "confirm": false
+  },
+  {
+    "name": "audio.voices",
+    "summary": "List installed Windows SAPI TTS voices.",
+    "exec": "node tools/impl/audio.mjs voices",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "audio.say",
+    "summary": "Text-to-speech to a WAV via Windows SAPI.",
+    "exec": "node tools/impl/audio.mjs say",
+    "args_schema": {
+      "text": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "description": "wav path"
+      },
+      "voice": {
+        "type": "string",
+        "description": "voice name substring"
+      },
+      "rate": {
+        "type": "number",
+        "description": "-10..10"
+      }
+    },
+    "side_effects": "writes a wav",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "audio.info",
+    "summary": "Audio metadata via ffprobe.",
+    "exec": "node tools/impl/audio.mjs info",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "audio.convert",
+    "summary": "Convert audio between formats (ffmpeg).",
+    "exec": "node tools/impl/audio.mjs convert",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true,
+        "description": "format by extension"
+      }
+    },
+    "side_effects": "writes audio",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "audio.trim",
+    "summary": "Trim an audio clip (ffmpeg).",
+    "exec": "node tools/impl/audio.mjs trim",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      },
+      "start": {
+        "type": "string",
+        "required": true,
+        "description": "start sec"
+      },
+      "dur": {
+        "type": "string",
+        "required": true,
+        "description": "duration sec"
+      }
+    },
+    "side_effects": "writes audio",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "audio.transcribe",
+    "summary": "Transcribe audio via whisper if installed.",
+    "exec": "node tools/impl/audio.mjs transcribe",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "none (read-only); needs whisper",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "research",
+    "summary": "Deep multi-source web research with inline citations; saves a markdown report.",
+    "exec": "node tools/impl/research.mjs",
+    "args_schema": {
+      "question": {
+        "type": "string",
+        "required": true
+      },
+      "depth": {
+        "type": "number",
+        "description": "1-3"
+      },
+      "out": {
+        "type": "string",
+        "description": "md path"
+      }
+    },
+    "side_effects": "web requests + claude; writes a report",
+    "confirm": false
+  },
+  {
+    "name": "image.info",
+    "summary": "Image dimensions + format.",
+    "exec": "node tools/impl/image.edit.mjs info",
+    "args_schema": {
+      "path": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "image.resize",
+    "summary": "Resize an image (optionally keep aspect).",
+    "exec": "node tools/impl/image.edit.mjs resize",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      },
+      "width": {
+        "type": "number"
+      },
+      "height": {
+        "type": "number"
+      },
+      "keep-aspect": {
+        "type": "string",
+        "description": "true|false"
+      }
+    },
+    "side_effects": "writes an image",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "image.crop",
+    "summary": "Crop an image region.",
+    "exec": "node tools/impl/image.edit.mjs crop",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      },
+      "x": {
+        "type": "string",
+        "required": true
+      },
+      "y": {
+        "type": "string",
+        "required": true
+      },
+      "w": {
+        "type": "string",
+        "required": true
+      },
+      "h": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "writes an image",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "image.rotate",
+    "summary": "Rotate an image 90/180/270.",
+    "exec": "node tools/impl/image.edit.mjs rotate",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      },
+      "deg": {
+        "type": "string",
+        "required": true,
+        "description": "90|180|270"
+      }
+    },
+    "side_effects": "writes an image",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "image.flip",
+    "summary": "Flip an image horizontally/vertically.",
+    "exec": "node tools/impl/image.edit.mjs flip",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      },
+      "dir": {
+        "type": "string",
+        "required": true,
+        "description": "h|v"
+      }
+    },
+    "side_effects": "writes an image",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "image.convert",
+    "summary": "Convert image format (by out extension).",
+    "exec": "node tools/impl/image.edit.mjs convert",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "writes an image",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "image.grayscale",
+    "summary": "Convert an image to grayscale.",
+    "exec": "node tools/impl/image.edit.mjs grayscale",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "writes an image",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "image.annotate",
+    "summary": "Draw text onto an image.",
+    "exec": "node tools/impl/image.edit.mjs annotate",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true
+      },
+      "out": {
+        "type": "string",
+        "required": true
+      },
+      "text": {
+        "type": "string",
+        "required": true
+      },
+      "x": {
+        "type": "number"
+      },
+      "y": {
+        "type": "number"
+      },
+      "size": {
+        "type": "number"
+      },
+      "color": {
+        "type": "string"
+      }
+    },
+    "side_effects": "writes an image",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "system.stats",
+    "summary": "System snapshot: CPU%, memory, disks, uptime, OS, hostname.",
+    "exec": "node tools/impl/system.mjs stats",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "system.top",
+    "summary": "Top processes by cpu or mem.",
+    "exec": "node tools/impl/system.mjs top",
+    "args_schema": {
+      "by": {
+        "type": "string",
+        "description": "cpu|mem"
+      },
+      "n": {
+        "type": "number",
+        "description": "default 10"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "system.ps",
+    "summary": "List processes (optionally filter by name).",
+    "exec": "node tools/impl/system.mjs ps",
+    "args_schema": {
+      "name": {
+        "type": "string",
+        "description": "name substring"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "system.net",
+    "summary": "Active TCP connections.",
+    "exec": "node tools/impl/system.mjs net",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "system.disk",
+    "summary": "Drive free/total.",
+    "exec": "node tools/impl/system.mjs disk",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "system.kill",
+    "summary": "Terminate a process by pid or name (refuses system-critical).",
+    "exec": "node tools/impl/system.mjs kill",
+    "args_schema": {
+      "pid": {
+        "type": "number",
+        "description": "exact pid"
+      },
+      "name": {
+        "type": "string",
+        "description": "name substring — kills all matching"
+      }
+    },
+    "side_effects": "terminates process(es) — irreversible",
+    "confirm": true,
+    "platform": "win32"
+  },
+  {
+    "name": "translate",
+    "summary": "Translate text or a file into any language via the claude engine.",
+    "exec": "node tools/impl/translate.mjs",
+    "args_schema": {
+      "text": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string",
+        "description": "file to translate"
+      },
+      "to": {
+        "type": "string",
+        "required": true,
+        "description": "target language"
+      },
+      "from": {
+        "type": "string",
+        "description": "source (auto if omitted)"
+      },
+      "formal": {
+        "type": "boolean"
+      },
+      "out": {
+        "type": "string",
+        "description": "write result to file"
+      }
+    },
+    "side_effects": "none (calls the claude engine)",
+    "confirm": false
+  },
+  {
+    "name": "screen.record.start",
+    "summary": "Start a screen recording to mp4 (ffmpeg gdigrab). Bounded if seconds given, else detached.",
+    "exec": "node tools/impl/screen.record.mjs start",
+    "args_schema": {
+      "out": {
+        "type": "string",
+        "description": "mp4 path"
+      },
+      "seconds": {
+        "type": "number",
+        "description": "duration; omit for detached"
+      },
+      "fps": {
+        "type": "number",
+        "description": "default 30"
+      },
+      "region": {
+        "type": "string",
+        "description": "x,y,w,h"
+      }
+    },
+    "side_effects": "writes an mp4; may leave a detached recorder",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "screen.record.stop",
+    "summary": "Stop the active detached screen recording.",
+    "exec": "node tools/impl/screen.record.mjs stop",
+    "args_schema": {},
+    "side_effects": "stops the recorder",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "screen.record.status",
+    "summary": "Is a screen recording active?",
+    "exec": "node tools/impl/screen.record.mjs status",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false,
+    "platform": "win32"
+  },
+  {
+    "name": "screen.record.gif",
+    "summary": "Convert an mp4 to an optimized GIF (ffmpeg).",
+    "exec": "node tools/impl/screen.record.mjs gif",
+    "args_schema": {
+      "src": {
+        "type": "string",
+        "required": true,
+        "description": "mp4"
+      },
+      "out": {
+        "type": "string",
+        "required": true,
+        "description": "gif"
+      },
+      "fps": {
+        "type": "number",
+        "description": "default 10"
+      },
+      "width": {
+        "type": "number",
+        "description": "default 640"
+      }
+    },
+    "side_effects": "writes a gif",
+    "confirm": false,
+    "platform": "win32"
   }
 ]

@@ -2090,6 +2090,33 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- power tools: fleet impls exist + parse ----
+{
+  const label = 'power tools: solve/video/flow/files/doc/data/audio/research/image.edit/system/translate/screen.record exist + node --check';
+  try {
+    for (const f of ['solve.mjs','video.gen.mjs','flow.mjs','files.mjs','doc.mjs','data.mjs','audio.mjs','research.mjs','image.edit.mjs','system.mjs','translate.mjs','screen.record.mjs']) {
+      const p = path.join(WORKSPACE, 'tools/impl', f);
+      if (!existsSync(p)) throw new Error('missing impl: ' + f);
+      const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' });
+      if (r.status !== 0) throw new Error('node --check failed for ' + f + ': ' + (r.stderr || '').trim().slice(0, 120));
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- power tools: registry registers the fleet ----
+{
+  const label = 'power tools: registry has the new families (solve/research/translate/video/flow/files/doc/data/audio/image/system/screen.record)';
+  try {
+    const reg = JSON.parse(readFileSync(path.join(WORKSPACE, 'tools/registry.json'), 'utf8'));
+    const names = new Set(reg.map(t => t.name));
+    const want = ['solve','research','translate','video.generate','flow.run','files.find','doc.topdf','data.chart','audio.say','image.resize','system.stats','screen.record.start'];
+    for (const x of want) if (!names.has(x)) throw new Error('registry missing: ' + x);
+    if (reg.length < 120) throw new Error('expected >=120 tools, got ' + reg.length);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

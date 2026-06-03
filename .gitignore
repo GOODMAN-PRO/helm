@@ -142,3 +142,7 @@ workspace/odysseus/
 workspace/.helm-brain.pid
 workspace/odysseus/
 workspace/macros/
+workspace/flows/
+workspace/research/
+workspace/.discord-last-seen
+workspace/cortex/
