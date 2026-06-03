@@ -1,8 +1,8 @@
 {
-  "name": "helm-desktop",
-  "productName": "Helm",
+  "name": "helm-dashboard",
+  "productName": "Helm Dashboard",
   "version": "1.0.0",
-  "description": "Helm — your personal AI assistant, on your own machine",
+  "description": "Helm Dashboard — the desktop client for your personal AI agent",
   "main": "main.js",
   "author": "Helm",
   "homepage": "https://goodman-pro.github.io/helm/",
@@ -19,37 +19,37 @@
     "electron-is-dev": "^3.0.1"
   },
   "build": {
-    "appId": "com.helm.desktop",
-    "productName": "Helm",
+    "appId": "com.helm.dashboard",
+    "productName": "Helm Dashboard",
     "copyright": "Helm",
     "directories": { "buildResources": "build", "output": "dist" },
     "files": ["main.js", "preload.js", "index.html", "logo.svg", "build/icon.*"],
     "publish": [{ "provider": "github", "owner": "GOODMAN-PRO", "repo": "helm" }],
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }, { "target": "zip", "arch": ["arm64", "x64"] }],
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
       "identity": null,
-      "artifactName": "Helm-${version}-${arch}.${ext}"
+      "artifactName": "Helm-Dashboard-${version}-${arch}.${ext}"
     },
-    "dmg": { "title": "Helm ${version}", "artifactName": "Helm-${version}-${arch}.${ext}" },
+    "dmg": { "title": "Helm Dashboard ${version}", "artifactName": "Helm-Dashboard-${version}-${arch}.${ext}" },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "build/icon.png",
-      "artifactName": "Helm-Setup-${version}.${ext}"
+      "artifactName": "Helm-Dashboard-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Helm"
+      "shortcutName": "Helm Dashboard"
     },
     "linux": {
       "target": ["AppImage"],
       "icon": "build/icon.png",
       "category": "Utility",
-      "artifactName": "Helm-${version}.${ext}"
+      "artifactName": "Helm-Dashboard-${version}.${ext}"
     }
   }
 }
