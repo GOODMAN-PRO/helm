@@ -9,7 +9,7 @@
 //   HELM_UPGRADE_DRYRUN=1     skip npm update + the claude self-improve pass
 //   HELM_UPGRADE_SKIP_SMOKE=1 skip the smoke gate (plumbing test only)
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { resolveClaude } from '../lib/engine.mjs';
 import { existsSync, writeFileSync, appendFileSync, readFileSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -54,8 +54,11 @@ function sleepMs(ms) { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4
 function restartBot() {
   const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
   if (process.platform === 'win32') {
-    sh('schtasks', ['/End', '/TN', 'HelmDiscord'], { timeout: 15_000 });
-    sh('schtasks', ['/Run', '/TN', 'HelmDiscord'], { timeout: 15_000 });
+    // Kill the running brain, then relaunch it hidden + detached so it survives this process —
+    // robust whether the bot was started by the Startup VBS launcher, a scheduled task, or `helm`.
+    sh('powershell', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*index.js*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"], { timeout: 15_000 });
+    sleepMs(2500);
+    try { spawn(process.execPath, ['index.js'], { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true }).unref(); } catch {}
   } else if (process.platform === 'darwin') {
     sh('launchctl', ['kickstart', '-k', `gui/${uid}/com.helm.discord`], { timeout: 15_000 });
   } else {
