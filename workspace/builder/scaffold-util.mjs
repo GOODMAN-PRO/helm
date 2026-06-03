@@ -26,6 +26,8 @@ export function nextCreateArgs(projectDir, pm = 'npm') {
     pm === 'pnpm' ? '--use-pnpm' : '--use-npm',
     '--yes',                       // create-next-app: use defaults for anything not specified (no prompts)
     '--disable-git',               // we manage git ourselves
+    '--skip-install',              // decouple install — create-next-app's bundled install is the flaky part
+                                   // (esp. on low-RAM machines); we run `npm install` separately + bounded.
     '--import-alias', '@/*',       // valid form (the old `--no-import-alias` does not exist)
   ];
 }

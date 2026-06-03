@@ -90,8 +90,11 @@ export const STACKS = {
       // `--no-import-alias`/`--no-turbopack` flags don't exist and made it fail). ensureNextScaffold
       // GUARANTEES a buildable project: if create-next-app produces nothing, it writes a minimal base.
       const parent = ensureParent(projectDir);
-      const r = runScaffolder('npx', nextCreateArgs(projectDir, 'npm'), { cwd: parent, timeoutMs: 600_000 });
-      return ensureNextScaffold(projectDir, r);
+      const r = runScaffolder('npx', nextCreateArgs(projectDir, 'npm'), { cwd: parent, timeoutMs: 300_000 });
+      const ensured = ensureNextScaffold(projectDir, r);   // guarantees a package.json (real or fallback)
+      // Install deps separately (bounded) — create-next-app's own install is the flaky/slow part.
+      const inst = runScaffolder('npm', ['install', '--no-audit', '--no-fund'], { cwd: projectDir, timeoutMs: 600_000 });
+      return { ok: ensured.ok, fallback: ensured.fallback, output: [ensured.output, inst.output].filter(Boolean).join('\n'), error: inst.ok ? ensured.error : `deps install issue: ${inst.error}` };
     },
   },
 
