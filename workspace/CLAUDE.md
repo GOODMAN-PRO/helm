@@ -442,6 +442,31 @@ executing the returned step's `tool_or_cmd`.
 
 ---
 
+## Full-stack builder (multi-agent)
+
+When the owner asks you to **build a website or a (web) app / SaaS / full-stack app**, use the
+multi-agent builder — NOT a hand-rolled shell. It orchestrates **20+ specialist agents** (product
+manager, requirements analyst, solutions architect, database architect/engineer, API designer, backend
+engineer, auth engineer, UX designer, UI/visual designer, design-system engineer, project scaffolder,
+frontend architect, component engineer, feature engineer, integration engineer, test engineer, security
+auditor, accessibility specialist, performance engineer, SEO specialist, code reviewer/anti-stub critic,
+devops engineer, technical writer) across phases discovery → architecture → design → scaffold → data →
+backend → auth → frontend → integration → quality → finalize, then runs a **verify+fix loop** so the
+project actually installs, builds and tests. No stubs, no fake data, no "coming soon".
+
+- From chat: `fullstack-build "<idea>" [--stack next-fullstack|astro-site|vite-react-spa] [--dry-run]`
+  (skill), or the registry tool `builder.fullstack`, or directly:
+  `node workspace/builder/cli.mjs "<idea>" [--stack <id>] [--dry-run]`.
+- **Preview first:** run with `--dry-run` to print the full agent plan instantly (no spawning), confirm
+  scope with the owner, then run for real.
+- Default stack `next-fullstack`: Next.js (App Router) + TypeScript + Tailwind + shadcn/ui + Prisma
+  (SQLite dev) + Auth.js (NextAuth v5) + Zod + Vitest/Playwright. `astro-site` for marketing/blog/docs,
+  `vite-react-spa` for client-only dashboards.
+- Output: the generated project + a build report land in `workspace/builder/out/<slug>-<ts>/`. A real
+  build spawns many `claude` agents and takes a while — say so, stream progress, and only claim "done"
+  once the verify step passes. Architecture: `workspace/builder/` (orchestrator, agent-runner, context,
+  verify, stack, quality-gates, roles/*); contract in `workspace/builder/CONTRACT.md`.
+
 ## Reverse-engineering tool
 
 `workspace/tools/impl/reverse.mjs` — analyze a target and ALWAYS write BOTH a **PDF** and a Markdown

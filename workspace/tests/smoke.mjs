@@ -2117,6 +2117,41 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- full-stack builder: roster validates + orchestrator dry-runs the whole pipeline ----
+{
+  const label = 'builder: 20+ roles validate (deps resolve) + orchestrator dry-run schedules all in dep order';
+  try {
+    const { getAllRoles, validateRoles } = await imp(path.join(WORKSPACE, 'builder/roles.mjs'));
+    const roles = getAllRoles();
+    if (roles.length < 20) throw new Error(`expected 20+ roles, got ${roles.length}`);
+    const v = validateRoles(roles);
+    if (!v.ok) throw new Error('role validation: ' + v.errors.join('; '));
+    const { buildApp } = await imp(path.join(WORKSPACE, 'builder/orchestrator.mjs'));
+    const done = [];
+    const r = await buildApp({ brief: 'smoke: a notes app', dryRun: true, onProgress: e => { if (e && e.status === 'done') done.push(e.role); } });
+    if (!r.ok) throw new Error('dry-run not ok');
+    if (done.length !== roles.length) throw new Error(`dry-run ran ${done.length}/${roles.length} roles`);
+    const pos = new Map(done.map((id, i) => [id, i]));   // dependency order: a role never precedes its deps
+    for (const role of roles) for (const d of (role.deps || [])) {
+      if (pos.has(d) && pos.has(role.id) && pos.get(d) > pos.get(role.id)) throw new Error(`${role.id} ran before dep ${d}`);
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- full-stack builder: skill + registry wired ----
+{
+  const label = 'builder: fullstack-build skill loads + builder.fullstack in registry';
+  try {
+    const { listSkills } = await imp(path.join(WORKSPACE, 'skills/loader.mjs'));
+    const skills = await listSkills();
+    if (!skills.find(s => s.name === 'fullstack-build')) throw new Error('fullstack-build skill not loaded');
+    const reg = JSON.parse(readFileSync(path.join(WORKSPACE, 'tools/registry.json'), 'utf8'));
+    if (!reg.find(t => t.name === 'builder.fullstack')) throw new Error('builder.fullstack not in registry');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

@@ -68,6 +68,7 @@ workspace/research/research.log
 workspace/conversations/
 
 workspace/reverse/
+workspace/builder/out/
 workspace/costs/*.db
 
 # stuck queue (runtime state for nightly self-upgrade)

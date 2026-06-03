@@ -953,6 +953,33 @@
     "confirm": false
   },
   {
+    "name": "builder.fullstack",
+    "summary": "Build a REAL, production-quality FULL-STACK website or app by orchestrating 20+ specialist agents (PM, architect, DB, API, backend, auth, UX, visual design, frontend, components, features, integration, testing, security, a11y, performance, SEO, devops, docs, anti-stub reviewer). Default stack Next.js+TS+Tailwind+shadcn/ui+Prisma+Auth.js+Zod+Vitest/Playwright. Runs a verify+fix loop so the project actually installs/builds/tests — no stubs. Use --dry-run to preview the agent plan instantly. Output project + report in workspace/builder/out/<slug>/.",
+    "exec": "node builder/cli.mjs",
+    "args_schema": {
+      "brief": {
+        "type": "string",
+        "required": true,
+        "description": "What to build, in plain language (e.g. 'a task manager with teams, projects and auth')"
+      },
+      "stack": {
+        "type": "string",
+        "enum": ["next-fullstack", "astro-site", "vite-react-spa"],
+        "description": "Tech stack preset (default next-fullstack; astro-site for marketing/blog/docs, vite-react-spa for client-only dashboards)"
+      },
+      "dryRun": {
+        "type": "boolean",
+        "description": "Plan only — print the 20+ agent pipeline without spawning agents or scaffolding"
+      }
+    },
+    "requires": [
+      "the `claude` engine on PATH (each specialist agent is a claude -p call)",
+      "network + Node package manager for scaffolding (create-next-app etc.)"
+    ],
+    "side_effects": "spawns many claude agents; scaffolds + writes a full project under workspace/builder/out/<slug>/; runs install/build/test. A full build takes a while — prefer --dry-run to preview the plan.",
+    "confirm": false
+  },
+  {
     "name": "mind",
     "summary": "Helm Mind — AI-first second brain over HelmBrain. Verbs: save, capture, find, synthesize, research, daily, recap, health. Reads the vault first and writes AI-first notes back (the vault rewrites itself).",
     "exec": "node tools/impl/mind.mjs",
