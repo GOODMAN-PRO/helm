@@ -689,6 +689,31 @@ function freshReverseReports(sinceMs) {
 }
 const mergeFiles = (files, extra) => { for (const p of extra) if (!files.includes(p)) files.push(p); return files; };
 
+// Pull the leading "## Summary" + "## How It Works" sections out of a reverse report's .md so the chat
+// reply ALWAYS shows them — even when the engine writes a terse "report attached" message and drops them.
+function reverseSummaryText(pdfPath) {
+  try {
+    const md = readFileSync(pdfPath.replace(/\.pdf$/i, '.md'), 'utf8');
+    const start = md.indexOf('## Summary');
+    if (start < 0) return '';
+    const rest = md.slice(start);
+    const hiw = rest.indexOf('## How It Works');
+    if (hiw < 0) return '';
+    const after = rest.indexOf('\n## ', hiw + 3);   // stop at the heading after How It Works
+    return (after < 0 ? rest : rest.slice(0, after)).trim();
+  } catch { return ''; }
+}
+// If a reverse report was produced this turn, ensure its summary leads the chat body (skip if the engine
+// already wrote a How-It-Works section itself).
+function withReverseSummary(body, reports) {
+  if (!reports || !reports.length) return body;
+  if (/how it works/i.test(body)) return body;
+  const t = reverseSummaryText(reports[0]);
+  if (!t) return body;
+  const tail = (body && !/^\((see attachment|done)\)$/.test(body.trim())) ? body : '_Full report attached._';
+  return `${t}\n\n${tail}`;
+}
+
 // Agent can attach files by ending lines with "ATTACH: /abs/path" (e.g. screenshots).
 function splitAttachments(s) {
   const files = [];
@@ -1025,13 +1050,15 @@ client.on(Events.MessageCreate, async msg => {
     clearInterval(typing);
     clearStatus();
     let { text: rawBody, files } = splitAttachments(reply);
-    mergeFiles(files, freshReverseReports(turnStart));   // always attach any reverse PDF made this turn
+    const reverseReports = freshReverseReports(turnStart);   // any reverse PDF written this turn
+    mergeFiles(files, reverseReports);                        // always attach it
     rawBody = handleDirectives(rawBody, text);   // [STUCK: ...] -> queue for the nightly self-upgrade
 
     // Autopilot plan detection: if Claude included [PLAN-PENDING], strip the marker,
     // post the plan, then auto-send "go" after 60 s (cancellable by "stop").
     const hasPlanPending = mode === 'autopilot' && rawBody.includes('[PLAN-PENDING]');
-    const body = rawBody.replace(/\[PLAN-PENDING\]/g, '').trim();
+    let body = rawBody.replace(/\[PLAN-PENDING\]/g, '').trim();
+    if (!hasPlanPending) body = withReverseSummary(body, reverseReports);   // surface the report summary in chat
 
     if (hasPlanPending) {
       const planMsg = body + '\n\n_Auto-proceeding in 60 s — reply `stop` to cancel._';
@@ -1044,8 +1071,10 @@ client.on(Events.MessageCreate, async msg => {
         try {
           const execReply = await ask('go ahead with the plan', null, mode);
           const { text: execBody, files: execFiles } = splitAttachments(execReply);
-          mergeFiles(execFiles, freshReverseReports(execStart));
-          for (const part of chunks(execBody || '(done)')) await channelRef.send(part);
+          const execReports = freshReverseReports(execStart);
+          mergeFiles(execFiles, execReports);
+          const execOut = withReverseSummary(execBody || '(done)', execReports);
+          for (const part of chunks(execOut || '(done)')) await channelRef.send(part);
           for (const f of execFiles) {
             try { await channelRef.send({ files: [f] }); }
             catch (e) { await channelRef.send(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
@@ -1174,8 +1203,10 @@ startCliBridge(async (text, reply, convId) => {
     const mode = getAutonomyMode();
     const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, mode, { sessionKey });
     const { text: rawBody, files } = splitAttachments(raw);
-    mergeFiles(files, freshReverseReports(turnStart));   // always attach any reverse PDF made this turn
-    const body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
+    const reverseReports = freshReverseReports(turnStart);   // any reverse PDF written this turn
+    mergeFiles(files, reverseReports);                        // always attach it
+    let body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
+    body = withReverseSummary(body, reverseReports);         // surface the report summary in chat
     try { captureTurn(text, body, convId ? 'desktop' : 'terminal'); } catch {}
     reply(body);   // broadcasts to every terminal once (no separate mirrorReply, or it'd double-send)
     // Helm produced files (e.g. a generated image, a screenshot). Discord/iMessage attach them; the
