@@ -130,3 +130,6 @@ workspace/projects.json
 workspace/network/identity.json
 workspace/network/friends.json
 workspace/network/hub-data.json
+
+# nightly self-upgrade heartbeat (runtime state)
+.last-nightly-upgrade

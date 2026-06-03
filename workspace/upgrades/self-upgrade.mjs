@@ -23,15 +23,22 @@ loadEnv({ path: path.join(ROOT, '.env'), override: true });
 const { CLAUDE_BIN = 'claude', MODEL = 'opus' } = process.env;
 const DRYRUN = process.env.HELM_UPGRADE_DRYRUN === '1';
 const SKIP_SMOKE = process.env.HELM_UPGRADE_SKIP_SMOKE === '1';
+// Owner kill-switch for the auto-publish step: set HELM_UPGRADE_NO_PUSH=1 in .env to keep nightly
+// self-improvements LOCAL (still commits + gates + restarts), e.g. while unreleased work is in the tree.
+const NO_PUSH = process.env.HELM_UPGRADE_NO_PUSH === '1';
 
 const LOCK = path.join(ROOT, '.upgrade.lock');
 const LOG = path.join(__dirname, 'self-upgrade.log');
 const QUEUE = path.join(__dirname, 'QUEUE.md');
 const HISTORY = path.join(__dirname, 'UPGRADE_LOG.md');
 const AGENT_LOG = path.join(ROOT, 'agent.log');
+const MARKER = path.join(ROOT, '.last-nightly-upgrade');   // heartbeat the status-check / health watch reads
 
 const ts = () => new Date().toISOString();
 const log = m => { const l = `[${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
+// Record that (and when) the nightly job last ran, with its outcome — so "is self-upgrade alive?" has a
+// real answer even on a no-op night. Written at start and overwritten with the result at the end.
+const markRun = (status, head) => { try { writeFileSync(MARKER, JSON.stringify({ time: ts(), status, head: head || null, dryrun: DRYRUN }) + '\n'); } catch {} };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
 // On Windows npm is `npm.cmd`, and patched Node refuses to spawn a .cmd without a shell (ENOENT/EINVAL).
 // Route npm through the shell there so nightly self-upgrade doesn't silently fail to update deps.
@@ -72,6 +79,7 @@ function restartAndHealth() {
 function appendHistory(status, base, head, summary) {
   const entry = `\n## ${ts()} — ${status}\n- base: ${base}\n- head: ${head}\n- summary: ${(summary || '').slice(0, 1200).replace(/\n+/g, ' ')}\n`;
   try { appendFileSync(HISTORY, entry); } catch {}
+  markRun(status, head);   // update the heartbeat with the run's outcome
 }
 function rollback(base, why, summary) {
   log(`ROLLBACK (${why}) -> ${base}`);
@@ -100,6 +108,7 @@ process.on('exit', () => { try { rmSync(LOCK); } catch {} });
 
 try {
   log(`=== self-upgrade start ${DRYRUN ? '(DRYRUN) ' : ''}===`);
+  markRun('started');
 
   // 0. snapshot current state as the precise revert point
   git('add', '-A');
@@ -180,9 +189,11 @@ try {
   if (!restartAndHealth()) { rollback(base, 'unhealthy after restart', summary); process.exit(0); }
 
   // 5b. push the upgrade to origin so it's backed up / pullable. (Single machine — no peer to sync.)
-  if (changed && !DRYRUN) {
+  if (changed && !DRYRUN && !NO_PUSH) {
     const pushed = git('push', 'origin', 'HEAD:main').status === 0;
     log(`push origin ${pushed ? 'ok' : 'FAIL (will retry next run)'}`);
+  } else if (changed && NO_PUSH) {
+    log('push skipped (HELM_UPGRADE_NO_PUSH=1) — changes committed locally only');
   }
 
   // Clear the stuck queue once changes are applied and healthy (kept if nothing changed, so it retries).
