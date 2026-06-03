@@ -4,7 +4,7 @@
 //
 // §4 of CONTRACT.md owns this file.
 
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { selectRoles } from './select.mjs';   // adaptive, token-efficient role selection
@@ -51,7 +51,10 @@ function tsNow() {
 // Safe dynamic import: returns the module or null on any error.
 async function tryImport(specifier) {
   try {
-    return await import(specifier);
+    // On Windows, import() rejects raw absolute paths ("C:\..." looks like a URL scheme).
+    // Convert filesystem paths to file:// URLs so dynamic imports work cross-platform.
+    const spec = path.isAbsolute(specifier) ? pathToFileURL(specifier).href : specifier;
+    return await import(spec);
   } catch {
     return null;
   }
