@@ -148,3 +148,6 @@ workspace/research/
 workspace/.discord-last-seen
 workspace/cortex/
 workspace/builder/.build.lock
+
+# Helm network runtime state (per-machine identity — never commit)
+workspace/network/*.json
