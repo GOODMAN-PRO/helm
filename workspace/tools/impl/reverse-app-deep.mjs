@@ -508,8 +508,12 @@ function plistRaw(plist, key) {
   return r.status === 0 ? r.stdout.trim() : '';
 }
 // Read an Info.plist key as JSON (for arrays/dicts). Returns parsed value or null.
+// CRITICAL: `-o -` forces output to STDOUT. Without it, `plutil -extract KEY json FILE` REWRITES FILE
+// IN PLACE with the extracted value (destroying the original plist + its code signature). This tool must
+// be strictly read-only on its target — only `raw` extracts print to stdout by default; json/xml/binary
+// do NOT, so they must always pass `-o -`.
 function plistJson(plist, key) {
-  const r = run('/usr/bin/plutil', ['-extract', key, 'json', plist]);
+  const r = run('/usr/bin/plutil', ['-extract', key, 'json', '-o', '-', plist]);
   if (r.status !== 0 || !r.stdout.trim()) return null;
   try { return JSON.parse(r.stdout); } catch { return null; }
 }

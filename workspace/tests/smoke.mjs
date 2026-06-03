@@ -2195,6 +2195,28 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- reverse: app analysis MUST be read-only (no in-place plutil writes that corrupt the target) ----
+{
+  const label = 'reverse: no destructive plutil -extract (json/xml/binary must use -o - → stdout)';
+  try {
+    for (const f of ['tools/impl/reverse-app-deep.mjs', 'tools/impl/reverse.mjs']) {
+      const src = readFileSync(path.join(WORKSPACE, f), 'utf8');
+      // Every `['-extract', …]` arg array that extracts a non-`raw` format rewrites the file IN PLACE
+      // unless it also passes `-o -`. raw prints to stdout safely; json/xml1/binary1 do NOT.
+      const arrays = [...src.matchAll(/\[\s*'-extract'[\s\S]*?\]/g)].map(m => m[0]);
+      for (const a of arrays) {
+        if (/'(?:json|xml1|binary1)'/.test(a) && !/'-o'/.test(a)) {
+          throw new Error(`${f}: destructive plutil -extract (would overwrite the target plist): ${a.replace(/\s+/g, ' ').slice(0, 90)}`);
+        }
+      }
+      // -convert without -o also rewrites in place
+      const conv = [...src.matchAll(/\[\s*'-convert'[\s\S]*?\]/g)].map(m => m[0]);
+      for (const a of conv) if (!/'-o'/.test(a)) throw new Error(`${f}: destructive plutil -convert (rewrites target): ${a.replace(/\s+/g, ' ').slice(0, 90)}`);
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
