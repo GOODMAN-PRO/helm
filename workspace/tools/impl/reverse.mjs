@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { analyzeSources, decodeInlineScripts, findSourceMapRef, parseSourceMap, traceTerms } from './reverse-code.mjs';
 
 const __dirname   = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE   = path.resolve(__dirname, '../..');
@@ -30,6 +31,24 @@ function slugify(s) {
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60) || 'target';
+}
+
+// Shorten the long hashed bundle/source names (e.g. `OBdQiWa9…FrnIAv.js`) so the report stays readable
+// instead of printing a 90-char filename in every table row.
+function shortName(s) {
+  const b = String(s || '');
+  if (b.length <= 26) return b;
+  return b.slice(0, 14) + '…' + b.slice(-9);
+}
+
+// Did we get the UNAUTHENTICATED experience? Either a redirect to a login/auth URL, OR the page itself
+// is a login/auth surface (password field + sign-in text, or known logged-out app markers). Many SPAs
+// (instagram.com root) serve the logged-out shell WITHOUT redirecting, so the URL alone misses it.
+export function looksLoggedOut(finalUrl = '', html = '') {
+  const byUrl = /\/(accounts\/)?login\b|\/login\/|[?&](next|__coig_login)=|\/signin\b|auth0|oauth\/authorize|\/sso\//i.test(finalUrl || '');
+  const byForm = /<input[^>]+type=["']password["']/i.test(html) && /\b(log[\s-]?in|sign[\s-]?in|password)\b/i.test(html);
+  const byMarker = /PolarisLoggedOut|LoggedOutRoot|LoginForm|LoginAndSignup|__coig_login|BarcelonaLoggedOut/i.test(html);
+  return byUrl || byForm || byMarker;
 }
 
 function run(cmd, args, opts = {}) {
@@ -188,22 +207,34 @@ async function writePdf(markdown, pdfPath, title) {
 
 // ---- web helpers ----
 
-function detectStack(html, headers) {
+// Detect the stack from PRECISE signatures, not bare substrings. Libraries (jQuery/Bootstrap/Tailwind)
+// are matched against <script>/<link> URLs or specific globals — never `html.includes('bootstrap')`,
+// because big SPAs (Facebook/Instagram) ship tokens like `bootstrapData`/`requireLazy` that trip naive
+// substring checks into false positives. `scripts`/`links` are the extracted src/href URLs.
+function detectStack(html, headers, scripts = [], links = []) {
   const found = [];
-  const h = html.toLowerCase();
-  if (h.includes('__reactfiber') || h.includes('data-reactroot') || h.includes('react-dom')) found.push('React');
-  if ((h.includes('vue') && (h.includes('v-if') || h.includes('__vue'))) || h.includes('vuejs')) found.push('Vue');
-  if (h.includes('ng-app') || h.includes('ng-version') || h.includes('angular')) found.push('Angular');
-  if (h.includes('__nuxt') || h.includes('/_nuxt/')) found.push('Nuxt');
-  if (h.includes('__next') || h.includes('/_next/')) found.push('Next.js');
-  if (h.includes('svelte')) found.push('Svelte');
-  if (h.includes('gatsby')) found.push('Gatsby');
-  if (h.includes('htmx.org') || h.includes('hx-get')) found.push('htmx');
-  if (h.includes('jquery')) found.push('jQuery');
-  if (h.includes('bootstrap')) found.push('Bootstrap');
-  if (h.includes('tailwind')) found.push('Tailwind CSS');
-  if (h.includes('graphql')) found.push('GraphQL');
-  if (h.includes('apollo')) found.push('Apollo');
+  const h = html;
+  const srcBlob = [...scripts, ...links].join('\n').toLowerCase();
+  const inSrc = re => re.test(srcBlob);
+
+  // Frameworks — markers specific enough to trust.
+  if (/data-reactroot|__reactcontainer|__reactfiber|react-dom(?:\.production)?\.min\.js/i.test(h) || inSrc(/react-dom|\breact[-.@]/)) found.push('React');
+  if (/__NEXT_DATA__|\/_next\//.test(h)) found.push('Next.js');
+  if (/__NUXT__|\/_nuxt\//.test(h)) found.push('Nuxt');
+  if (/\bng-version=|\bng-app=/i.test(h) || inSrc(/\bangular(?:[-.]|\.min)/)) found.push('Angular');
+  if (/data-v-app|\b__vue__\b/i.test(h) || inSrc(/\bvue(?:@|[-.]|\.min|\.runtime|\.global)/)) found.push('Vue');
+  if (/\bsvelte-[a-z0-9]{4,}\b/i.test(h)) found.push('Svelte');
+  if (inSrc(/gatsby[-.]/) || /id=["']___gatsby["']/i.test(h)) found.push('Gatsby');
+  if (/\bhx-(get|post|target|swap|trigger)=/i.test(h) || inSrc(/htmx(?:\.org|[-.])/)) found.push('htmx');
+
+  // Libraries — by SCRIPT/LINK URL or a precise global only.
+  if (inSrc(/jquery[-.@]?[\d.]*(?:\.min|\.slim)?\.js/) || /jquery\.fn\.jquery|window\.jquery\b/i.test(h)) found.push('jQuery');
+  if (inSrc(/bootstrap[-.@]?[\d.]*(?:\.bundle|\.min)?\.(?:css|js)/)) found.push('Bootstrap');
+  if (inSrc(/cdn\.tailwindcss\.com|tailwind[-.][\w.]*\.css/)) found.push('Tailwind CSS');
+  if (/[?&"']graphql\b|"\/api\/graphql"|\/graphql"/i.test(h)) found.push('GraphQL (referenced)');
+  if (inSrc(/apollo/) || /__APOLLO_STATE__/.test(h)) found.push('Apollo');
+
+  // Server / infra from headers.
   const genM = html.match(/<meta[^>]+name=["']generator["'][^>]+content=["']([^"']+)["']/i);
   if (genM) found.push(`Generator: ${genM[1].trim()}`);
   if (headers['x-powered-by']) found.push(`Powered-by: ${headers['x-powered-by']}`);
@@ -211,6 +242,7 @@ function detectStack(html, headers) {
   if (headers['x-vercel-id'] || headers['x-vercel-cache']) found.push('Vercel');
   if (headers['cf-ray']) found.push('Cloudflare');
   if (headers['x-amz-cf-id'] || headers['x-amz-request-id']) found.push('AWS');
+  if (headers['x-fb-debug'] || /facebook\.com|instagram\.com/.test(headers['content-security-policy'] || '')) found.push('Meta (Facebook/Instagram) infra');
   return [...new Set(found)];
 }
 
@@ -235,7 +267,97 @@ function extractApiEndpoints(html) {
 function extractScripts(html) {
   const srcs = [];
   for (const m of html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)) srcs.push(m[1]);
-  return srcs.slice(0, 20);
+  return srcs.slice(0, 40);
+}
+
+function extractLinks(html) {
+  const hrefs = [];
+  for (const m of html.matchAll(/<link[^>]+href=["']([^"']+)["']/gi)) hrefs.push(m[1]);
+  return hrefs.slice(0, 40);
+}
+
+// ---- request classification: the central fix ----
+// The old tool dumped EVERY request into one list and let the OpenAPI/clone stages treat CDN video
+// byte-range fetches as distinct API "endpoints". Media delivery is not an API surface. We classify
+// each captured request so the report separates the genuine API calls from media and static assets.
+const CDN_HOST_RE  = /(fbcdn\.net|cdninstagram\.com|akamaihd\.net|akamaized\.net|cloudfront\.net|fastly\.net|gstatic\.com|ggpht\.com|googlevideo\.com|twimg\.com|licdn\.com|pinimg\.com|\bcdn\d*\.)/i;
+const MEDIA_EXT_RE = /\.(?:mp4|m4s|webm|mov|ts|mp3|m4a|aac|ogg|flac|jpe?g|png|gif|webp|avif|svg|ico|woff2?|ttf|otf|eot)(?:[?#]|$)/i;
+
+function classifyRequest(req) {
+  const t  = req.type;
+  const u  = req.url;
+  const ct = (req.contentType || '').toLowerCase();
+  let host = ''; try { host = new URL(u).host; } catch {}
+  const mediaCt    = /^(?:video|audio|image|font)\//.test(ct) || ct.includes('font/');
+  const rangeChunk = /[?&](?:bytestart|byteend|efg)=/.test(u) || !!req.contentRange;   // fbcdn video chunks
+  if (t === 'media' || t === 'image' || t === 'font' || mediaCt || MEDIA_EXT_RE.test(u) || (CDN_HOST_RE.test(host) && rangeChunk)) return 'media';
+  if (t === 'document') return 'document';
+  if (t === 'script' || t === 'stylesheet' || /\.(?:js|mjs|css)(?:[?#]|$)/i.test(u)) return 'asset';
+  const looksApi = /\/api\/|\/graphql|\/ajax\/|\/gql(?:\b|\/)/i.test(u) || ct.includes('application/json') || /[?&]__a=/.test(u) || !!req.postData;
+  if ((t === 'fetch' || t === 'xhr' || t === 'other') && looksApi && !CDN_HOST_RE.test(host)) return 'api';
+  return 'other';
+}
+
+// Collapse byte-range chunks of the same media file to one key (host + path, query stripped).
+function mediaKey(u) {
+  try { const url = new URL(u); return url.host + url.pathname; } catch { return u.split('?')[0]; }
+}
+
+// Parse an application/x-www-form-urlencoded body into a plain object.
+function parseForm(body) {
+  const params = {};
+  for (const pair of body.split('&')) {
+    const i = pair.indexOf('=');
+    if (i < 0) continue;
+    try {
+      const k = decodeURIComponent(pair.slice(0, i).replace(/\+/g, ' '));
+      const v = decodeURIComponent(pair.slice(i + 1).replace(/\+/g, ' '));
+      params[k] = v;
+    } catch { /* skip malformed pair */ }
+  }
+  return params;
+}
+
+// Extract the part that actually matters for reverse engineering a request: method, path, and — for
+// GraphQL/AJAX POSTs — the operation name, doc_id/query_hash, and the variable KEYS. This is exactly
+// what the old report omitted (it just emitted TODOs).
+function summarizeApiCall(req) {
+  const out = { method: req.method, url: req.url, status: req.status, contentType: req.contentType };
+  try { out.path = new URL(req.url).pathname; } catch { out.path = req.url; }
+  const body = req.postData || '';
+  const ctHeader = (req.reqHeaders && req.reqHeaders['content-type']) || '';
+  if (body) {
+    const trimmed = body.trim();
+    if (/multipart\/form-data/i.test(ctHeader) || /WebKitFormBoundary|Content-Disposition:\s*form-data/i.test(trimmed)) {
+      // multipart/form-data — read the field NAMES, don't split on &/= (that produced boundary garbage).
+      const names = [...trimmed.matchAll(/name="([^"]+)"/g)].map(m => m[1]);
+      out.bodyParamKeys = [...new Set(names)];
+      out.multipart = true;
+    } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const j = JSON.parse(trimmed);
+        if (!Array.isArray(j)) {
+          const g = {};
+          for (const k of ['operationName', 'doc_id', 'query_hash']) if (j[k] != null) g[k] = j[k];
+          if (j.variables && typeof j.variables === 'object') g.variables_keys = Object.keys(j.variables);
+          if (typeof j.query === 'string') g.query_snippet = j.query.replace(/\s+/g, ' ').slice(0, 160);
+          if (Object.keys(g).length) out.graphql = g;
+          out.bodyParamKeys = Object.keys(j);
+        }
+      } catch { /* not JSON */ }
+    } else if (!trimmed.startsWith('{') && !trimmed.startsWith('[') && trimmed.includes('=')) {
+      const p = parseForm(trimmed);
+      const g = {};
+      for (const k of ['fb_api_req_friendly_name', 'doc_id', 'query_hash', 'fb_api_caller_class', 'operationName', 'operation_name', 'av']) if (p[k] != null) g[k] = p[k];
+      if (p.variables) { try { g.variables_keys = Object.keys(JSON.parse(p.variables)); } catch { g.variables_raw = p.variables.slice(0, 200); } }
+      if (Object.keys(g).length) out.graphql = g;
+      out.bodyParamKeys = Object.keys(p);
+    }
+  }
+  const hn = req.reqHeaders || {};
+  out.reqContentType = hn['content-type'] || null;   // the REQUEST body media type (not the response)
+  out.friendlyName = (out.graphql && out.graphql.fb_api_req_friendly_name) || hn['x-fb-friendly-name'] || hn['x-graphql-operation-name'] || null;
+  return out;
 }
 
 // ---- web subcommand ----
@@ -253,11 +375,28 @@ async function analyzeWeb(url, name) {
   if (resp.error) lines.push(`> Fetch warning: ${resp.error}`, '');
   lines.push(`- **HTTP status:** ${resp.status || 'n/a'}${resp.finalUrl && resp.finalUrl !== url ? `  ·  redirected to ${resp.finalUrl}` : ''}`, '');
 
+  // Honesty gate: if this is a login/auth surface (redirected OR served inline), the capture is the
+  // LOGGED-OUT shell. The real app and its authenticated API never loaded — say so loudly so the report
+  // isn't mistaken for the app. (instagram.com root serves login inline without redirecting.)
+  const loggedOut = looksLoggedOut(resp.finalUrl, html);
+  if (loggedOut) {
+    lines.push('## ⚠ Capture Context — UNAUTHENTICATED',
+      '> This is a **login / auth surface** (you were redirected to it, or it was served inline), so everything',
+      '> below is the **logged-out shell**. The real application and its authenticated API did **not** load —',
+      '> captured calls are public bootstrap, telemetry and route-prefetch, and the "key functions" are the',
+      '> module loader, not the product code. To analyze the real surface you would need to be signed in as a',
+      '> user **you are authorized to act as**. This tool does not bypass the auth wall.', '');
+  }
+
   const titleM = html.match(/<title[^>]*>([^<]{0,200})<\/title>/i);
   const pageTitle = titleM ? titleM[1].trim() : new URL(url).hostname;
 
+  // Extract script/link URLs first — stack detection matches against these, not raw HTML substrings.
+  const scripts = extractScripts(html);
+  const links = extractLinks(html);
+
   // Stack detection
-  const stack = detectStack(html, headers);
+  const stack = detectStack(html, headers, scripts, links);
   lines.push('## Detected Stack');
   if (stack.length) for (const s of stack) lines.push(`- ${s}`);
   else lines.push('- (none detected via static analysis)');
@@ -272,10 +411,11 @@ async function analyzeWeb(url, name) {
   if (!anyHeader) lines.push('- (no interesting headers captured)');
   lines.push('');
 
-  // Script sources
-  const scripts = extractScripts(html);
-  lines.push(`## Script Sources (${scripts.length})`);
-  if (scripts.length) for (const s of scripts) lines.push(`- \`${s}\``);
+  // Script sources — deduped; inline data: URIs are summarized, not pasted as base64 spew.
+  const scriptCounts = new Map();
+  for (const s of scripts) { const key = s.startsWith('data:') ? `data: inline script (${s.length} bytes)` : s; scriptCounts.set(key, (scriptCounts.get(key) || 0) + 1); }
+  lines.push(`## Script Sources (${scriptCounts.size} unique of ${scripts.length})`);
+  if (scriptCounts.size) for (const [s, n] of scriptCounts) lines.push(`- \`${s}\`${n > 1 ? `  ×${n}` : ''}`);
   else lines.push('- (none)');
   lines.push('');
 
@@ -294,39 +434,185 @@ async function analyzeWeb(url, name) {
   if (!titleM && !descM) lines.push('- (no title or description meta found)');
   lines.push('');
 
-  // Playwright network capture (Chromium is bundled; we also use it for the PDF)
+  // Playwright network capture (Chromium is bundled; we also use it for the PDF). Every request is
+  // CLASSIFIED so genuine API calls are separated from CDN media chunks and static assets.
   let netData = null;
   try { netData = await captureNetwork(url); } catch (e) { lines.push(`> Network capture skipped: ${String(e.message || e).slice(0, 120)}`, ''); }
 
+  let apiCalls = [];
   if (netData) {
-    const xhrCalls = netData.requests.filter(r => r.type === 'fetch' || r.type === 'xhr');
-    lines.push(`## Network Capture (Playwright — ${netData.requests.length} total, ${xhrCalls.length} XHR/fetch)`);
-    if (xhrCalls.length) {
-      for (const req of xhrCalls.slice(0, 30)) {
-        lines.push(`- **${req.method}** \`${req.url}\``);
-        if (req.postData) lines.push(`  - Body snippet: \`${req.postData.slice(0, 200)}\``);
-        if (req.status) lines.push(`  - Status: ${req.status} | Content-Type: ${req.contentType || '?'}`);
-      }
-    } else lines.push('- (no XHR/fetch calls captured during page load)');
+    const buckets = { api: [], media: [], asset: [], document: [], other: [] };
+    for (const r of netData.requests) buckets[classifyRequest(r)].push(r);
+
+    lines.push('## Network Capture (Playwright)');
+    lines.push(`- **Total requests:** ${netData.requests.length}`);
+    lines.push(`- **API/XHR:** ${buckets.api.length}  ·  **Media/CDN:** ${buckets.media.length}  ·  **Scripts/CSS:** ${buckets.asset.length}  ·  **Documents:** ${buckets.document.length}  ·  **Other:** ${buckets.other.length}`);
     lines.push('');
+
+    // ---- API surface: the only part that matters for reverse engineering ----
+    // Dedupe by method + path + operation so repeated GraphQL POSTs collapse to one row.
+    const seen = new Map();
+    for (const r of buckets.api) {
+      const s = summarizeApiCall(r);
+      const op = s.friendlyName || (s.graphql && (s.graphql.doc_id || s.graphql.operationName)) || '';
+      const key = `${s.method} ${s.path} ${op}`;
+      if (!seen.has(key)) seen.set(key, s);
+    }
+    apiCalls = [...seen.values()];
+    lines.push(`## API Surface (${apiCalls.length} distinct call${apiCalls.length === 1 ? '' : 's'})`);
+    if (apiCalls.length) {
+      for (const s of apiCalls.slice(0, 25)) {
+        lines.push(`- **${s.method}** \`${s.path}\`${s.status ? `  → ${s.status}` : ''}${s.contentType ? `  (${s.contentType.split(';')[0]})` : ''}`);
+        if (s.friendlyName) lines.push(`  - operation: \`${s.friendlyName}\``);
+        const g = s.graphql;
+        if (g) {
+          if (g.doc_id) lines.push(`  - doc_id: \`${g.doc_id}\``);
+          if (g.query_hash) lines.push(`  - query_hash: \`${g.query_hash}\``);
+          if (g.operationName && g.operationName !== s.friendlyName) lines.push(`  - operationName: \`${g.operationName}\``);
+          if (g.query_snippet) lines.push(`  - query: \`${g.query_snippet}\``);
+          if (g.variables_keys) lines.push(`  - variables: ${g.variables_keys.slice(0, 20).map(k => `\`${k}\``).join(', ')}`);
+          else if (g.variables_raw) lines.push(`  - variables (raw): \`${g.variables_raw}\``);
+        } else if (s.bodyParamKeys && s.bodyParamKeys.length) {
+          lines.push(`  - body params: ${s.bodyParamKeys.slice(0, 12).map(k => `\`${k}\``).join(', ')}`);
+        }
+      }
+    } else lines.push('- (no genuine API/XHR calls captured — the page may render server-side or only fetch media)');
+    lines.push('');
+
+    // ---- Media / CDN: collapse byte-range chunks of the same file into ONE asset ----
+    if (buckets.media.length) {
+      const assets = new Map();
+      for (const r of buckets.media) {
+        const k = mediaKey(r.url);
+        const a = assets.get(k) || { key: k, chunks: 0, bytes: 0, type: r.contentType || '' };
+        a.chunks++;
+        if (r.contentLength) a.bytes += r.contentLength;
+        if (!a.type && r.contentType) a.type = r.contentType;
+        assets.set(k, a);
+      }
+      const list = [...assets.values()].sort((x, y) => y.chunks - x.chunks);
+      lines.push(`## Media / CDN Assets (${list.length} file${list.length === 1 ? '' : 's'} across ${buckets.media.length} requests)`);
+      lines.push('_Byte-range chunks of the same file are collapsed here — this is media delivery, NOT an API surface._', '');
+      for (const a of list.slice(0, 15)) {
+        const short = a.key.length > 90 ? a.key.slice(0, 88) + '…' : a.key;
+        const sz = a.bytes ? ` · ~${(a.bytes / 1024).toFixed(0)} KB` : '';
+        lines.push(`- \`${short}\` — ${a.chunks} request${a.chunks === 1 ? '' : 's'}${sz}${a.type ? ` · ${a.type.split(';')[0]}` : ''}`);
+      }
+      lines.push('');
+    }
   }
 
-  // Clone scaffold outline
+  // ============================ CODE ANALYSIS ============================
+  // The part that makes this reverse engineering instead of a HAR dump: parse the JS the site actually
+  // serves the browser, enumerate functions with an AST, build a call graph, recover original file
+  // structure from source maps, and point data-flow from captured request params back to the code.
+  try {
+    const scriptBodies = (netData?.requests || [])
+      .filter(r => r.body && (r.type === 'script' || /\.m?js(?:[?#]|$)/i.test(r.url)))
+      .map(r => ({ name: ((() => { try { return new URL(r.url).pathname.split('/').pop() || r.url; } catch { return r.url; } })()), code: r.body, url: r.url }));
+    const inlineBlocks = decodeInlineScripts(html).map((b, i) => ({ name: `inline#${i + 1}`, code: b.code, count: b.count }));
+    const sources = [...scriptBodies, ...inlineBlocks];
+
+    if (sources.length) {
+      const code = analyzeSources(sources);
+      lines.push('## Code Analysis (static, AST-based)');
+      lines.push(`- **Bundles analyzed:** ${code.bundleCount} (${scriptBodies.length} external, ${inlineBlocks.length} inline-deduped)  ·  **~${(code.totalBytes / 1024).toFixed(0)} KB**  ·  **${code.totalFunctions} functions**`);
+      if (code.moduleSystems.length) lines.push(`- **Module system:** ${code.moduleSystems.join(', ')}`);
+      if (code.endpoints.length) lines.push(`- **Endpoints referenced in code:** ${code.endpoints.slice(0, 20).map(e => `\`${e}\``).join(', ')}`);
+      lines.push('');
+
+      // Source maps — recover original file/dir structure + symbol names (publicly served when present).
+      const maps = [];
+      for (const s of scriptBodies.slice(0, 12)) {
+        const ref = findSourceMapRef(s.code);
+        if (!ref) continue;
+        let mapJson = null;
+        try {
+          if (ref.startsWith('data:')) {
+            const b64 = ref.indexOf('base64,');
+            if (b64 >= 0) mapJson = Buffer.from(ref.slice(b64 + 7), 'base64').toString('utf8');
+            else { const c = ref.indexOf(','); if (c >= 0) mapJson = decodeURIComponent(ref.slice(c + 1)); }
+          } else {
+            const mu = new URL(ref, s.url).href;
+            const rr = await fetch(mu, { headers: { 'User-Agent': UA } });
+            if (rr.ok) mapJson = (await rr.text()).slice(0, 8_000_000);
+          }
+        } catch { /* map unavailable */ }
+        const parsed = mapJson && parseSourceMap(mapJson);
+        if (parsed) maps.push({ bundle: s.name, ...parsed });
+      }
+      if (maps.length) {
+        lines.push('### Recovered Source Maps');
+        for (const mp of maps) {
+          lines.push(`- **${mp.bundle}** → ${mp.sourceCount} original source${mp.sourceCount === 1 ? '' : 's'}${mp.hasContent ? ' (with original code embedded)' : ''}`);
+          for (const src of mp.sources.slice(0, 12)) lines.push(`  - \`${src}\``);
+          if (mp.sources.length > 12) lines.push(`  - … +${mp.sources.length - 12} more`);
+        }
+        lines.push('');
+      }
+
+      // Key functions — ranked by network/signing behavior, call-fan-in and size.
+      lines.push('### Key Functions (ranked)');
+      if (code.keyFunctions.length) {
+        lines.push('| Function | Bundle | Size | Callers | Signals | Calls |', '|---|---|--:|--:|---|---|');
+        for (const f of code.keyFunctions) {
+          const nm = f.name ? `\`${f.name}\`${f.async ? ' (async)' : ''}` : '_(anonymous)_';
+          const calls = (f.calls || []).slice(0, 5).join(', ');
+          lines.push(`| ${nm} | ${shortName(f.bundle)} | ${f.size} | ${f.callers} | ${(f.flags || []).join(', ') || '—'} | ${calls ? `\`${calls.slice(0, 60)}\`` : '—'} |`);
+        }
+      } else lines.push('- (no functions parsed — bundles may be encrypted or unavailable)');
+      lines.push('');
+
+      // Data-flow: where do the captured request params / doc_ids appear in the code?
+      const terms = [];
+      for (const s of apiCalls) {
+        if (s.graphql) { if (s.graphql.doc_id) terms.push(s.graphql.doc_id); if (s.graphql.variables_keys) terms.push(...s.graphql.variables_keys); }
+        if (s.bodyParamKeys) terms.push(...s.bodyParamKeys);
+      }
+      const traces = terms.length ? traceTerms(code.bundles, terms) : [];
+      if (traces.length) {
+        lines.push('### Request → Code Data-Flow');
+        lines.push('_Functions that reference each captured request parameter. This points at the relevant code; it is not proof of construction._', '');
+        for (const t of traces.slice(0, 15)) {
+          lines.push(`- \`${t.term}\` referenced in: ${t.refs.map(r => `${r.fn} (${shortName(r.bundle)}${r.flags && r.flags.length ? `, ${r.flags.join('/')}` : ''})`).join('; ')}`);
+        }
+        lines.push('');
+      }
+    }
+  } catch (e) { lines.push(`> Code analysis skipped: ${String(e.message || e).slice(0, 160)}`, ''); }
+
+  // Clone scaffold outline — honest about what was actually extracted.
   lines.push('## Clone Scaffold Outline', '');
-  if (stack.some(s => s.includes('Next.js'))) lines.push('```bash', 'npx create-next-app@latest clone', '# Recreate: app/page.tsx (home), app/layout.tsx (shell)', '# Identify data sources from the API endpoints above', '```');
-  else if (stack.some(s => s.includes('React'))) lines.push('```bash', 'npm create vite@latest clone -- --template react-ts', '# Recreate: src/App.tsx and the component tree from the page structure', '```');
-  else if (stack.some(s => s.includes('Vue') || s.includes('Nuxt'))) lines.push('```bash', 'npm create vue@latest clone', '# Recreate: src/views/ and src/components/ from the page structure', '```');
-  else lines.push('```bash', 'mkdir clone && cd clone', '# index.html  — main shell', '# style.css   — extracted styles', '# main.js     — extracted scripts', '```');
+  if (stack.some(s => s.includes('Next.js'))) lines.push('```bash', 'npx create-next-app@latest clone', '# Rebuild app/page.tsx + app/layout.tsx; wire the API Surface calls above', '```');
+  else if (stack.some(s => s.includes('React'))) lines.push('```bash', 'npm create vite@latest clone -- --template react-ts', '# Rebuild the component tree; wire the API Surface calls above', '```');
+  else if (stack.some(s => s.includes('Vue') || s.includes('Nuxt'))) lines.push('```bash', 'npm create vue@latest clone', '# Rebuild views/components; wire the API Surface calls above', '```');
+  else lines.push('```bash', 'mkdir clone && cd clone   # index.html / style.css / main.js', '```');
+  if (!apiCalls.length) lines.push('', '_No API surface was captured this run, so the data layer can\'t be scaffolded — the page likely renders server-side or is media-only._');
   lines.push('');
 
-  // API spec stub if endpoints found
-  const allEndpoints = [...endpoints, ...(netData?.requests.filter(r => r.type === 'fetch' || r.type === 'xhr').map(r => r.url) || [])];
-  if (allEndpoints.length) {
+  // API spec stub — built ONLY from the genuine API surface (never CDN media chunks), filled from the
+  // captured operation/params rather than blanket TODOs.
+  if (apiCalls.length) {
     lines.push('## API Spec Stub (OpenAPI 3.0)', '```yaml', 'openapi: "3.0.0"', 'info:', `  title: "${new URL(url).hostname} API"`, '  version: "0.1.0"', 'paths:');
-    for (const ep of [...new Set(allEndpoints)].slice(0, 15)) {
-      let p = ep; try { p = new URL(ep).pathname; } catch {}
-      const safe = p.replace(/[^a-zA-Z0-9/_\-{}]/g, '_').slice(0, 80) || '/unknown';
-      lines.push(`  ${safe}:`, '    get:', '      summary: "TODO — fill from network capture"', '      responses:', '        "200":', '          description: "TODO"');
+    const byPath = new Map();
+    for (const s of apiCalls) { if (!byPath.has(s.path)) byPath.set(s.path, []); byPath.get(s.path).push(s); }
+    for (const [p, calls] of [...byPath.entries()].slice(0, 15)) {
+      const safe = (p.replace(/[^a-zA-Z0-9/_\-{}]/g, '_').slice(0, 80)) || '/unknown';
+      lines.push(`  "${safe}":`);
+      for (const mth of [...new Set(calls.map(c => c.method.toLowerCase()))]) {
+        const c = calls.find(cc => cc.method.toLowerCase() === mth);
+        const summary = String(c.friendlyName || (c.graphql && (c.graphql.operationName || c.graphql.doc_id)) || `${mth.toUpperCase()} ${p}`).replace(/"/g, "'");
+        lines.push(`    ${mth}:`, `      summary: "${summary}"`);
+        const params = (c.graphql && c.graphql.variables_keys) || c.bodyParamKeys || [];
+        // Use the REQUEST content-type (not the response's) and only emit a body when we actually
+        // parsed params — an invented schema with the wrong media type is worse than none.
+        if (params.length && (c.method !== 'GET' && c.method !== 'HEAD')) {
+          lines.push('      requestBody:', '        content:', `          ${(c.reqContentType || 'application/x-www-form-urlencoded').split(';')[0]}:`,
+            '            schema:', '              type: object', '              properties:');
+          for (const k of params.slice(0, 20)) lines.push(`                ${String(k).replace(/[^a-zA-Z0-9_]/g, '_')}: { type: string }`);
+        }
+        lines.push('      responses:', '        "200": { description: "captured" }');
+      }
     }
     lines.push('```', '');
   }
@@ -334,7 +620,18 @@ async function analyzeWeb(url, name) {
   return { slug, report: lines.join('\n'), title: `Reverse Engineering — ${pageTitle}` };
 }
 
-// Playwright network capture — launches the bundled headless Chromium and records requests.
+// Keep only non-sensitive request headers that aid reverse engineering (operation names, app ids).
+// Deliberately drops cookies/authorization/csrf tokens so the report never captures the owner's creds.
+const KEEP_REQ_HEADERS = ['x-fb-friendly-name', 'x-graphql-operation-name', 'x-ig-app-id', 'x-requested-with', 'content-type', 'x-asbd-id'];
+function pickHeaders(h) {
+  const out = {};
+  for (const k of KEEP_REQ_HEADERS) if (h[k] != null) out[k] = h[k];
+  return out;
+}
+
+// Playwright network capture — launches the bundled headless Chromium and records requests. We keep a
+// larger POST body (GraphQL `variables` are long) and the content-length/range so media chunks can be
+// collapsed and API payloads (doc_id, variables) extracted downstream.
 async function captureNetwork(url) {
   const { chromium } = await import('playwright');
   await ensureChromium(chromium);
@@ -342,9 +639,33 @@ async function captureNetwork(url) {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const ctx = await browser.newContext({ userAgent: UA });
   const page = await ctx.newPage();
-  page.on('request', req => requests.push({ url: req.url(), method: req.method(), type: req.resourceType(), postData: req.postDataBuffer()?.toString('utf8')?.slice(0, 500) ?? null }));
-  page.on('response', res => { const m = requests.find(r => r.url === res.url()); if (m) { m.status = res.status(); m.contentType = res.headers()['content-type'] ?? null; } });
+  page.on('request', req => requests.push({
+    url: req.url(), method: req.method(), type: req.resourceType(),
+    postData: req.postDataBuffer()?.toString('utf8')?.slice(0, 8000) ?? null,
+    reqHeaders: pickHeaders(req.headers()),
+  }));
+  // Capture the actual bytes of the executed scripts (+ the document) so we can analyze the REAL bundle,
+  // not just its URL. Bounded so a huge page can't blow up memory.
+  const bodyJobs = [];
+  let bodied = 0;
+  page.on('response', res => {
+    const m = requests.find(r => r.url === res.url());
+    if (!m) return;
+    const h = res.headers();
+    m.status = res.status();
+    m.contentType = h['content-type'] ?? null;
+    m.contentLength = h['content-length'] ? Number(h['content-length']) : null;
+    m.contentRange = h['content-range'] ?? null;
+    const rt = m.type || res.request().resourceType();
+    if ((rt === 'script' || rt === 'document') && bodied < 30) {
+      bodied++;
+      bodyJobs.push((async () => {
+        try { const buf = await res.body(); if (buf && buf.length <= 4_000_000) m.body = buf.toString('utf8'); } catch { /* body unavailable (cached/opaque) */ }
+      })());
+    }
+  });
   try { await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 }); } catch { /* timeout/nav error acceptable */ }
+  try { await Promise.allSettled(bodyJobs); } catch { /* best effort */ }
   await browser.close();
   return { requests };
 }
@@ -512,6 +833,9 @@ async function main() {
 
   console.log(JSON.stringify({ ok: true, pdf: pdfPath, report: mdPath, pdf_error: pdfError, slug: result.slug }));
 }
+
+// Pure helpers exported for unit tests (no side effects on import).
+export { detectStack, classifyRequest, mediaKey, parseForm, summarizeApiCall, extractScripts, extractLinks };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch(e => { console.error(e.message); process.exit(1); });
