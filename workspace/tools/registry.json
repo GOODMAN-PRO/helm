@@ -85,6 +85,28 @@
     "confirm": false
   },
   {
+    "name": "gui.move",
+    "summary": "Move the mouse WITHOUT clicking. Target by absolute x,y, OR a named anchor (top-left, top-right, bottom-left, bottom-right, center, top, bottom, left, right), OR a percentage of the screen (xpct/ypct, 0-100). Anchors/percent auto-resolve the screen size, so you can move to a corner without knowing the resolution.",
+    "exec": "node tools/impl/gui.move.mjs",
+    "args_schema": {
+      "x": { "type": "number" },
+      "y": { "type": "number" },
+      "at": { "type": "string", "enum": ["top-left", "top-right", "bottom-left", "bottom-right", "center", "top", "bottom", "left", "right"] },
+      "xpct": { "type": "number" },
+      "ypct": { "type": "number" }
+    },
+    "side_effects": "moves mouse",
+    "confirm": false
+  },
+  {
+    "name": "gui.size",
+    "summary": "Return the screen dimensions {width,height,left,top} of the virtual desktop (all monitors). Use to compute coordinates for gui.click / gui.move.",
+    "exec": "node tools/impl/gui.size.mjs",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
     "name": "gui.type",
     "summary": "Type text into the currently focused element.",
     "exec": "node tools/impl/gui.type.mjs",

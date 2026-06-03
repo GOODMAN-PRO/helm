@@ -171,6 +171,11 @@ user's interactive session — so **the Windows screen must be unlocked** for ca
 Linux: screenshots work; cursor/keyboard driving isn't wired. On Windows, `gui.key`'s `--code` is a key
 NAME (enter, esc, tab, up, f5…), not a macOS keycode.
 
+- **Move/position the mouse — by corner, %, or coords:** use `gui.move` to move WITHOUT clicking, and to
+  target a corner/edge WITHOUT knowing the resolution: `at` = top-left|top-right|bottom-left|bottom-right|
+  center|top|bottom|left|right (or `xpct`/`ypct` 0-100, or absolute `x`/`y`). Get the screen size anytime
+  with `gui.size`. So "move to the top right corner" is just `gui.move --at top-right`. Never tell the owner
+  you can't reach a corner or don't know the screen size — you can, and you do.
 - **See the screen (cross-platform — captures the machine you're running on):** prefer
   `node workspace/tools/impl/screencap.mjs --out <file>` (or the `screencap` registry tool / the
   `/screenshot-and-show` skill). It writes a PNG and works on **macOS, Windows and Linux** — when the
@@ -306,7 +311,7 @@ Servers are passed with `--strict-mcp-config` so the user's global MCP config is
 ### Tool registry
 Declarative list of Helm's callable verbs lives in `workspace/tools/registry.json`.
 Dispatcher: `node workspace/tools/tools.mjs list` or `tools.mjs call <name> --json '{...}'`.
-Built-in tools: image.generate, screencap, gui.click, gui.type, gui.key, imessage.send,
+Built-in tools: image.generate, screencap, gui.click, gui.move, gui.size, gui.type, gui.key, imessage.send,
 discord.attach, memory.remember, memory.recall, scheduler.add, scheduler.list.
 Each tool impl is a standalone script under `workspace/tools/impl/`.
 

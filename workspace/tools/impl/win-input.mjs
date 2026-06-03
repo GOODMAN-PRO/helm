@@ -97,6 +97,34 @@ export function winInput(action, { timeout = 12_000 } = {}) {
   return { ok: false, error: 'HelmInput timed out — ensure you are logged in at the Windows machine with the screen unlocked.' };
 }
 
+// Screen geometry of the whole virtual desktop (all monitors). Read-only, so it runs locally with a
+// quick PowerShell call — no interactive scheduled task needed. Returns { ok, left, top, width, height }.
+export function screenBounds() {
+  const ps = [
+    'Add-Type -AssemblyName System.Windows.Forms',
+    '$v=[System.Windows.Forms.SystemInformation]::VirtualScreen',
+    'Write-Output ("BOUNDS="+$v.Left+","+$v.Top+","+$v.Width+","+$v.Height)',
+  ].join('\n');
+  const b64 = Buffer.from(ps, 'utf16le').toString('base64');
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', b64], { encoding: 'utf8', timeout: 10_000 });
+  const m = ((r.stdout || '') + (r.stderr || '')).match(/BOUNDS=(-?\d+),(-?\d+),(\d+),(\d+)/);
+  if (!m) return { ok: false, error: 'could not read screen size' };
+  return { ok: true, left: +m[1], top: +m[2], width: +m[3], height: +m[4] };
+}
+
+// Resolve a named anchor (e.g. "top-right", "center") to absolute screen coords given bounds.
+// `inset` nudges off the exact edge so corners stay clickable. Returns [x, y] or null.
+export function resolveAnchor(at, b, inset = 1) {
+  const l = b.left + inset, t = b.top + inset;
+  const r = b.left + b.width - 1 - inset, btm = b.top + b.height - 1 - inset;
+  const cx = b.left + Math.floor(b.width / 2), cy = b.top + Math.floor(b.height / 2);
+  const map = {
+    'top-left': [l, t], 'top-right': [r, t], 'bottom-left': [l, btm], 'bottom-right': [r, btm],
+    'center': [cx, cy], 'middle': [cx, cy], 'top': [cx, t], 'bottom': [cx, btm], 'left': [l, cy], 'right': [r, cy],
+  };
+  return map[String(at).toLowerCase().replace(/\s+/g, '-')] || null;
+}
+
 // --task-run: executed by the HelmInput scheduled task inside the interactive session.
 if (process.argv.includes('--task-run')) {
   let action = {};
