@@ -135,3 +135,7 @@ workspace/network/hub-data.json
 .last-nightly-upgrade
 
 workspace/model-pref
+
+# desktop app build outputs
+desktop/node_modules/
+desktop/dist/

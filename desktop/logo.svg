@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Helm">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="75%">
+      <stop offset="0%" stop-color="#1b2942"/>
+      <stop offset="55%" stop-color="#0f1722"/>
+      <stop offset="100%" stop-color="#070a10"/>
+    </radialGradient>
+    <linearGradient id="wheel" gradientUnits="userSpaceOnUse" x1="120" y1="100" x2="392" y2="412">
+      <stop offset="0%" stop-color="#7df0dc"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e6fffb"/>
+      <stop offset="60%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- full-bleed circular avatar background -->
+  <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="250" fill="none" stroke="#2a3a54" stroke-width="3" opacity="0.5"/>
+
+  <g transform="translate(256,256)" filter="url(#glow)" fill="none"
+     stroke="url(#wheel)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 8 bold spokes / handle pegs -->
+    <g stroke-width="22">
+      <line y2="-190"/>
+      <line y2="-190" transform="rotate(45)"/>
+      <line y2="-190" transform="rotate(90)"/>
+      <line y2="-190" transform="rotate(135)"/>
+      <line y2="-190" transform="rotate(180)"/>
+      <line y2="-190" transform="rotate(225)"/>
+      <line y2="-190" transform="rotate(270)"/>
+      <line y2="-190" transform="rotate(315)"/>
+    </g>
+    <!-- bold outer ring -->
+    <circle r="150" stroke-width="30"/>
+  </g>
+
+  <!-- hub: dark disc + ring + glowing core -->
+  <circle cx="256" cy="256" r="58" fill="#070a10"/>
+  <circle cx="256" cy="256" r="58" fill="none" stroke="url(#wheel)" stroke-width="9"/>
+  <circle cx="256" cy="256" r="22" fill="url(#core)" filter="url(#glow)"/>
+</svg>
