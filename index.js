@@ -471,7 +471,36 @@ function runClaudeStream(args, prompt, onEvent) {
   });
 }
 
-async function ask(prompt, onProgress, mode = 'copilot') {
+// ---- memory: retrieval-augmented recall + lightweight capture ----
+// Before each turn, pull the most relevant things Helm already knows and inject them into the prompt so
+// it actually USES its memory instead of just storing it. After a turn, archive the exchange (so past
+// conversations are recall-able) and capture any explicit "remember …" facts.
+function recallMemories(text) {
+  try {
+    const q = String(text || '').replace(/\s+/g, ' ').slice(0, 240);
+    if (q.length < 3) return '';
+    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', q], { cwd: __dirname, encoding: 'utf8', timeout: 6000 });
+    if (r.status !== 0) return '';
+    const arr = JSON.parse(r.stdout || '[]');
+    // Skip the CLAUDE.md/helm.md persona-doc fragments (already in the prompt) — keep real learned facts.
+    const picks = arr.filter(f => f && f.value && f.key && !/^(CLAUDE|helm)\.md$/i.test(f.source || '')).slice(0, 8);
+    if (!picks.length) return '';
+    const lines = picks.map(f => `- (${f.kind}) ${String(f.key).slice(0, 80)}: ${String(f.value).slice(0, 180)}`);
+    return `\n\nMEMORY — relevant things you already know (use them, never contradict them; don't recite them unless asked):\n${lines.join('\n')}`;
+  } catch { return ''; }
+}
+function captureTurn(userText, reply, channel = 'chat') {
+  try {
+    const mm = path.join(WORKSPACE, 'memory/memory.mjs');
+    const ep = `${String(userText || '').replace(/\s+/g, ' ').slice(0, 160)} → ${String(reply || '').replace(/\s+/g, ' ').slice(0, 160)}`;
+    if (ep.trim().length > 6) spawn(process.execPath, [mm, 'episode', 'add', ep, '--channel', channel], { cwd: __dirname, stdio: 'ignore', detached: true }).unref();
+    const m = String(userText || '').match(/\b(?:remember(?:\s+that)?|note\s+that|for\s+the\s+record|fyi[:,]?)\s+(.{4,200})/i);
+    if (m) spawn(process.execPath, [mm, 'remember', 'learned', 'note-' + Date.now().toString(36), m[1].trim(), '--source', 'observed', '--confidence', '0.8'], { cwd: __dirname, stdio: 'ignore', detached: true }).unref();
+  } catch {}
+}
+
+async function ask(prompt, onProgress, mode = 'copilot', opts = {}) {
+  const sessionKey = opts.sessionKey || 'owner';   // per-conversation sessions enable resumable chats
   // Single machine: every task runs locally on this box. (No fleet / peer SSH / cross-machine sync.)
   // Free/local backend preflight: if the model endpoint isn't reachable, say so clearly and fast —
   // otherwise the engine hangs forever trying to reach a dead Ollama/proxy upstream.
@@ -489,12 +518,12 @@ async function ask(prompt, onProgress, mode = 'copilot') {
     '-p', '--output-format', 'stream-json', '--verbose',   // stream events so we can show live progress
     '--model', model,
     '--permission-mode', PERMISSION_MODE,
-    '--append-system-prompt', buildPersona(mode),
+    '--append-system-prompt', buildPersona(mode) + recallMemories(prompt),
     '--add-dir', WORKSPACE,
     '--add-dir', os.homedir(), // full home access (ultimate powers), on whatever OS this is
     '--strict-mcp-config', '--mcp-config', mcpConfigArg(), // workspace/mcp/servers.json (filesystem + fetch)
   ];
-  const sid = getSession('owner');
+  const sid = getSession(sessionKey);
   const args = sid ? [...base, '--resume', sid] : base;
 
   // Live status: surface what the engine is actually doing, with elapsed time, so it never looks
@@ -518,13 +547,13 @@ async function ask(prompt, onProgress, mode = 'copilot') {
     r = await runClaudeStream(args, prompt, onEvent);
   } catch (e) {
     if (e.stopped || e.timedOut || !sid) { clearInterval(ticker); throw e; }  // never retry a cancel/timeout
-    deleteSession('owner');      // stale/expired session -> retry fresh once
+    deleteSession(sessionKey);   // stale/expired session -> retry fresh once
     lastStatus = 'retrying…'; push(true);
     r = await runClaudeStream(base, prompt, onEvent);
   } finally {
     clearInterval(ticker);
   }
-  if (r.session_id) setSession('owner', r.session_id, 'discord');
+  if (r.session_id) setSession(sessionKey, r.session_id, 'chat');
   const reply = (r.result ?? '').toString().trim() || '(empty reply)';
   try { appendCost(MODEL, prompt.length, reply.length); } catch {}
   return reply;
@@ -962,6 +991,7 @@ client.on(Events.MessageCreate, async msg => {
       }
       try { mirrorReply(body || '(see attachment)'); } catch {}   // show Discord replies in any open terminal
       if (files.length) { try { mirrorAttach(files); } catch {} }  // let any open terminal OPEN the images too
+      try { captureTurn(text, body, 'discord'); } catch {}         // build memory from this exchange
     }
     console.log(`📤 replied (${body.length} chars, ${files.length} files, mode=${mode}, planPending=${hasPlanPending})`);
     // durable transcript so nothing is ever lost (the brain distills these into memory)
@@ -1051,7 +1081,10 @@ await new Promise(resolve => {
 // terminal/Discord/iMessage), instead of spawning a second brain. A terminal line runs through the
 // same ask() + 'owner' session; the reply is mirrored to every channel.
 let cliBusy = false;
-startCliBridge(async (text, reply) => {
+startCliBridge(async (text, reply, convId) => {
+  // Each desktop conversation carries its own id -> its own resumable Claude session. No id = the shared
+  // 'owner' thread (terminal / cross-channel).
+  const sessionKey = convId ? `conv:${String(convId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40)}` : 'owner';
   try { mirrorEcho(text, 'you (terminal)'); } catch {}
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); reply(n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'); return; }
   if (/^\s*\/?pathway\s*$/i.test(text)) { reply(pathwayReport()); return; }   // same command works in the terminal
@@ -1060,14 +1093,15 @@ startCliBridge(async (text, reply) => {
   if (mModel) { if (!mModel[1]) reply(`Model: ${getModelPref() || 'auto-route'}`); else { const ok = setModelPref(mModel[1]); reply(ok ? `Model set to ${mModel[1]}.` : `Unknown model "${mModel[1]}". Use opus | sonnet | haiku | auto.`); } return; }
   const mMode = text.match(/^!mode(?:\s+(suggest|copilot|autopilot))?\s*$/i);
   if (mMode) { if (!mMode[1]) reply(`Mode: ${getAutonomyMode()}`); else { const ok = setAutonomyMode(mMode[1].toLowerCase()); reply(ok ? `Mode set to ${mMode[1].toLowerCase()}.` : 'Failed to set mode.'); } return; }
-  if (/^\s*\/?(new|reset|newchat)\s*$/i.test(text)) { try { deleteSession('owner'); } catch {} reply('Started a new conversation — context cleared.'); return; }
+  if (/^\s*\/?(new|reset|newchat)\s*$/i.test(text)) { try { deleteSession(sessionKey); } catch {} reply('Started a new conversation — context cleared.'); return; }
   if (cliBusy) { reply('(still working on the previous message — try again in a moment)'); return; }
   cliBusy = true;
   try {
     const mode = getAutonomyMode();
-    const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, mode);
+    const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, mode, { sessionKey });
     const { text: rawBody, files } = splitAttachments(raw);
     const body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
+    try { captureTurn(text, body, convId ? 'desktop' : 'terminal'); } catch {}
     reply(body);   // broadcasts to every terminal once (no separate mirrorReply, or it'd double-send)
     // Helm produced files (e.g. a generated image, a screenshot). Discord/iMessage attach them; the
     // terminal can't show inline pixels, so send the paths and let the terminal client OPEN them.

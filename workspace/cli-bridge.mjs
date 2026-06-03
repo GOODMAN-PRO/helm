@@ -59,7 +59,7 @@ export function startCliBridge(onMessage) {
           for (const s of clients) if (s !== sock) send(s, { type: 'echo', text: msg.text, from: 'you (terminal)' });
           // reply() broadcasts to EVERY terminal (so all mirror it) exactly once — the brain must NOT
           // also call mirrorReply for the same answer, or the originating terminal would see it twice.
-          try { onMessage(msg.text.trim(), reply => broadcast({ type: 'reply', text: reply, from: 'helm' })); } catch (e) {
+          try { onMessage(msg.text.trim(), reply => broadcast({ type: 'reply', text: reply, from: 'helm' }), msg.conv); } catch (e) {
             send(sock, { type: 'info', text: 'error: ' + (e?.message || e) });
           }
         }
