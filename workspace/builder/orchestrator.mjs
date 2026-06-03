@@ -6,6 +6,7 @@
 
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { selectRoles } from './select.mjs';   // adaptive, token-efficient role selection
 
 const __filename = fileURLToPath(import.meta.url);
@@ -250,8 +251,24 @@ export async function buildApp(options = {}) {
   } = options;
 
   let projectDir = outDir || null;
+  // Single-build lock: spinning up a second 34-40 agent build while one is running thrashes the machine
+  // (this is exactly what happened when a build was relaunched mid-run). Refuse to start a concurrent one.
+  const LOCK = path.join(REPO_ROOT, 'workspace', 'builder', '.build.lock');
+  let lockHeld = false;
 
   try {
+    if (!dryRun) {
+      try {
+        if (existsSync(LOCK)) {
+          const pid = parseInt(readFileSync(LOCK, 'utf8'), 10);
+          let alive = false; try { if (pid) { process.kill(pid, 0); alive = true; } } catch {}
+          if (alive) return { ok: false, error: `a build is already running (pid ${pid}). Wait for it to finish or stop it before starting another — running several at once thrashes the machine.`, projectDir: null };
+        }
+        mkdirSync(path.dirname(LOCK), { recursive: true });
+        writeFileSync(LOCK, String(process.pid));
+        lockHeld = true;
+      } catch { /* lock best-effort */ }
+    }
     // ── 1. Resolve stack ────────────────────────────────────────────────────
     let stack = stackOpt;
     if (!stack) {
@@ -285,10 +302,10 @@ export async function buildApp(options = {}) {
       }
     }
 
-    // ── 4. Create context ───────────────────────────────────────────────────
+    // ── 4. Create context (skip in dryRun so a plan/smoke run never creates folders on disk) ──
     let ctx;
     const ctxMod = await tryImport(path.join(__dirname, 'context.mjs'));
-    if (ctxMod?.createContext) {
+    if (!dryRun && ctxMod?.createContext) {
       try {
         ctx = ctxMod.createContext({ brief, stack, projectDir });
       } catch (e) {
@@ -506,6 +523,8 @@ export async function buildApp(options = {}) {
       error:      String(fatal),
       projectDir: projectDir || null,
     };
+  } finally {
+    if (lockHeld) { try { unlinkSync(LOCK); } catch {} }   // always release the single-build lock
   }
 }
 

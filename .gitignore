@@ -147,3 +147,4 @@ workspace/flows/
 workspace/research/
 workspace/.discord-last-seen
 workspace/cortex/
+workspace/builder/.build.lock
