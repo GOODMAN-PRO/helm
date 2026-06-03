@@ -43,7 +43,9 @@ function slugify(s) {
 
 // Short ISO timestamp for directory names — no colons (filesystem-safe).
 function tsNow() {
-  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  // No uppercase / no ':'/'.': the folder basename becomes the project name, and create-next-app rejects
+  // any name with capitals (npm naming) — the ISO 'T' separator silently broke every scaffold.
+  return new Date().toISOString().replace(/[:.tz]/gi, '-').slice(0, 19);
 }
 
 // Safe dynamic import: returns the module or null on any error.

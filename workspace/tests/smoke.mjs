@@ -2241,6 +2241,20 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- builder: project folder name is npm-name-safe (no uppercase → create-next-app accepts it) ----
+{
+  const label = 'builder: generated project folder has no uppercase (create-next-app name rule)';
+  try {
+    const { buildApp } = await imp(path.join(WORKSPACE, 'builder/orchestrator.mjs'));
+    const r = await buildApp({ brief: 'Cinematic Product LAUNCH Site', dryRun: true });
+    const base = String(r.projectDir || '').split(/[\\/]/).pop();
+    if (!base) throw new Error('no projectDir produced');
+    if (/[A-Z]/.test(base)) throw new Error(`project folder has uppercase (breaks create-next-app): ${base}`);
+    if (/[T]/.test(base) && /\d{4}-\d\d-\d\dT/.test(base)) throw new Error(`ISO 'T' present in folder name: ${base}`);
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
