@@ -23,7 +23,7 @@ import { startCliBridge, mirrorReply, mirrorEcho, mirrorStatus, mirrorAttach } f
 import { listSkills, runSkillCommand } from './workspace/skills/loader.mjs';
 import { renderProjects, addProject, cancelProject, deleteProject, doneProject } from './workspace/projects/projects.mjs';
 import { publicIdentity, setHandle as netSetHandle } from './workspace/network/identity.mjs';
-import { register as netRegister, addFriend, acceptFriend, listFriends, sendMessage as netSend, poll as netPoll, HUB_URL } from './workspace/network/friends.mjs';
+import { register as netRegister, addFriend, acceptFriend, listFriends, sendMessage as netSend, poll as netPoll, hubUrl } from './workspace/network/friends.mjs';
 
 // Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -788,7 +788,7 @@ client.on(Events.MessageCreate, async msg => {
   // ---- Helm network: add other Helm agents as friends and message them over a hub ----
   if (/^\/?(myhandle|my handle|whoami)\s*$/i.test(low)) {
     const me = publicIdentity();
-    await msg.reply(`I'm **@${me.handle}** (id \`${me.id}\`) on the Helm network. Hub: \`${HUB_URL}\`.\nFriends add me with: \`add friend @${me.handle}\` (once we share a hub).`);
+    await msg.reply(`I'm **@${me.handle}** (id \`${me.id}\`) on the Helm network. Hub: \`${hubUrl()}\`.\nFriends add me with: \`add friend @${me.handle}\` (once we share a hub).`);
     return;
   }
   let nm;

@@ -12,14 +12,14 @@
 
 import { fileURLToPath } from 'node:url';
 import { publicIdentity, setHandle } from './identity.mjs';
-import { register, addFriend, acceptFriend, listFriends, sendMessage, poll, HUB_URL } from './friends.mjs';
+import { register, addFriend, acceptFriend, listFriends, sendMessage, poll, hubUrl } from './friends.mjs';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const out = o => console.log(JSON.stringify(o));
 
 async function main() {
   switch (cmd) {
-    case 'whoami':   return out({ ok: true, ...publicIdentity(), hub: HUB_URL });
+    case 'whoami':   return out({ ok: true, ...publicIdentity(), hub: hubUrl() });
     case 'handle':   return out({ ok: true, handle: setHandle(rest[0] || '') });
     case 'register': return out(await register());
     case 'add':      return out(await addFriend(rest[0] || ''));

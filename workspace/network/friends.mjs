@@ -14,7 +14,11 @@ import path from 'node:path';
 import { getIdentity, publicIdentity, sign, verify, fingerprint, NET_DIR } from './identity.mjs';
 
 const FILE = path.join(NET_DIR, 'friends.json');
-export const HUB_URL = (process.env.HELM_HUB_URL || 'http://127.0.0.1:8910').replace(/\/$/, '');
+// Read the hub URL LIVE (every call), not once at import time. The brain imports this module before it
+// loads .env (ES imports run first), so a load-time constant would freeze to the localhost default and
+// poll a dead port. A getter sees HELM_HUB_URL once dotenv has populated process.env.
+export const hubUrl = () => (process.env.HELM_HUB_URL || 'http://127.0.0.1:8910').replace(/\/$/, '');
+export const HUB_URL = hubUrl();   // snapshot kept for back-compat; live code paths must use hubUrl()
 
 const load = () => { try { return JSON.parse(readFileSync(FILE, 'utf8')); } catch { return { friends: {}, lastHubTs: 0 }; } };
 const save = db => { mkdirSync(NET_DIR, { recursive: true }); writeFileSync(FILE, JSON.stringify(db, null, 2)); };
@@ -23,7 +27,7 @@ const canon = m => `${m.to}|${m.from}|${m.ts}|${m.type}|${m.body || ''}`;
 async function hub(method, pathName, { body: b, headers } = {}) {
   // 'ngrok-skip-browser-warning' + a non-browser UA bypass ngrok's free-tier interstitial so a hub
   // served through ngrok returns JSON (not the warning HTML) to the Helm client. Harmless on other hubs.
-  const res = await fetch(`${HUB_URL}${pathName}`, { method, headers: { 'content-type': 'application/json', 'ngrok-skip-browser-warning': 'true', 'user-agent': 'Helm/1.0', ...(headers || {}) }, body: b ? JSON.stringify(b) : undefined });
+  const res = await fetch(`${hubUrl()}${pathName}`, { method, headers: { 'content-type': 'application/json', 'ngrok-skip-browser-warning': 'true', 'user-agent': 'Helm/1.0', ...(headers || {}) }, body: b ? JSON.stringify(b) : undefined });
   let j = {}; try { j = await res.json(); } catch {}
   return { status: res.status, ...j };
 }
@@ -56,12 +60,16 @@ export async function addFriend(handle) {
   return r.ok ? { ok: true, handle } : { ok: false, error: `request not delivered (${r.error || r.status})` };
 }
 
-// Accept a pending incoming request.
+// Accept a pending incoming request. If we don't have the request locally yet, pull the hub inbox
+// first — the request is often still un-polled when the owner accepts right after the other side sends.
+// This makes `accept` self-sufficient instead of failing with "no pending request" until you `poll`.
 export async function acceptFriend(handle) {
   handle = handle.replace(/^@/, '');
-  const db = load();
+  let db = load();
+  if (!db.friends[handle]) { try { await poll(); } catch {} db = load(); }
   const f = db.friends[handle];
-  if (!f) return { ok: false, error: `no pending request from @${handle}` };
+  if (!f) return { ok: false, error: `no pending request from @${handle} (none found on the hub either)` };
+  if (f.status === 'pending-out') return { ok: false, error: `@${handle} hasn't accepted YOUR request yet — nothing to accept here` };
   f.status = 'accepted'; f.since = new Date().toISOString(); save(db);
   await deliver(handle, 'friend-accept', '');
   return { ok: true, handle };
