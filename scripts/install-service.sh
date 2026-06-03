@@ -45,7 +45,7 @@ EOF
   echo "  installed launchd service '$label' ($script)"
 }
 
-# Nightly self-upgrade job (com.helm.selfupgrade) — runs workspace/upgrades/self-upgrade.mjs at 03:00
+# Nightly self-upgrade job (com.helm.selfupgrade) — runs workspace/upgrades/self-upgrade.mjs at midnight
 # local time. This is separate from the always-on gateway service; without it the stuck-queue /
 # self-improvement loop never fires. macOS: launchd StartCalendarInterval.
 install_selfupgrade_mac() {
@@ -64,7 +64,7 @@ install_selfupgrade_mac() {
 <key>EnvironmentVariables</key><dict>
 <key>PATH</key><string>$(dirname "$NODE"):/usr/bin:/bin:/usr/sbin:/sbin</string>
 <key>HOME</key><string>$HOME</string></dict>
-<key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+<key>StartCalendarInterval</key><dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
 <key>RunAtLoad</key><false/>
 <key>StandardOutPath</key><string>$DIR/workspace/upgrades/self-upgrade.log</string>
 <key>StandardErrorPath</key><string>$DIR/workspace/upgrades/self-upgrade.log</string>
@@ -72,10 +72,10 @@ install_selfupgrade_mac() {
 EOF
   launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
   launchctl bootstrap "gui/$(id -u)" "$plist"
-  echo "  installed nightly self-upgrade '$label' (03:00 local)"
+  echo "  installed nightly self-upgrade '$label' (midnight local)"
 }
 
-# Linux: a systemd --user timer firing at 03:00 daily.
+# Linux: a systemd --user timer firing at midnight daily.
 install_selfupgrade_linux() {
   local dir="$HOME/.config/systemd/user"; mkdir -p "$dir"
   cat > "$dir/helm-selfupgrade.service" <<EOF
@@ -88,16 +88,16 @@ ExecStart=$NODE $DIR/workspace/upgrades/self-upgrade.mjs
 EOF
   cat > "$dir/helm-selfupgrade.timer" <<EOF
 [Unit]
-Description=Run Helm self-upgrade nightly at 03:00
+Description=Run Helm self-upgrade nightly at midnight
 [Timer]
-OnCalendar=*-*-* 03:00:00
+OnCalendar=*-*-* 00:00:00
 Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
   systemctl --user daemon-reload
   systemctl --user enable --now helm-selfupgrade.timer
-  echo "  installed nightly self-upgrade timer 'helm-selfupgrade.timer' (03:00)"
+  echo "  installed nightly self-upgrade timer 'helm-selfupgrade.timer' (midnight)"
 }
 
 install_linux() {
