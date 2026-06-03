@@ -35,6 +35,12 @@
       "args": ["__HELM_ROOT__/workspace/mcp/wrap-brave-search.mjs"],
       "healthCheck": "initialize",
       "enabled": true
+    },
+    "video": {
+      "command": "node",
+      "args": ["__HELM_ROOT__/workspace/mcp/wrap-video.mjs"],
+      "healthCheck": "initialize",
+      "enabled": true
     }
   }
 }
