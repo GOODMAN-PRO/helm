@@ -499,14 +499,18 @@ function recallMemories(text) {
     if (q.length < 3) return '';
     // 12s: the first recall after a process start loads the local embedding model (all-MiniLM) for
     // semantic ranking; subsequent calls hit the cached vectors and are fast.
-    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', q], { cwd: __dirname, encoding: 'utf8', timeout: 12000 });
+    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', q, '--with-episodes'], { cwd: __dirname, encoding: 'utf8', timeout: 12000 });
     if (r.status !== 0) return '';
-    const arr = JSON.parse(r.stdout || '[]');
+    const parsed = JSON.parse(r.stdout || '{}');
+    const facts = Array.isArray(parsed) ? parsed : (parsed.facts || []);
+    const episodes = Array.isArray(parsed) ? [] : (parsed.episodes || []);
     // Skip the CLAUDE.md/helm.md persona-doc fragments (already in the prompt) — keep real learned facts.
-    const picks = arr.filter(f => f && f.value && f.key && !/^(CLAUDE|helm)\.md$/i.test(f.source || '')).slice(0, 8);
-    if (!picks.length) return '';
-    const lines = picks.map(f => `- (${f.kind}) ${String(f.key).slice(0, 80)}: ${String(f.value).slice(0, 180)}`);
-    return `\n\nMEMORY — relevant things you already know (use them, never contradict them; don't recite them unless asked):\n${lines.join('\n')}`;
+    const picks = facts.filter(f => f && f.value && f.key && !/^(CLAUDE|helm)\.md$/i.test(f.source || '')).slice(0, 8);
+    const sections = [];
+    if (picks.length) sections.push('Relevant things you already know:\n' + picks.map(f => `- (${f.kind}) ${String(f.key).slice(0, 80)}: ${String(f.value).slice(0, 180)}`).join('\n'));
+    if (episodes.length) sections.push('Relevant past conversations/notes (by meaning):\n' + episodes.map(e => `- ${e.ts ? '[' + new Date(e.ts * 1000).toISOString().slice(0, 10) + '] ' : ''}${String(e.summary).slice(0, 200)}`).join('\n'));
+    if (!sections.length) return '';
+    return `\n\nMEMORY — use these, never contradict them; don't recite them unless asked:\n${sections.join('\n\n')}`;
   } catch { return ''; }
 }
 function captureTurn(userText, reply, channel = 'chat') {

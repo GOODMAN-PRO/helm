@@ -279,53 +279,58 @@ switch (verb) {
     };
     const confWeight = f => 0.7 + 0.3 * f.confidence;
 
-    let scored;
+    let scored, results;
     if (keywordOnly || !cosScores) {
       // BM25-only path: score = bm25 * confWeight * keyBoost
-      scored = allFacts.map((f, i) => ({
-        ...f,
-        _score: bm25Scores[i] * confWeight(f) * keyMatchBoost(f),
-      }));
-      const results = scored
+      scored = allFacts.map((f, i) => ({ ...f, _score: bm25Scores[i] * confWeight(f) * keyMatchBoost(f) }));
+      results = scored
         .filter(f => f._score > 0)
         .sort((a, b) => b._score - a._score || b.confidence - a.confidence || b.updated - a.updated)
         .slice(0, limit)
         .map(({ _score, ...f }) => f);
-      for (const f of results) {
-        db.prepare(`UPDATE facts SET access_count = access_count + 1 WHERE id = ?`).run(f.id);
-      }
-      out(results);
-      break;
+    } else {
+      // RRF fusion: rank BM25 and cosine independently, combine via Reciprocal Rank Fusion.
+      const bm25Idx = allFacts.map((_, i) => i).sort((a, b) => bm25Scores[b] - bm25Scores[a]);
+      const bm25Rank = new Array(allFacts.length); bm25Idx.forEach((idx, rank) => { bm25Rank[idx] = rank; });
+      const cosIdx = allFacts.map((_, i) => i).sort((a, b) => cosScores[b] - cosScores[a]);
+      const cosRank = new Array(allFacts.length); cosIdx.forEach((idx, rank) => { cosRank[idx] = rank; });
+      scored = allFacts.map((f, i) => ({
+        ...f, _score: (1 / (60 + bm25Rank[i]) + 1 / (60 + cosRank[i])) * confWeight(f) * keyMatchBoost(f),
+        _bm25: bm25Scores[i], _cos: cosScores[i],
+      }));
+      results = scored
+        .filter(f => f._bm25 > 0 || f._cos > 0.01)
+        .sort((a, b) => b._score - a._score || b.confidence - a.confidence || b.updated - a.updated)
+        .slice(0, limit)
+        .map(({ _score, _bm25, _cos, ...f }) => f);
     }
+    for (const f of results) db.prepare(`UPDATE facts SET access_count = access_count + 1 WHERE id = ?`).run(f.id);
 
-    // RRF fusion: rank BM25 and cosine independently, combine via Reciprocal Rank Fusion.
-    // score = (1/(60+bm25_rank) + 1/(60+cos_rank)) * confWeight * keyBoost
-    const bm25Idx = allFacts.map((_, i) => i).sort((a, b) => bm25Scores[b] - bm25Scores[a]);
-    const bm25Rank = new Array(allFacts.length);
-    bm25Idx.forEach((idx, rank) => { bm25Rank[idx] = rank; });
-
-    const cosIdx = allFacts.map((_, i) => i).sort((a, b) => cosScores[b] - cosScores[a]);
-    const cosRank = new Array(allFacts.length);
-    cosIdx.forEach((idx, rank) => { cosRank[idx] = rank; });
-
-    scored = allFacts.map((f, i) => {
-      const rrf = 1 / (60 + bm25Rank[i]) + 1 / (60 + cosRank[i]);
-      return {
-        ...f,
-        _score: rrf * confWeight(f) * keyMatchBoost(f),
-        _bm25: bm25Scores[i],
-        _cos: cosScores[i],
-      };
-    });
-
-    const results = scored
-      .filter(f => f._bm25 > 0 || f._cos > 0.01)
-      .sort((a, b) => b._score - a._score || b.confidence - a.confidence || b.updated - a.updated)
-      .slice(0, limit)
-      .map(({ _score, _bm25, _cos, ...f }) => f);
-
-    for (const f of results) {
-      db.prepare(`UPDATE facts SET access_count = access_count + 1 WHERE id = ?`).run(f.id);
+    // --with-episodes: also semantically rank PAST CONVERSATIONS (episodes), blended with recency, so the
+    // brain can recall "what we talked about", not just stored facts. Output shape becomes {facts,episodes}.
+    if (flags['with-episodes'] || flags.episodes === true) {
+      const epLimit = parseInt(flags['ep-limit'] ?? 6, 10);
+      const eps = db.prepare(`SELECT id, summary, channel, ts FROM episodes WHERE summary IS NOT NULL AND summary != '' ORDER BY ts DESC LIMIT 500`).all();
+      let episodes = [];
+      if (eps.length) {
+        const now = Date.now() / 1000;
+        const epDocs = eps.map(e => tokenize(e.summary).map(stem));
+        const edf = new Map(); for (const d of epDocs) for (const w of new Set(d)) edf.set(w, (edf.get(w) || 0) + 1);
+        const eN = epDocs.length || 1, eAvg = epDocs.reduce((s, d) => s + d.length, 0) / eN || 1;
+        const ebm = toks => { const tf = new Map(); for (const w of toks) tf.set(w, (tf.get(w) || 0) + 1); let s = 0; for (const qt of qStems) { const f = tf.get(qt) || 0; if (!f) continue; const ni = edf.get(qt) || 0; s += Math.log((eN - ni + 0.5) / (ni + 0.5) + 1) * (f * 2.5) / (f + 1.5 * (0.25 + 0.75 * toks.length / eAvg)); } return s; };
+        let qVecEp = null, em = null;
+        if (!keywordOnly) { try { em = await import('./embed.mjs'); qVecEp = (await em.ensurePipelineLoaded()) ? await em.embedText(query || ' ') : (em = null); } catch { em = null; } }
+        for (let i = 0; i < eps.length; i++) {
+          const e = eps[i]; let cos = 0;
+          if (em && qVecEp) { const ev = await em.getOrComputeEpisodeVector(db, e.id, e.summary); if (ev) cos = em.cosineSimilarity(qVecEp, ev); }
+          const bm = ebm(epDocs[i]);
+          const recency = Math.exp(-(now - (e.ts || now)) / (60 * 60 * 24 * 30)); // ~30-day decay
+          episodes.push({ id: e.id, summary: e.summary, channel: e.channel, ts: e.ts, _s: (cos + bm * 0.12) * (0.6 + 0.4 * recency), _cos: cos, _bm: bm });
+        }
+        episodes = episodes.filter(e => e._cos > 0.18 || e._bm > 0).sort((a, b) => b._s - a._s).slice(0, epLimit).map(({ _s, _cos, _bm, ...e }) => e);
+      }
+      out({ facts: results, episodes });
+      break;
     }
 
     out(results);

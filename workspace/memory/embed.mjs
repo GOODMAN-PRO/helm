@@ -104,6 +104,24 @@ export async function getOrComputeVector(db, factId, text) {
   return vec;
 }
 
+// ---- episode vectors (past conversations) — parallel cache so episodes are semantically recallable ----
+export function ensureEpisodeVectorsTable(db) {
+  db.exec(`CREATE TABLE IF NOT EXISTS episode_vectors (
+    episode_id INTEGER PRIMARY KEY,
+    vector     TEXT NOT NULL,
+    created    INTEGER NOT NULL DEFAULT (unixepoch())
+  )`);
+}
+const _epTablesReady = new WeakSet();
+export async function getOrComputeEpisodeVector(db, episodeId, text) {
+  if (!_epTablesReady.has(db)) { ensureEpisodeVectorsTable(db); _epTablesReady.add(db); }
+  const row = db.prepare('SELECT vector FROM episode_vectors WHERE episode_id = ?').get(episodeId);
+  if (row) return JSON.parse(row.vector);
+  let vec; try { vec = await embedText(text); } catch { return null; }
+  db.prepare('INSERT OR REPLACE INTO episode_vectors (episode_id, vector) VALUES (?, ?)').run(episodeId, JSON.stringify(vec));
+  return vec;
+}
+
 // One-time provisioning: `node workspace/memory/embed.mjs download` fetches all-MiniLM-L6-v2 into the
 // stable cache so semantic recall works (runtime never downloads — allowRemoteModels stays false there).
 if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === 'download') {
