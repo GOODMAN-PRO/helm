@@ -1055,6 +1055,12 @@ startCliBridge(async (text, reply) => {
   try { mirrorEcho(text, 'you (terminal)'); } catch {}
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); reply(n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'); return; }
   if (/^\s*\/?pathway\s*$/i.test(text)) { reply(pathwayReport()); return; }   // same command works in the terminal
+  // Control commands over the bridge (terminal + desktop app), parity with the Discord gateway:
+  const mModel = text.match(/^!model(?:\s+(\S+))?\s*$/i);
+  if (mModel) { if (!mModel[1]) reply(`Model: ${getModelPref() || 'auto-route'}`); else { const ok = setModelPref(mModel[1]); reply(ok ? `Model set to ${mModel[1]}.` : `Unknown model "${mModel[1]}". Use opus | sonnet | haiku | auto.`); } return; }
+  const mMode = text.match(/^!mode(?:\s+(suggest|copilot|autopilot))?\s*$/i);
+  if (mMode) { if (!mMode[1]) reply(`Mode: ${getAutonomyMode()}`); else { const ok = setAutonomyMode(mMode[1].toLowerCase()); reply(ok ? `Mode set to ${mMode[1].toLowerCase()}.` : 'Failed to set mode.'); } return; }
+  if (/^\s*\/?(new|reset|newchat)\s*$/i.test(text)) { try { deleteSession('owner'); } catch {} reply('Started a new conversation — context cleared.'); return; }
   if (cliBusy) { reply('(still working on the previous message — try again in a moment)'); return; }
   cliBusy = true;
   try {

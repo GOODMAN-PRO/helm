@@ -133,3 +133,5 @@ workspace/network/hub-data.json
 
 # nightly self-upgrade heartbeat (runtime state)
 .last-nightly-upgrade
+
+workspace/model-pref
