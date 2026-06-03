@@ -889,7 +889,7 @@
   },
   {
     "name": "reverse.web",
-    "summary": "Reverse-engineer a web URL (cross-platform): detect stack, capture live XHR/fetch via headless Chromium, extract API endpoints, produce a clone scaffold + OpenAPI stub. ALWAYS writes a PDF (and a .md) to workspace/reverse/<slug>-report.pdf.",
+    "summary": "Reverse-engineer a web URL (cross-platform). Leads with a plain-language Summary / What It Does / How It Works, then deep detail: tech stack, live XHR/fetch capture via headless Chromium, AST code analysis, third-party services & SDKs, full API operation catalog with inferred purpose, inferred data model, auth/session mechanics, security posture (CSP/HSTS/etc. explained), forms/data collection, clone scaffold + OpenAPI stub. ALWAYS writes a PDF (and a .md) to workspace/reverse/<slug>-report.pdf.",
     "exec": "node tools/impl/reverse.mjs web",
     "args_schema": {
       "url": {
@@ -911,7 +911,7 @@
   },
   {
     "name": "reverse.app",
-    "summary": "Reverse-engineer an app/binary (cross-platform). macOS .app: Info.plist, otool -L, frameworks, entitlements. Windows/Linux .exe/.dll/ELF: format ID, framework/runtime inference, URL/API strings. ALWAYS writes a PDF (and .md) to workspace/reverse/<slug>-report.pdf.",
+    "summary": "Reverse-engineer an app/binary (cross-platform). Leads with a plain-language Summary / What It Does / How It Works, then deep internals. macOS .app: Info.plist, otool -L, entitlements (explained in plain language), plus a deep dive — Electron app.asar package.json/dependencies/main-entry/native-addons, embedded frameworks + versions, CPU architectures, code signing, helper apps, auto-update feed, declared capabilities. Windows PE/Linux ELF: header parse, imports/needed libs, runtime inference. ALWAYS writes a PDF (and .md) to workspace/reverse/<slug>-report.pdf.",
     "exec": "node tools/impl/reverse.mjs app",
     "args_schema": {
       "path": {

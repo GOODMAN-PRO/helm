@@ -16,6 +16,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 import { analyzeSources, decodeInlineScripts, findSourceMapRef, parseSourceMap, traceTerms } from './reverse-code.mjs';
+import { appDeepDive } from './reverse-app-deep.mjs';     // Electron asar / PE / ELF deep dive
+import { webDeepDive } from './reverse-web-deep.mjs';      // third-party services, API catalog, data model, security
+import { explainEntitlement, explainFramework, explainMany } from './reverse-explain.mjs';   // plain-language glossary
 
 const __dirname   = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE   = path.resolve(__dirname, '../..');
@@ -729,6 +732,15 @@ async function analyzeWeb(url, name) {
     }
   } catch (e) { lines.push(`> Code analysis skipped: ${String(e.message || e).slice(0, 160)}`, ''); }
 
+  // Deep behavioral analysis: what the app DOES + how — third-party services, the API operation catalog
+  // (with inferred purpose), data-model inference, auth/session mechanics, security posture, forms/data
+  // collection, feature inference. Never throws — merges into the report + synthesis.
+  try {
+    const deep = webDeepDive({ url, html, headers, scripts, links, content, apiCalls, netData });
+    if (deep.lines && deep.lines.length) lines.push('', ...deep.lines);
+    Object.assign(findings, deep.findings || {});
+  } catch (e) { lines.push(`> Deep behavioral analysis skipped: ${String(e.message || e).slice(0, 160)}`, ''); }
+
   // Clone scaffold outline — honest about what was actually extracted.
   lines.push('## Clone Scaffold Outline', '');
   if (stack.some(s => s.includes('Next.js'))) lines.push('```bash', 'npx create-next-app@latest clone', '# Rebuild app/page.tsx + app/layout.tsx; wire the API Surface calls above', '```');
@@ -949,6 +961,21 @@ async function analyzeApp(appPath, name) {
     if (hints.length) { findings.endpoints = hints.filter(s => /https?:\/\//.test(s)).slice(0, 20); lines.push('## Interesting Strings (URLs / APIs / modules)', '```', ...hints, '```', ''); }
   }
 
+  // Deep dive: crack open the app's internals (Electron app.asar package.json/deps/main, embedded
+  // frameworks + versions, architectures, code-signing, helpers, auto-update, capabilities; PE/ELF on
+  // other OSes). Never throws — returns {lines,findings} and merges into the report + synthesis.
+  try {
+    const deep = await appDeepDive(appPath);
+    if (deep.lines && deep.lines.length) lines.push('', ...deep.lines);
+    Object.assign(findings, deep.findings || {});
+  } catch (e) { lines.push(`> Deep app analysis skipped: ${String(e.message || e).slice(0, 160)}`, ''); }
+
+  // Plain-language glossary for the raw entitlement keys collected above.
+  if (findings.entitlements && findings.entitlements.length) {
+    const explained = explainMany('entitlement', findings.entitlements).filter(e => e.explanation);
+    if (explained.length) { lines.push('## Entitlements explained'); for (const e of explained) lines.push(`- \`${e.item}\` — ${e.explanation}`); lines.push(''); }
+  }
+
   return { slug, kind: 'app', target: appPath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
 }
 
@@ -1001,6 +1028,14 @@ async function analyzeFile(filePath, name) {
 
 const bullets = arr => arr.filter(Boolean).map(b => `- ${b}`).join('\n');
 
+// Label a catalogued API operation (GraphQL op/doc_id, or REST method+path).
+const opLabel = o => {
+  if (!o) return 'operation';
+  if (o.graphql) return o.graphql.operationName || o.graphql.name || (o.graphql.doc_id && `doc_id ${o.graphql.doc_id}`) || 'graphql op';
+  if (o.rest) return `${o.rest.method || 'GET'} ${o.rest.path || ''}`.trim();
+  return o.name || 'operation';
+};
+
 function buildWebSummary(f) {
   const host = f.host || 'the site';
   const stack = f.stack || [];
@@ -1011,6 +1046,13 @@ function buildWebSummary(f) {
   const isNext = stack.some(s => /Next\.js/i.test(s));
   const isReact = stack.some(s => /React/i.test(s));
   const isVue = stack.some(s => /Vue|Nuxt/i.test(s));
+  // Deep behavioral findings (from reverse-web-deep.mjs)
+  const services = f.services || [];
+  const features = f.features || [];
+  const catalog = f.apiCatalog || [];
+  const security = f.security || {};
+  const dataModel = f.dataModel || [];
+  const auth = f.auth || {};
 
   const stackPhrase = isNext ? 'a Next.js (React) web application'
     : isReact ? 'a React single-page application'
@@ -1020,62 +1062,125 @@ function buildWebSummary(f) {
   const mediaKind = c.video ? 'a video/media post' : (c.type || c.caption || c.author) ? 'a content post' : '';
   const sum = [`**${host}** is ${stackPhrase}${mediaKind ? ` — the captured page is ${mediaKind}` : ''}.`];
   if (c.author || c.caption) sum.push(`${[c.author && `By ${c.author}`, c.caption && `"${String(c.caption).slice(0, 120)}"`].filter(Boolean).join(' — ')}.`);
-  if (api.length) sum.push(`Its data layer is ${gql.length ? 'a GraphQL API' : 'a REST/XHR API'} (${api.length} distinct call${api.length === 1 ? '' : 's'} captured).`);
+  if (api.length || catalog.length) sum.push(`Its data layer is ${gql.length ? 'a GraphQL API' : 'a REST/XHR API'} (${(catalog.length || api.length)} operation${(catalog.length || api.length) === 1 ? '' : 's'} captured).`);
+  if (services.length) { const cats = [...new Set(services.map(s => s.category).filter(Boolean))]; sum.push(`Integrates ${services.length} third-party service${services.length === 1 ? '' : 's'}${cats.length ? ` (${cats.slice(0, 5).join(', ')})` : ''}.`); }
   if (f.loggedOut) sum.push('This was the **logged-out shell** — the authenticated app and its real API did not load.');
+
+  // What it does — high-level feature inference from routes, API purposes, services and metadata.
+  const what = (features || []).slice(0, 12);
 
   const how = [];
   how.push(isNext ? 'Rendering — server-rendered React (Next.js), hydrated in the browser; pages are React components.'
     : isReact ? 'Rendering — a client-side React SPA: the HTML shell boots JS bundles that build the UI in the browser.'
     : isVue ? 'Rendering — a Vue/Nuxt app: components render client-side once the JS loads.'
     : 'Rendering — largely static or server-rendered HTML.');
-  if (gql.length) {
+  if (catalog.length) {
+    const ex = catalog.slice(0, 5).map(o => `\`${opLabel(o)}\`${o.purpose ? ` (${o.purpose})` : ''}`);
+    how.push(`Data — ${catalog.length} API operation${catalog.length === 1 ? '' : 's'} captured; e.g. ${ex.join(', ')}.`);
+  } else if (gql.length) {
     const ops = gql.map(s => s.friendlyName || (s.graphql && (s.graphql.operationName || (s.graphql.doc_id && `doc_id ${s.graphql.doc_id}`)))).filter(Boolean).slice(0, 4);
     how.push(`Data — a GraphQL endpoint using ${gql.some(s => s.graphql && s.graphql.doc_id) ? 'persisted queries (doc_id-keyed)' : 'named operations'}${ops.length ? `, e.g. ${ops.map(o => `\`${o}\``).join(', ')}` : ''}.`);
   } else if (api.length) {
     how.push(`Data — REST/XHR calls, e.g. ${api.slice(0, 4).map(s => `\`${s.method} ${s.path}\``).join(', ')}.`);
   }
+  if (dataModel.length) how.push(`Data model (inferred) — ${dataModel.slice(0, 6).map(e => e.entity).filter(Boolean).join(', ')}.`);
+  if (auth.providers && auth.providers.length) how.push(`Auth — via ${auth.providers.join(', ')}${auth.cookies && auth.cookies.length ? `; session cookie(s): ${auth.cookies.map(ck => ck.name).filter(Boolean).slice(0, 4).join(', ')}` : ''}.`);
+  else if (f.loggedOut) how.push('Auth — a login wall gates the real app; everything captured is public bootstrap, telemetry and route-prefetch.');
   if (c.video || c.image) how.push('Media — video/images are served from a CDN (often as byte-range chunks), separate from the API surface.');
+  if (services.length) how.push(`Third-party services — ${services.slice(0, 8).map(s => s.name).join(', ')}.`);
+  if (security.headers && security.headers.length) {
+    const weak = (security.flags || []).some(x => x && x.level === 'weak');
+    how.push(`Security — ${security.headers.map(h => h.name).slice(0, 6).join(', ')} present${weak ? '; some weak directives flagged' : ''}.`);
+  }
   if (code) {
     const ks = (code.keyFunctions || []).filter(fn => fn.flags && fn.flags.length).slice(0, 3).map(fn => `\`${fn.name || '(anon)'}\` (${fn.flags.join('/')})`);
     how.push(`Client code — ${code.totalFunctions} functions across ${code.bundleCount} bundle(s)${code.moduleSystems && code.moduleSystems.length ? `, ${code.moduleSystems.join('/')} modules` : ''}${ks.length ? `; notable: ${ks.join(', ')}` : ''}.`);
   }
-  if (f.loggedOut) how.push('Auth — a login wall gates the real app; everything captured is public bootstrap, telemetry and route-prefetch.');
-  if (how.length <= 1 && !api.length) how.push('No dynamic API surface was captured — the page is likely server-rendered or media-only.');
+  if (how.length <= 1 && !api.length && !catalog.length) how.push('No dynamic API surface was captured — the page is likely server-rendered or media-only.');
 
-  return `## Summary\n${sum.join(' ')}\n\n## How It Works\n${bullets(how)}`;
+  const parts = [`## Summary\n${sum.join(' ')}`];
+  if (what.length) parts.push(`## What It Does\n${bullets(what)}`);
+  parts.push(`## How It Works\n${bullets(how)}`);
+  return parts.join('\n\n');
 }
 
-function buildAppSummary(f) {
-  const name = f.displayName || f.label;
-  const fw = f.frameworks || [];
-  const ents = f.entitlements || [];
-  const schemes = f.urlSchemes || [];
-  const isElectron = fw.some(x => /Electron/i.test(x));
-  const isFlutter = fw.some(x => /Flutter/i.test(x));
-  const nativeFw = fw.filter(x => /AppKit|SwiftUI|UIKit|WebKit/i.test(x));
+// Frameworks may be plain strings (shallow pass) or {name,version} objects (deep pass) — normalize.
+const fwName = x => (typeof x === 'string' ? x : (x && x.name) || '');
+const asString = x => (typeof x === 'string' ? x : (x && (x.name || x.type)) || '');
 
-  const techPhrase = isElectron ? 'an Electron desktop app (a web UI running in a Chromium shell)'
+function buildAppSummary(f) {
+  const app = f.app || {};                 // Electron package.json identity (deep)
+  const elec = f.electron || {};           // Electron internals (deep)
+  const caps = f.capabilities || {};       // Info.plist capabilities (deep)
+  const name = app.productName || app.name || f.displayName || f.label;
+  const version = app.version || f.version;
+  const fwAll = f.frameworks || [];
+  const fwNames = fwAll.map(fwName).filter(Boolean);
+  const isElectron = f.kind === 'electron' || fwNames.some(x => /Electron/i.test(x));
+  const isFlutter = f.kind === 'flutter' || fwNames.some(x => /Flutter/i.test(x));
+  const nativeFw = fwNames.filter(x => /AppKit|SwiftUI|UIKit|WebKit/i.test(x));
+  const schemes = (f.urlSchemes && f.urlSchemes.length ? f.urlSchemes : (caps.urlSchemes || [])).map(s => String(s).replace(/:\/\/$/, ''));
+  const ents = f.entitlements || [];
+  const subsystems = (f.subsystems && f.subsystems.length ? f.subsystems : (elec.subsystems || []));
+  const archs = f.architectures || [];
+
+  const techPhrase = isElectron ? 'an Electron desktop app (a web UI running in a bundled Chromium + Node.js runtime)'
     : isFlutter ? 'a Flutter app (UI drawn by the Flutter/Skia engine from compiled Dart)'
-    : nativeFw.length ? `a native app using ${nativeFw.join(', ')}`
-    : fw.length ? `built with ${fw.join(', ')}`
+    : nativeFw.length ? `a native ${f.platform === 'darwin' || process.platform === 'darwin' ? 'macOS ' : ''}app using ${nativeFw.join(', ')}`
+    : f.pe ? `a Windows ${f.pe.runtime && f.pe.runtime.length ? f.pe.runtime.join('/') + ' ' : ''}executable`
+    : f.elf ? `a Linux ${f.elf.runtime && f.elf.runtime.length ? f.elf.runtime.join('/') + ' ' : ''}executable`
+    : fwNames.length ? `built with ${fwNames.join(', ')}`
     : 'an application';
-  const ver = f.version ? ` v${f.version}` : '';
+  const ver = version ? ` v${version}` : '';
   const idp = f.bundleId ? ` (\`${f.bundleId}\`)` : '';
   const sum = [`**${name}**${ver}${idp} is ${techPhrase}.`];
-  if (f.format && !/^directory$/i.test(f.format)) sum.push(`Binary: ${f.format}.`);
+  if (app.description && String(app.description).trim().toLowerCase() !== String(name).trim().toLowerCase())
+    sum.push(String(app.description).slice(0, 200) + (String(app.description).length > 200 ? '…' : ''));
+  if (isElectron && elec.electronVersion) sum.push(`Built on Electron ${elec.electronVersion}.`);
+  if (archs.length) sum.push(`Ships ${f.universal ? 'a universal binary' : 'a binary'} for ${archs.join(', ')}.`);
+
+  // What it does — from the package description, the document types it opens, and detected subsystems.
+  const what = [];
+  if (app.homepage) what.push(`Project: ${app.homepage}`);
+  const docTypes = (caps.documentTypes || []).map(asString).filter(Boolean).slice(0, 6);
+  if (docTypes.length) what.push(`Opens document types: ${docTypes.join(', ')}.`);
+  for (const s of subsystems.slice(0, 6)) what.push(asString(s));
 
   const how = [];
-  if (isElectron) how.push('Architecture — Electron pairs a Chromium renderer (the UI, written in HTML/CSS/JS) with a Node.js main process for native/OS work; the UI code ships bundled in `Contents/Resources/app.asar`.');
-  else if (isFlutter) how.push('Architecture — Flutter renders its own widgets via the Skia engine from Dart code compiled into the binary; no system UI toolkit.');
+  if (isElectron) {
+    how.push('Architecture — Electron pairs a Chromium renderer (the UI, in HTML/CSS/JS) with a Node.js main process for native/OS work; the UI code ships in `Contents/Resources/app.asar`.');
+    const mainEntry = elec.mainEntry || app.main;
+    if (mainEntry) how.push(`Startup — main-process entry \`${mainEntry}\`${elec.mainRequires && elec.mainRequires.length ? `; loads ${elec.mainRequires.slice(0, 5).join(', ')}` : ''}.`);
+    const deps = elec.dependencies ? Object.keys(elec.dependencies) : [];
+    if (deps.length) how.push(`Key dependencies — ${deps.slice(0, 10).join(', ')}${deps.length > 10 ? ` (+${deps.length - 10} more)` : ''}.`);
+    if (elec.nativeAddons && elec.nativeAddons.length) how.push(`Native addons — ${elec.nativeAddons.slice(0, 6).map(asString).join(', ')}.`);
+  } else if (isFlutter) how.push('Architecture — Flutter renders its own widgets via the Skia engine from Dart compiled into the binary; no system UI toolkit.');
   else if (nativeFw.length) how.push(`Architecture — a native app built on ${nativeFw.join(', ')}.`);
-  if (fw.length) how.push(`Frameworks linked: ${fw.join(', ')}.`);
-  if (schemes.length) how.push(`Deep links — registers the \`${schemes.map(s => s + '://').join('`, `')}\` URL scheme(s) so other apps/links can drive it.`);
-  if (f.atsLocalhost) how.push('Networking — its ATS config permits insecure HTTP to `127.0.0.1`/`localhost`, so it likely runs or talks to a local helper/server.');
-  if (ents.length) how.push(`Capabilities (entitlements): ${ents.slice(0, 10).join(', ')}${ents.length > 10 ? ', …' : ''}.`);
-  if (f.endpoints && f.endpoints.length) how.push(`Network hints in the binary: ${f.endpoints.slice(0, 5).map(e => `\`${String(e).slice(0, 80)}\``).join(', ')}.`);
+  else if (f.pe) how.push(`Architecture — Windows PE (${[f.pe.machine, f.pe.subsystem].filter(Boolean).join(', ')})${f.pe.importedDlls && f.pe.importedDlls.length ? `; imports ${f.pe.importedDlls.slice(0, 6).join(', ')}` : ''}.`);
+  else if (f.elf) how.push(`Architecture — ELF (${f.elf.machine || ''})${f.elf.needed && f.elf.needed.length ? `; needs ${f.elf.needed.slice(0, 6).join(', ')}` : ''}.`);
+
+  if (fwAll.length) {
+    const fwWithVer = fwAll.map(x => (typeof x === 'string' ? x : (x.version ? `${x.name} ${x.version}` : x.name))).filter(Boolean);
+    how.push(`Embedded frameworks — ${fwWithVer.slice(0, 8).join(', ')}.`);
+  }
+  if (schemes.length) how.push(`Deep links — registers \`${schemes.map(s => s + '://').join('`, `')}\` so other apps/links can drive it.`);
+  if (f.updateFeed && f.updateFeed.url) how.push(`Auto-update — ${f.updateFeed.type || 'updater'} checking \`${String(f.updateFeed.url).slice(0, 90)}\`.`);
+  if (f.atsLocalhost) how.push('Networking — ATS permits insecure HTTP to `127.0.0.1`/`localhost`, so it likely runs or talks to a local helper/server.');
+  if (f.signing && f.signing.signed) how.push(`Code signing — ${[f.signing.teamId && `Team ${f.signing.teamId}`, f.signing.hardenedRuntime && 'hardened runtime'].filter(Boolean).join(', ') || 'signed'}.`);
+  const priv = (caps.privacyStrings ? Object.keys(caps.privacyStrings) : [])
+    .map(k => k.replace(/^NS/, '').replace(/UsageDescription$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').trim());
+  if (priv.length) how.push(`Privacy/hardware access requested — ${priv.slice(0, 8).join(', ')}.`);
+  if (ents.length) {
+    const explained = explainMany('entitlement', ents).filter(e => e.explanation).slice(0, 3);
+    how.push(`Entitlements (${ents.length})${explained.length ? ` — e.g. ${explained.map(e => e.explanation).join('; ')}` : ''}.`);
+  }
+  if (f.endpoints && f.endpoints.length) how.push(`Network hints in the binary — ${f.endpoints.slice(0, 4).map(e => `\`${String(e).slice(0, 70)}\``).join(', ')}.`);
   if (!how.length) how.push('Generic binary — no framework/runtime signatures or capabilities detected to explain its operation.');
 
-  return `## Summary\n${sum.join(' ')}\n\n## How It Works\n${bullets(how)}`;
+  const parts = [`## Summary\n${sum.join(' ')}`];
+  if (what.filter(Boolean).length) parts.push(`## What It Does\n${bullets(what)}`);
+  parts.push(`## How It Works\n${bullets(how)}`);
+  return parts.join('\n\n');
 }
 
 function buildFileSummary(f) {
