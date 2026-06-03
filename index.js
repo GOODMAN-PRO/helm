@@ -797,6 +797,28 @@ client.on(Events.MessageCreate, async msg => {
     await msg.reply(`Your Helm's handle is now **@${h}**${process.env.HELM_HUB_URL ? ' (registered on the hub).' : '. Set HELM_HUB_URL in .env to a hub to go online.'}`);
     return;
   }
+  if ((nm = text.match(/^\/?set\s*hub\s+(\S+)/i))) {
+    let url = nm[1].trim().replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(url)) { await msg.reply('Give me a full hub URL — e.g. `sethub https://my-hub.trycloudflare.com`.'); return; }
+    try {
+      const envPath = path.join(__dirname, '.env');
+      let env = ''; try { env = readFileSync(envPath, 'utf8'); } catch {}
+      const line = `HELM_HUB_URL=${url}`;
+      env = /^HELM_HUB_URL=.*$/m.test(env) ? env.replace(/^HELM_HUB_URL=.*$/m, line) : (env.replace(/\s*$/, '') + `\n${line}\n`);
+      writeFileSync(envPath, env);
+    } catch (e) { await msg.reply('Could not write .env: ' + String(e.message || e).slice(0, 160)); return; }
+    try { writeFileSync(path.join(WORKSPACE, '.restarting'), String(msg.channel.id)); } catch {}
+    await msg.reply(`Hub set to \`${url}\` and saved to .env. ♻️ Restarting to apply — back in ~10s.`);
+    try {
+      spawn(process.execPath, [path.join(__dirname, 'scripts', 'relaunch.mjs')], { cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true, env: process.env }).unref();
+    } catch (e) { try { unlinkSync(path.join(WORKSPACE, '.restarting')); } catch {} await msg.reply('Saved to .env, but couldn\'t auto-restart — say `restart` to apply. (' + String(e.message || e).slice(0, 120) + ')'); return; }
+    setTimeout(() => process.exit(0), 1500);
+    return;
+  }
+  if (/^\/?hub\s*$/i.test(low)) {
+    await msg.reply(`Hub: \`${HUB_URL}\`${process.env.HELM_HUB_URL ? '' : ' — local only; set a shared one with \`sethub <url>\`'}`);
+    return;
+  }
   if (/^\/?friends\s*$/i.test(low)) {
     const f = listFriends(); const names = Object.entries(f);
     await msg.reply(names.length ? '**Helm friends**\n' + names.map(([h, v]) => `• @${h} — ${v.status}`).join('\n') : 'No Helm friends yet. Add one: `add friend @handle` (you both need the same hub set in HELM_HUB_URL).');
