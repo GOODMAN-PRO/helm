@@ -40,7 +40,7 @@ Write-Host "Installing Helm to run at logon (no admin needed):"
 New-HelmStartup "HelmDiscord"   "index.js"                            # the bot
 New-HelmStartup "HelmScheduler" "workspace\scheduler\scheduler.mjs"   # fires scheduled jobs
 New-HelmStartup "HelmThink"     "workspace\think\think.mjs"           # background cognition
-New-HelmDaily   "HelmSelfUpgrade" "workspace\upgrades\self-upgrade.mjs" "03:00"   # nightly auto-upgrade
+New-HelmDaily   "HelmSelfUpgrade" "workspace\upgrades\self-upgrade.mjs" "00:00"   # nightly auto-upgrade (midnight)
 
 Write-Host ""
 Write-Host "They start automatically at your next logon. To start the bot NOW (without logging out):  helm"
