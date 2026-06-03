@@ -513,6 +513,68 @@ function recallMemories(text) {
     return `\n\nMEMORY — use these, never contradict them; don't recite them unless asked:\n${sections.join('\n\n')}`;
   } catch { return ''; }
 }
+
+// ---- Discord catch-up: don't lose messages across a reboot ----
+// Discord doesn't replay messages sent while the bot was offline, so a restart silently drops anything
+// you said during downtime. We persist the last message we processed and, on reconnect, scan what we
+// missed: ingest it into memory and surface a single catch-up notice (no auto-firing a backlog).
+const DISCORD_SEEN = path.join(WORKSPACE, '.discord-last-seen');
+const getLastSeen = () => { try { return readFileSync(DISCORD_SEEN, 'utf8').trim() || null; } catch { return null; } };
+const setLastSeen = id => { try { if (id) writeFileSync(DISCORD_SEEN, String(id)); } catch {} };
+
+// Bulk-insert text snippets as memory episodes, deduped against recent episodes.
+function ingestEpisodes(items, channel = 'discord') {
+  if (!items || !items.length) return 0;
+  try {
+    const db = new DatabaseSync(MEMORY_DB);
+    const have = new Set(db.prepare(`SELECT summary FROM episodes ORDER BY ts DESC LIMIT 2000`).all().map(r => r.summary));
+    const ins = db.prepare(`INSERT INTO episodes (summary, channel) VALUES (?, ?)`);
+    let n = 0;
+    for (const t of items) { const s = String(t || '').replace(/\s+/g, ' ').trim().slice(0, 280); if (s && !have.has(s)) { ins.run(s, channel); have.add(s); n++; } }
+    db.close();
+    return n;
+  } catch { return 0; }
+}
+
+const ownerDM = async c => { try { const u = await c.users.fetch(OWNER_ID); return await u.createDM(); } catch { return null; } };
+
+// On reconnect: fetch owner messages newer than the last we processed, save them to memory, and notify
+// once if the most recent message is an unanswered ask. First run just seeds the marker (no backfill).
+async function catchUpDiscord(c) {
+  try {
+    const dm = await ownerDM(c);
+    if (!dm) return;
+    const lastSeen = getLastSeen();
+    const fetched = await dm.messages.fetch(lastSeen ? { limit: 50, after: lastSeen } : { limit: 50 });
+    if (!fetched || !fetched.size) return;
+    const msgs = [...fetched.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+    setLastSeen(msgs[msgs.length - 1].id);
+    if (!lastSeen) return;  // first run — just seed the marker, don't replay old history
+    const ownerMsgs = msgs.filter(m => m.author.id === OWNER_ID && (m.content || '').trim());
+    if (!ownerMsgs.length) return;
+    const n = ingestEpisodes(ownerMsgs.map(m => `you (Discord, while I was offline): ${m.content}`));
+    console.log(`[catch-up] scanned ${ownerMsgs.length} missed Discord message(s), ingested ${n}`);
+    if (msgs[msgs.length - 1].author.id === OWNER_ID) {
+      const latest = ownerMsgs[ownerMsgs.length - 1].content.slice(0, 300);
+      await dm.send(`I was offline and missed ${ownerMsgs.length} message(s) you sent (saved to memory). Most recent: "${latest}". I haven't acted on these — re-send or tell me what to do.`).catch(() => {});
+    }
+  } catch (e) { console.error('catch-up scan failed:', e?.message || e); }
+}
+
+// Manual deep scan: page through the whole channel history and ingest the owner's messages into memory.
+async function scanDiscordHistory(channel, maxPages = 20) {
+  const collected = [];
+  let before;
+  for (let p = 0; p < maxPages; p++) {
+    let batch; try { batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) }); } catch { break; }
+    if (!batch || !batch.size) break;
+    const arr = [...batch.values()];
+    for (const m of arr) if (m.author.id === OWNER_ID && (m.content || '').trim()) collected.push(m.content);
+    before = arr[arr.length - 1].id;
+    if (batch.size < 100) break;
+  }
+  return ingestEpisodes(collected.map(t => `you (Discord): ${t}`));
+}
 function captureTurn(userText, reply, channel = 'chat') {
   try {
     const mm = path.join(WORKSPACE, 'memory/memory.mjs');
@@ -654,12 +716,16 @@ client.once(Events.ClientReady, c => {
       if (chId) c.channels.fetch(chId).then(ch => ch?.send('✅ Back online.')).catch(() => {});
     }
   } catch {}
+  // Catch up on anything the owner DM'd while we were offline — Discord won't replay it. Delay a few
+  // seconds so the gateway/DM channel is fully ready before we fetch history.
+  setTimeout(() => catchUpDiscord(c).catch(() => {}), 3000);
 });
 
 client.on(Events.MessageCreate, async msg => {
   if (msg.author.bot) return;
   console.log(`[msg] from=${msg.author.id} dm=${!msg.guild} content=${JSON.stringify((msg.content || '').slice(0, 120))}`);
   if (msg.author.id !== OWNER_ID) return;                       // owner-only lock
+  setLastSeen(msg.id);                                          // mark progress so a reboot knows where to resume
   const dm = !msg.guild;
   if (!dm && !msg.mentions.users.has(client.user.id)) return;   // in servers: only when @mentioned
 
@@ -704,6 +770,19 @@ client.on(Events.MessageCreate, async msg => {
   // ---- pathway: report which auth + model route is active (subscription / API key / free / local) ----
   if (/^\s*\/?pathway\s*$/i.test(text)) {
     await msg.reply('```\n' + pathwayReport() + '\n```');
+    return;
+  }
+
+  // ---- scan/catchup: deep-scan this channel's whole history into memory (manual backfill) ----
+  if (/^\s*\/?(scan|catch\s?up)\s*$/i.test(text)) {
+    await msg.reply('Scanning this channel\'s history into memory…');
+    try {
+      const n = await scanDiscordHistory(msg.channel);
+      setLastSeen(msg.id);
+      await msg.reply(n ? `Done — ingested ${n} of your message(s) into memory.` : 'Done — nothing new to ingest (already in memory).');
+    } catch (e) {
+      await msg.reply('Scan failed: ' + String(e?.message || e).slice(0, 200));
+    }
     return;
   }
 
