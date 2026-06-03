@@ -21,7 +21,9 @@ const save = db => { mkdirSync(NET_DIR, { recursive: true }); writeFileSync(FILE
 const canon = m => `${m.to}|${m.from}|${m.ts}|${m.type}|${m.body || ''}`;
 
 async function hub(method, pathName, { body: b, headers } = {}) {
-  const res = await fetch(`${HUB_URL}${pathName}`, { method, headers: { 'content-type': 'application/json', ...(headers || {}) }, body: b ? JSON.stringify(b) : undefined });
+  // 'ngrok-skip-browser-warning' + a non-browser UA bypass ngrok's free-tier interstitial so a hub
+  // served through ngrok returns JSON (not the warning HTML) to the Helm client. Harmless on other hubs.
+  const res = await fetch(`${HUB_URL}${pathName}`, { method, headers: { 'content-type': 'application/json', 'ngrok-skip-browser-warning': 'true', 'user-agent': 'Helm/1.0', ...(headers || {}) }, body: b ? JSON.stringify(b) : undefined });
   let j = {}; try { j = await res.json(); } catch {}
   return { status: res.status, ...j };
 }
