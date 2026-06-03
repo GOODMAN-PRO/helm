@@ -9,9 +9,10 @@
 // Collaborators: import `showcaseStack` from this file. Do NOT import internal helpers.
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { nextCreateArgs, ensureNextScaffold } from './scaffold-util.mjs';   // correct flags + guaranteed fallback
 
 // ---------------------------------------------------------------------------
 // Internal helpers (mirrors stack.mjs style for consistency across builder)
@@ -139,35 +140,15 @@ export const showcaseStack = {
   async scaffold(projectDir) {
     ensureParent(projectDir);
 
-    // Step 1: create-next-app
-    // Flags match the next-fullstack preset for consistency — same App Router + TS + Tailwind base.
-    // --no-turbopack: use stable webpack so GSAP/Lenis plugins resolve without ESM quirks.
-    const scaffoldResult = runCmd(
-      'npx',
-      [
-        '--yes',
-        'create-next-app@latest',
-        projectDir,
-        '--ts',
-        '--tailwind',
-        '--eslint',
-        '--app',
-        '--src-dir',
-        '--use-npm',
-        '--no-import-alias',
-      ],
-      { cwd: path.dirname(projectDir), timeoutMs: 600_000 },
-    );
-
-    if (!scaffoldResult.ok) {
-      // create-next-app failed — could be network or missing npx.
-      // Engineers will create the project manually; animation libs still can't be installed.
-      return {
-        ok: false,
-        output: scaffoldResult.output,
-        error: `create-next-app failed: ${scaffoldResult.error}`,
-      };
+    // Step 1: create-next-app (correct non-interactive flags from scaffold-util), then GUARANTEE a
+    // buildable base — if create-next-app produced nothing, ensureNextScaffold writes a minimal Next.js
+    // project so the animation work always has somewhere to land.
+    const scaffoldResult = runCmd('npx', nextCreateArgs(projectDir, 'npm'), { cwd: path.dirname(projectDir), timeoutMs: 600_000 });
+    const ensured = ensureNextScaffold(projectDir, scaffoldResult);
+    if (!ensured.ok || !existsSync(path.join(projectDir, 'package.json'))) {
+      return { ok: false, output: ensured.output || scaffoldResult.output, error: ensured.error || 'scaffold failed and fallback could not write a project' };
     }
+    scaffoldResult.output = ensured.output;
 
     // Step 2: install animation libraries (best-effort — if this fails the scaffold is still usable)
     // gsap         — ScrollTrigger, SplitText, etc. (all bundled)

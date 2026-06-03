@@ -2217,6 +2217,30 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- builder: scaffold is correct + guaranteed (no invalid create-next-app flags; fallback works) ----
+{
+  const label = 'builder: scaffold-util valid flags + fallback writes a buildable Next.js base';
+  try {
+    const { nextCreateArgs, writeMinimalNext, ensureNextScaffold } = await imp(path.join(WORKSPACE, 'builder/scaffold-util.mjs'));
+    const args = nextCreateArgs('/tmp/x').join(' ');
+    if (/--no-import-alias|--no-turbopack/.test(args)) throw new Error('nextCreateArgs has invalid flags: ' + args);
+    if (!/create-next-app/.test(args) || !/--import-alias/.test(args) || !/--yes/.test(args)) throw new Error('nextCreateArgs missing required flags: ' + args);
+    const os = await import('node:os'); const fs = await import('node:fs');
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'helm-scaffold-'));
+    try {
+      writeMinimalNext(d);
+      const pkg = JSON.parse(fs.readFileSync(path.join(d, 'package.json'), 'utf8'));
+      if (!pkg.scripts || !pkg.scripts.build || !pkg.dependencies || !pkg.dependencies.next) throw new Error('fallback package.json missing build script or next dep');
+      if (!fs.existsSync(path.join(d, 'src/app/layout.tsx')) || !fs.existsSync(path.join(d, 'src/app/page.tsx'))) throw new Error('fallback missing app router files');
+      JSON.parse(fs.readFileSync(path.join(d, 'tsconfig.json'), 'utf8'));
+      // ensureNextScaffold passes through when package.json exists
+      const ens = ensureNextScaffold(d, { output: 'ok' });
+      if (!ens.ok) throw new Error('ensureNextScaffold should pass through a valid project');
+    } finally { fs.rmSync(d, { recursive: true, force: true }); }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

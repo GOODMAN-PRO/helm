@@ -165,7 +165,7 @@ async function runPhase(phaseName, roles, ctx, runRoleFn, opts, globalDone) {
 }
 
 // ─── Markdown report builder ──────────────────────────────────────────────────
-function buildReport({ brief, projectDir, phases, roleResults, verify, gates, dryRun, selection }) {
+function buildReport({ brief, projectDir, phases, roleResults, verify, gates, dryRun, selection, scaffoldInfo }) {
   const lines = [];
   lines.push('# Helm Builder Report');
   lines.push('');
@@ -176,6 +176,7 @@ function buildReport({ brief, projectDir, phases, roleResults, verify, gates, dr
     lines.push(`**Tier:** ${selection.tier}  ·  **Agents selected:** ${roleResults.length}${selection.skipped?.length ? `  ·  **Skipped (not needed):** ${selection.skipped.length}` : ''}`);
     if (selection.needs) lines.push(`**Detected needs:** backend=${!!selection.needs.needsBackend}, animation=${!!selection.needs.wantsAnimation}`);
   }
+  if (scaffoldInfo) lines.push(`**Scaffold:** ${scaffoldInfo.ok === false ? '❌ FAILED — ' + (scaffoldInfo.error || 'unknown') : (scaffoldInfo.fallback ? '⚠ create-next-app failed; used minimal fallback base' : '✓ create-next-app')}`);
   lines.push(`**Generated:** ${new Date().toISOString()}`);
   lines.push('');
 
@@ -293,13 +294,23 @@ export async function buildApp(options = {}) {
     }
 
     // ── 3. Scaffold (skip in dryRun) ────────────────────────────────────────
+    let scaffoldInfo = null;
     if (!dryRun && stack.scaffold) {
       try {
-        await stack.scaffold(projectDir);
+        scaffoldInfo = (await stack.scaffold(projectDir)) || { ok: true };
       } catch (e) {
-        // Non-fatal — scaffolder failure is recorded but pipeline continues.
+        scaffoldInfo = { ok: false, error: String(e?.message ?? e) };
         console.error('[orchestrator] scaffold error:', e);
       }
+      // HARD GUARANTEE: a real build must start from a valid project. If the preset didn't leave a
+      // package.json, write the deterministic minimal Next.js base so agents never get an empty folder.
+      try {
+        if (!existsSync(path.join(projectDir, 'package.json'))) {
+          const sutil = await tryImport(path.join(__dirname, 'scaffold-util.mjs'));
+          if (sutil?.ensureNextScaffold) scaffoldInfo = sutil.ensureNextScaffold(projectDir, scaffoldInfo || {});
+        }
+      } catch (e) { console.error('[orchestrator] scaffold fallback error:', e); }
+      onProgress?.({ phase: 'scaffold', role: '*', status: (scaffoldInfo && scaffoldInfo.ok === false) ? 'fail' : 'done', fallback: !!(scaffoldInfo && scaffoldInfo.fallback) });
     }
 
     // ── 4. Create context (skip in dryRun so a plan/smoke run never creates folders on disk) ──
@@ -498,6 +509,7 @@ export async function buildApp(options = {}) {
       gates,
       dryRun,
       selection,
+      scaffoldInfo,
     });
 
     const overallOk = dryRun

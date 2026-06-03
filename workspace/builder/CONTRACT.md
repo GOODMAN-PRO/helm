@@ -145,10 +145,13 @@ export function resolveStack(hint) -> StackPreset   // hint = stack id OR the br
 ```
 **Default `next-fullstack`:** Next.js (App Router) + TypeScript + Tailwind + shadcn/ui + Prisma ORM
 (SQLite dev) + Auth.js (NextAuth v5) + Zod + Vitest + Playwright + ESLint/Prettier; pnpm preferred, npm
-fallback. `scaffold` should run create-next-app non-interactively, e.g.:
-`npx --yes create-next-app@latest <dir> --ts --tailwind --eslint --app --src-dir --use-npm --no-import-alias --no-turbopack`
-(verify the flags; fall back gracefully). `scaffold` may be a no-op stub that returns `{ok:true}` if the
-network/CLI is unavailable — but document it.
+fallback. Use the shared `nextCreateArgs()`/`ensureNextScaffold()` from `scaffold-util.mjs` — the correct
+non-interactive command is:
+`npx --yes create-next-app@latest <dir> --ts --tailwind --eslint --app --src-dir --use-npm --yes --disable-git --import-alias "@/*"`
+(NOTE: `--no-import-alias` and `--no-turbopack` are NOT valid flags and make create-next-app fail; pass
+`--yes` so any unprovided option takes a default instead of prompting). `ensureNextScaffold()` guarantees
+a buildable project even if create-next-app fails — it writes a minimal Next.js base. Never leave the
+project an empty folder.
 
 ---
 

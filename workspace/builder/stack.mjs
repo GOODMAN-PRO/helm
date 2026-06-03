@@ -9,6 +9,7 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { showcaseStack } from './stack-showcase.mjs';   // award-grade animated showcase preset
+import { nextCreateArgs, ensureNextScaffold } from './scaffold-util.mjs';   // correct flags + guaranteed fallback
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -85,35 +86,12 @@ export const STACKS = {
     ].join('\n'),
 
     async scaffold(projectDir) {
-      // create-next-app flags as of Next.js 14/15:
-      //   --ts         TypeScript
-      //   --tailwind   Tailwind CSS
-      //   --eslint     ESLint
-      //   --app        App Router (not pages/)
-      //   --src-dir    puts code under src/
-      //   --use-npm    use npm runner (safe cross-env fallback; pnpm can be switched later)
-      //   --no-import-alias  skip the @/* alias prompt
-      //   --no-turbopack     stable webpack build
-      // CI=1 suppresses "Would you like to…" prompts.
-      // If the network or npx is unavailable, catch and return {ok:false}.
+      // Correct, fully non-interactive create-next-app args live in scaffold-util (the old hard-coded
+      // `--no-import-alias`/`--no-turbopack` flags don't exist and made it fail). ensureNextScaffold
+      // GUARANTEES a buildable project: if create-next-app produces nothing, it writes a minimal base.
       const parent = ensureParent(projectDir);
-      return runScaffolder(
-        'npx',
-        [
-          '--yes',
-          'create-next-app@latest',
-          projectDir,
-          '--ts',
-          '--tailwind',
-          '--eslint',
-          '--app',
-          '--src-dir',
-          '--use-npm',
-          '--no-import-alias',
-          '--no-turbopack',
-        ],
-        { cwd: parent, timeoutMs: 600_000 },
-      );
+      const r = runScaffolder('npx', nextCreateArgs(projectDir, 'npm'), { cwd: parent, timeoutMs: 600_000 });
+      return ensureNextScaffold(projectDir, r);
     },
   },
 
