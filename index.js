@@ -19,7 +19,7 @@ import { classifyComplexity, getModelPref, setModelPref } from './workspace/mode
 import { recordStuck, processStuckMarkers, autoCaptureCant } from './workspace/upgrades/stuck.mjs';
 import { exportTemplate, importTemplate, listTemplates } from './workspace/templates/templates.mjs';
 import { runHealthChecks } from './workspace/mcp/check.mjs';
-import { startCliBridge, mirrorReply, mirrorEcho, mirrorStatus } from './workspace/cli-bridge.mjs';
+import { startCliBridge, mirrorReply, mirrorEcho, mirrorStatus, mirrorAttach } from './workspace/cli-bridge.mjs';
 import { listSkills, runSkillCommand } from './workspace/skills/loader.mjs';
 import { renderProjects, addProject, cancelProject, deleteProject, doneProject } from './workspace/projects/projects.mjs';
 import { publicIdentity, setHandle as netSetHandle } from './workspace/network/identity.mjs';
@@ -151,6 +151,54 @@ function claudeEnv() {
     delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
   }
   return e;
+}
+
+// ---- which "pathway" (auth + model route) am I on right now? ----
+// Helm should always be able to tell the owner whether it's running on their Claude subscription, an
+// Anthropic API key, Claude on Vertex AI, a free online model (via the local translation proxy), or a
+// local/custom model. One source of truth, used by the `pathway` command AND injected into the persona
+// so Helm answers "which model/backend are you using?" correctly.
+function describePathway() {
+  if (AUTH_MODE === 'apikey') {
+    return { id: 'apikey', label: 'Anthropic API key',
+      engine: 'Claude Code → Anthropic API', model: getModelPref() || 'auto-route',
+      endpoint: process.env.ANTHROPIC_BASE_URL || 'api.anthropic.com', cost: 'pay-per-token (your API key)' };
+  }
+  if (AUTH_MODE === 'vertex') {
+    return { id: 'vertex', label: 'Claude on Google Vertex AI',
+      engine: 'Claude Code → Vertex AI (gcloud ADC)', model: vertexModel(),
+      endpoint: `vertex:${process.env.CLOUD_ML_REGION || process.env.VERTEX_REGION || 'us-east5'}`,
+      cost: 'pay-per-token (your Google Cloud project)' };
+  }
+  if (AUTH_MODE === 'custom') {
+    if (proxyConfigured()) {
+      return { id: 'free-online', label: 'Free online model (via local proxy)',
+        engine: `Claude Code → Helm proxy :${PROXY_PORT} → ${process.env.OPENAI_BASE_URL || '?'}`,
+        model: process.env.OPENAI_MODEL || '?', endpoint: process.env.OPENAI_BASE_URL || '?',
+        cost: 'free / provider-dependent' };
+    }
+    return { id: 'free-local', label: 'Local / custom model',
+      engine: `Claude Code → ${process.env.ANTHROPIC_BASE_URL || 'custom endpoint'}`,
+      model: process.env.ANTHROPIC_MODEL || process.env.OPENAI_MODEL || '?',
+      endpoint: process.env.ANTHROPIC_BASE_URL || 'localhost', cost: 'free (runs on this machine)' };
+  }
+  return { id: 'subscription', label: 'Claude subscription (Pro/Max via OAuth)',
+    engine: 'Claude Code → your Claude login', model: getModelPref() || 'auto-route',
+    endpoint: 'claude.ai (OAuth)', cost: 'included in your Claude plan' };
+}
+// One-line summary for the persona / status.
+const pathwayLine = () => { const p = describePathway(); return `${p.label} · model ${p.model} · ${p.endpoint}`; };
+// Multi-line report for the `pathway` command.
+function pathwayReport() {
+  const p = describePathway();
+  return [
+    `Pathway: ${p.label}`,
+    `  engine:   ${p.engine}`,
+    `  model:    ${p.model}`,
+    `  endpoint: ${p.endpoint}`,
+    `  cost:     ${p.cost}`,
+    `  AUTH_MODE=${AUTH_MODE}`,
+  ].join('\n');
 }
 
 // Discord is OPTIONAL — Helm can run terminal-only (the `helm` CLI talks to the brain over the local
@@ -303,7 +351,11 @@ const MODE_GUIDANCE = {
 
 function buildPersona(mode = 'copilot') {
   const guidance = MODE_GUIDANCE[mode] ?? MODE_GUIDANCE.copilot;
-  return `${PERSONA_BASE}${ownerPersonaOverride()}\n${guidance}`;
+  const pathway =
+    `ACTIVE PATHWAY: you are currently running via ${pathwayLine()} (AUTH_MODE=${AUTH_MODE}). ` +
+    `If the owner asks which model, pathway, backend or engine you're using — or whether you're on their ` +
+    `subscription vs a free/local model — answer accurately from this. They can also type \`pathway\` for the full breakdown.`;
+  return `${PERSONA_BASE}${ownerPersonaOverride()}\n${pathway}\n${guidance}`;
 }
 // Optional persona/style override applied by an imported Helm template.
 function ownerPersonaOverride() {
@@ -612,6 +664,12 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
+  // ---- pathway: report which auth + model route is active (subscription / API key / free / local) ----
+  if (/^\s*\/?pathway\s*$/i.test(text)) {
+    await msg.reply('```\n' + pathwayReport() + '\n```');
+    return;
+  }
+
   // ---- !mode: get or set the autonomy mode ----
   if (/^!mode\s*$/i.test(text)) {
     await msg.reply(`Current mode: **${getAutonomyMode()}**. Options: \`suggest\` | \`copilot\` | \`autopilot\`.`);
@@ -903,6 +961,7 @@ client.on(Events.MessageCreate, async msg => {
         catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
       }
       try { mirrorReply(body || '(see attachment)'); } catch {}   // show Discord replies in any open terminal
+      if (files.length) { try { mirrorAttach(files); } catch {} }  // let any open terminal OPEN the images too
     }
     console.log(`📤 replied (${body.length} chars, ${files.length} files, mode=${mode}, planPending=${hasPlanPending})`);
     // durable transcript so nothing is ever lost (the brain distills these into memory)
@@ -995,14 +1054,18 @@ let cliBusy = false;
 startCliBridge(async (text, reply) => {
   try { mirrorEcho(text, 'you (terminal)'); } catch {}
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); reply(n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'); return; }
+  if (/^\s*\/?pathway\s*$/i.test(text)) { reply(pathwayReport()); return; }   // same command works in the terminal
   if (cliBusy) { reply('(still working on the previous message — try again in a moment)'); return; }
   cliBusy = true;
   try {
     const mode = getAutonomyMode();
     const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, mode);
-    const { text: rawBody } = splitAttachments(raw);
+    const { text: rawBody, files } = splitAttachments(raw);
     const body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
     reply(body);   // broadcasts to every terminal once (no separate mirrorReply, or it'd double-send)
+    // Helm produced files (e.g. a generated image, a screenshot). Discord/iMessage attach them; the
+    // terminal can't show inline pixels, so send the paths and let the terminal client OPEN them.
+    if (files.length) { try { mirrorAttach(files); } catch {} }
     try {
       const conv = path.join(WORKSPACE, 'conversations');
       mkdirSync(conv, { recursive: true });

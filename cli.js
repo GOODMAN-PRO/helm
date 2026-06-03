@@ -13,6 +13,8 @@
 import net from 'node:net';
 import readline from 'node:readline';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
@@ -20,6 +22,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.join(__dirname, '.env'), override: true });
 const PORT = parseInt(process.env.HELM_CLI_PORT || '4625', 10);
 const HOST = '127.0.0.1';
+
+// When Helm produces a file (a generated image, a screenshot), the brain sends an {type:'attach'}
+// with the paths. The terminal can't render pixels inline, so we OPEN images in the OS default viewer.
+const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg|tiff?|heic|heif|avif)$/i;
+function openExternally(file) {
+  try {
+    const plat = process.platform;
+    const cmd  = plat === 'darwin' ? 'open' : plat === 'win32' ? 'cmd' : 'xdg-open';
+    const argv = plat === 'win32' ? ['/c', 'start', '', file] : [file];
+    spawn(cmd, argv, { detached: true, stdio: 'ignore' }).unref();
+    return true;
+  } catch { return false; }
+}
+// Turn one attachment path into a short status line, opening it if it's a local image.
+function describeAttachment(f) {
+  if (!f) return null;
+  const name = path.basename(f);
+  if (!existsSync(f)) return `attachment (not found locally): ${f}`;
+  if (IMG_RE.test(f)) return (openExternally(f) ? `opened image ${name}` : `image (couldn't open) ${f}`);
+  return `attachment: ${f}`;   // non-image: show the path, don't auto-launch
+}
 
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
 const C = useColor
@@ -45,13 +68,22 @@ async function oneShot(text) {
   let sock;
   try { sock = await connect(); } catch { notRunning(); process.exit(1); }
   let buf = '';
+  let gotReply = false, finishTimer = null;
   const timer = setTimeout(() => { console.error(`${C.dim}(no reply within the time limit)${C.x}`); sock.end(); process.exit(1); }, 30 * 60_000);
+  const finish = () => { try { sock.end(); } catch {} process.exit(0); };
   sock.on('data', chunk => {
     buf += chunk; let nl;
     while ((nl = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
       let m; try { m = JSON.parse(line); } catch { continue; }
-      if (m.type === 'reply') { clearTimeout(timer); process.stdout.write(m.text + '\n'); sock.end(); process.exit(0); }
+      if (m.type === 'reply') {
+        clearTimeout(timer); process.stdout.write(m.text + '\n'); gotReply = true;
+        // Don't exit instantly — an {attach} for a generated image arrives right after the reply.
+        clearTimeout(finishTimer); finishTimer = setTimeout(finish, 500);
+      } else if (m.type === 'attach') {
+        for (const f of (m.files || [])) { const l = describeAttachment(f); if (l) process.stdout.write(`${C.dim}· ${l}${C.x}\n`); }
+        if (gotReply) { clearTimeout(finishTimer); finishTimer = setTimeout(finish, 150); }
+      }
     }
   });
   sock.on('error', () => { notRunning(); process.exit(1); });
@@ -125,6 +157,7 @@ const COMMANDS = [
   { cmd: '!model', desc: 'show or pin the model: !model opus|sonnet|haiku|auto' },
   { cmd: 'vault',  desc: 'store a secret: vault <NAME> <value>  ·  vault list' },
   { cmd: 'doctor', desc: 'check your setup: Node, engine, model, config' },
+  { cmd: 'pathway', desc: 'show which backend is active: subscription / API key / free / local' },
 ];
 
 function tui(sock) {
@@ -347,6 +380,9 @@ function tui(sock) {
         add('other', m.text, m.from || 'other');
       }
       else if (m.type === 'status') { status = m.text; if (!splashing) draw(); }
+      else if (m.type === 'attach') {                                  // Helm sent files — open images, list the rest
+        for (const f of (m.files || [])) { const line = describeAttachment(f); if (line) add('sys', line); }
+      }
       else if (m.type === 'info')   { history.push({ role: 'sys', text: m.text }); scroll = 0; if (!splashing) draw(); }   // queue under the splash, don't dismiss it
     }
   });
@@ -563,6 +599,7 @@ async function plainInteractive(sock) {
       let m; try { m = JSON.parse(line); } catch { continue; }
       if (m.type === 'reply')      { process.stdout.write(`\r\x1b[2K${C.teal}helm ›${C.x} ${m.text}\n`); rl.prompt(true); }
       else if (m.type === 'echo' && !/terminal/i.test(m.from || '')) { process.stdout.write(`\r\x1b[2K${C.dim}${m.from} › ${m.text}${C.x}\n`); rl.prompt(true); }
+      else if (m.type === 'attach') { for (const f of (m.files || [])) { const l = describeAttachment(f); if (l) process.stdout.write(`\r\x1b[2K${C.dim}· ${l}${C.x}\n`); } rl.prompt(true); }
       else if (m.type === 'info')  { process.stdout.write(`\r\x1b[2K${C.dim}· ${m.text}${C.x}\n`); rl.prompt(true); }
     }
   });

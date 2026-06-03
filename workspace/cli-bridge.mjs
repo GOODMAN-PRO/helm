@@ -9,6 +9,8 @@
 //                     {type:'echo', text, from}      a message that arrived on ANOTHER channel
 //                     {type:'status', text}          live progress ("thinking… · 12s")
 //                     {type:'info', text}            one-off notices (banner, errors)
+//                     {type:'attach', files:[...]}   files Helm produced (images/screenshots); the
+//                                                    terminal opens images in the OS default viewer
 //
 // "Mirror everything both ways": every owner message (terminal/Discord/iMessage) and every Helm reply
 // is broadcast to all connected terminals, so the terminal mirrors the whole conversation live.
@@ -30,6 +32,7 @@ export function broadcast(obj) { for (const s of clients) send(s, obj); }
 export const mirrorReply = (text, from = 'helm') => broadcast({ type: 'reply', text, from });
 export const mirrorEcho  = (text, from)           => broadcast({ type: 'echo', text, from });
 export const mirrorStatus = text                  => broadcast({ type: 'status', text });
+export const mirrorAttach = files                 => broadcast({ type: 'attach', files: Array.isArray(files) ? files : [files] });
 export const hasTerminals = () => clients.size > 0;
 
 // Start the bridge server. `onMessage(text, reply)` is called when a terminal sends a line:
