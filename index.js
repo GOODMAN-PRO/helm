@@ -5,7 +5,7 @@
 // No framework, no plugins, no gateway service. Read it top to bottom.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync, readdirSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
@@ -675,6 +675,20 @@ const chunks = (s, max = 1900) => {
   return out.length ? out : ['(empty)'];
 };
 
+// Reverse-engineering ALWAYS writes a PDF report, but the engine sometimes forgets to emit the
+// `ATTACH:` line (especially now that it can paste the summary inline). So we deterministically attach
+// any report written to workspace/reverse during this turn — never model-dependent.
+function freshReverseReports(sinceMs) {
+  try {
+    const dir = path.join(WORKSPACE, 'reverse');
+    return readdirSync(dir)
+      .filter(f => /\.pdf$/i.test(f))
+      .map(f => path.join(dir, f))
+      .filter(p => { try { return statSync(p).mtimeMs >= sinceMs - 1000; } catch { return false; } });
+  } catch { return []; }
+}
+const mergeFiles = (files, extra) => { for (const p of extra) if (!files.includes(p)) files.push(p); return files; };
+
 // Agent can attach files by ending lines with "ATTACH: /abs/path" (e.g. screenshots).
 function splitAttachments(s) {
   const files = [];
@@ -1005,11 +1019,13 @@ client.on(Events.MessageCreate, async msg => {
     lastEdit = now; statusMsg.edit(txt).catch(() => {});
   };
   const clearStatus = () => { if (statusMsg) { const m = statusMsg; statusMsg = null; m.delete().catch(() => {}); } };
+  const turnStart = Date.now();
   try {
     const reply = await ask(prompt, onProgress, mode);
     clearInterval(typing);
     clearStatus();
     let { text: rawBody, files } = splitAttachments(reply);
+    mergeFiles(files, freshReverseReports(turnStart));   // always attach any reverse PDF made this turn
     rawBody = handleDirectives(rawBody, text);   // [STUCK: ...] -> queue for the nightly self-upgrade
 
     // Autopilot plan detection: if Claude included [PLAN-PENDING], strip the marker,
@@ -1024,9 +1040,11 @@ client.on(Events.MessageCreate, async msg => {
       const timer = setTimeout(async () => {
         autopilotTimers.delete(channelRef.id);
         channelRef.sendTyping().catch(() => {});
+        const execStart = Date.now();
         try {
           const execReply = await ask('go ahead with the plan', null, mode);
           const { text: execBody, files: execFiles } = splitAttachments(execReply);
+          mergeFiles(execFiles, freshReverseReports(execStart));
           for (const part of chunks(execBody || '(done)')) await channelRef.send(part);
           for (const f of execFiles) {
             try { await channelRef.send({ files: [f] }); }
@@ -1151,10 +1169,12 @@ startCliBridge(async (text, reply, convId) => {
   if (/^\s*\/?(new|reset|newchat)\s*$/i.test(text)) { try { deleteSession(sessionKey); } catch {} reply('Started a new conversation — context cleared.'); return; }
   if (cliBusy) { reply('(still working on the previous message — try again in a moment)'); return; }
   cliBusy = true;
+  const turnStart = Date.now();
   try {
     const mode = getAutonomyMode();
     const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, mode, { sessionKey });
     const { text: rawBody, files } = splitAttachments(raw);
+    mergeFiles(files, freshReverseReports(turnStart));   // always attach any reverse PDF made this turn
     const body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
     try { captureTurn(text, body, convId ? 'desktop' : 'terminal'); } catch {}
     reply(body);   // broadcasts to every terminal once (no separate mirrorReply, or it'd double-send)
