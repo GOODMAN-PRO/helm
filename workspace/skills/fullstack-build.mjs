@@ -29,10 +29,13 @@ export const description =
 
 function parse(argsStr) {
   const tokens = String(argsStr || '').trim();
-  const o = { stack: undefined, outDir: undefined, dryRun: false };
+  const o = { stack: undefined, outDir: undefined, dryRun: false, tier: undefined };
   let s = tokens;
   const flag = (re, set) => { const m = s.match(re); if (m) { set(m); s = s.replace(m[0], ' '); } };
   flag(/--dry-run|--plan/, () => { o.dryRun = true; });
+  flag(/--lean/, () => { o.tier = 'lean'; });
+  flag(/--premium/, () => { o.tier = 'premium'; });
+  flag(/--tier\s+(\S+)/, m => { o.tier = m[1]; });
   flag(/--stack\s+(\S+)/, m => { o.stack = m[1]; });
   flag(/--out\s+(\S+)/, m => { o.outDir = m[1]; });
   o.brief = s.replace(/\s+/g, ' ').trim().replace(/^["']|["']$/g, '');
@@ -40,7 +43,7 @@ function parse(argsStr) {
 }
 
 export async function execute(argsStr = '') {
-  const { brief, stack, outDir, dryRun } = parse(argsStr);
+  const { brief, stack, outDir, dryRun, tier } = parse(argsStr);
   if (!brief) {
     const roles = getAllRoles();
     return 'Usage: fullstack-build "<what to build>" [--stack next-fullstack|astro-site|vite-react-spa] [--dry-run]\n' +
@@ -48,11 +51,15 @@ export async function execute(argsStr = '') {
       'Tip: add --dry-run to preview the agent plan instantly before committing to a full build.';
   }
   const result = await buildApp({
-    brief, stack, outDir, dryRun,
-    onProgress: e => { if (e && e.role) console.error(`[fullstack-build] [${e.phase}] ${e.role} — ${e.status}`); },
+    brief, stack, outDir, dryRun, tier,
+    onProgress: e => {
+      if (e && e.status === 'selected') console.error(`[fullstack-build] tier=${e.tier}, ${e.count} agents (${e.skipped} skipped)`);
+      else if (e && e.role) console.error(`[fullstack-build] [${e.phase}] ${e.role} — ${e.status}`);
+    },
   });
+  const n = result.roleResults ? result.roleResults.length : 0;
   const head = dryRun
-    ? `Planned a ${result.roleResults ? result.roleResults.length : 0}-agent full-stack build for: "${brief}". (Dry run — no files written.)`
-    : `${result.ok ? 'Built' : 'Build finished with issues for'}: "${brief}".\nProject: ${result.projectDir}`;
+    ? `Planned a ${n}-agent (tier: ${result.tier || 'auto'}) full-stack build for: "${brief}". (Dry run — no files written.)`
+    : `${result.ok ? 'Built' : 'Build finished with issues for'}: "${brief}" with ${n} agents (tier: ${result.tier || 'auto'}).\nProject: ${result.projectDir}`;
   return `${head}\n\n${result.report || ''}`.trim();
 }

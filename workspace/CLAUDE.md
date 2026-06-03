@@ -445,7 +445,12 @@ executing the returned step's `tool_or_cmd`.
 ## Full-stack builder (multi-agent)
 
 When the owner asks you to **build a website or a (web) app / SaaS / full-stack app**, use the
-multi-agent builder — NOT a hand-rolled shell. It orchestrates **40 specialist agents** across phases
+multi-agent builder — NOT a hand-rolled shell. **It auto-scales: it runs ONLY the agents a job needs**,
+not all 40 every time (token-efficient). A static portfolio runs ~16–17 agents (no backend); a CRUD app
+adds the data/API/auth agents (~21); an animated/award-grade site spins up the full creative + animation
+suite (~34–40). Selection is automatic from the brief + stack (tiers: lean | standard | premium); force
+it with `--tier <lean|standard|premium>` / `--lean` / `--premium`, cap with `--max-agents N`, or
+include/exclude specific roles. It has a roster of **40 specialist agents** to draw from, across phases
 discovery → architecture → design → scaffold → data → backend → auth → frontend → integration → quality
 → finalize, then runs a **verify+fix loop** so the project actually installs, builds and tests. No stubs,
 no fake data, no "coming soon". Roles include: product manager, requirements analyst, solutions

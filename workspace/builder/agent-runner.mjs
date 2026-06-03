@@ -97,6 +97,13 @@ export async function runRole(role, ctx, opts = {}) {
 
   const t0 = Date.now();
 
+  // Token efficiency: the big AWARD_STANDARD + ANIMATION_TOOLKIT blocks only matter to roles that touch
+  // visuals/motion. Backend/data/auth/devops/docs roles get a one-line quality note and a smaller spec
+  // digest instead — saving thousands of tokens per agent across the pipeline.
+  const VISUAL_PHASES = new Set(['design', 'frontend', 'quality']);
+  const isVisual = VISUAL_PHASES.has(role.phase);
+  const digestCap = isVisual ? 6000 : 3000;
+
   // Assemble the full prompt the agent will receive on stdin.
   // Order: persona/framing → shared context → concrete task → quality rules
   const stackHeader = [
@@ -108,19 +115,20 @@ export async function runRole(role, ctx, opts = {}) {
     ctx.stack?.notes   ?? '',
     '',
     '## PROJECT SPECS SO FAR',
-    ctx.artifactsDigest(),
+    ctx.artifactsDigest(digestCap),
   ].join('\n');
+
+  const qualityBlock = isVisual
+    ? ['## QUALITY BAR (every build aims here)', AWARD_STANDARD, '',
+       '## ANIMATION TOOLKIT (use these idioms when you touch the frontend)', ANIMATION_STACK]
+    : ['## QUALITY BAR', 'Production-grade, fully-wired, no stubs/placeholders/lorem. Match the project conventions.'];
 
   const prompt = [
     role.system,
     '',
     stackHeader,
     '',
-    '## QUALITY BAR (every build aims here)',
-    AWARD_STANDARD,
-    '',
-    '## ANIMATION TOOLKIT (use these idioms when you touch the frontend)',
-    ANIMATION_STACK,
+    ...qualityBlock,
     '',
     '## YOUR TASK',
     role.task(ctx),

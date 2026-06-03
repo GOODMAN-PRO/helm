@@ -22,8 +22,10 @@ import { buildApp } from './orchestrator.mjs';
 // (`--brief "<text>" --stack <id> --dryRun true`), so `tools.mjs call builder.fullstack` works too.
 const truthy = v => v === undefined || /^(1|true|yes|on)$/i.test(String(v));
 function parseArgs(argv) {
-  const out = { brief: '', stack: undefined, outDir: undefined, dryRun: false, concurrency: 3, maxFixRounds: 2, json: false };
+  const out = { brief: '', stack: undefined, outDir: undefined, dryRun: false, concurrency: 3, maxFixRounds: 2, json: false,
+    tier: undefined, maxAgents: undefined, includeRoles: undefined, excludeRoles: undefined };
   const rest = [];
+  const list = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run' || a === '--plan') out.dryRun = true;
@@ -34,6 +36,12 @@ function parseArgs(argv) {
     else if (a === '--out' || a === '--outDir') out.outDir = argv[++i];
     else if (a === '--concurrency') out.concurrency = parseInt(argv[++i], 10) || 3;
     else if (a === '--max-fix' || a === '--maxFixRounds') out.maxFixRounds = parseInt(argv[++i], 10) || 2;
+    else if (a === '--tier') out.tier = argv[++i];                 // lean | standard | premium (default: auto)
+    else if (a === '--lean') out.tier = 'lean';
+    else if (a === '--premium') out.tier = 'premium';
+    else if (a === '--max-agents' || a === '--maxAgents') out.maxAgents = parseInt(argv[++i], 10) || undefined;
+    else if (a === '--include' || a === '--includeRoles') out.includeRoles = list(argv[++i]);
+    else if (a === '--exclude' || a === '--excludeRoles') out.excludeRoles = list(argv[++i]);
     else rest.push(a);
   }
   if (!out.brief) out.brief = rest.join(' ').trim();
@@ -54,7 +62,14 @@ async function main() {
     dryRun: opts.dryRun,
     concurrency: opts.concurrency,
     maxFixRounds: opts.maxFixRounds,
-    onProgress: e => { if (e && e.role) console.error(`  ⚙️  [${e.phase}] ${e.role} — ${e.status}`); },
+    tier: opts.tier,
+    maxAgents: opts.maxAgents,
+    includeRoles: opts.includeRoles,
+    excludeRoles: opts.excludeRoles,
+    onProgress: e => {
+      if (e && e.status === 'selected') console.error(`  → tier=${e.tier}, ${e.count} agents selected (${e.skipped} skipped as unneeded)`);
+      else if (e && e.role) console.error(`  ⚙️  [${e.phase}] ${e.role} — ${e.status}`);
+    },
   });
   const mins = ((Date.now() - startedAt) / 60000).toFixed(1);
   if (opts.json) { console.log(JSON.stringify({ ...result, elapsedMin: mins })); return; }

@@ -6,6 +6,7 @@
 
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { selectRoles } from './select.mjs';   // adaptive, token-efficient role selection
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -163,13 +164,17 @@ async function runPhase(phaseName, roles, ctx, runRoleFn, opts, globalDone) {
 }
 
 // ─── Markdown report builder ──────────────────────────────────────────────────
-function buildReport({ brief, projectDir, phases, roleResults, verify, gates, dryRun }) {
+function buildReport({ brief, projectDir, phases, roleResults, verify, gates, dryRun, selection }) {
   const lines = [];
   lines.push('# Helm Builder Report');
   lines.push('');
   lines.push(`**Brief:** ${brief || '(none)'}`);
   lines.push(`**Project:** \`${projectDir}\``);
   lines.push(`**Mode:** ${dryRun ? 'dry-run (no files written)' : 'live'}`);
+  if (selection) {
+    lines.push(`**Tier:** ${selection.tier}  ·  **Agents selected:** ${roleResults.length}${selection.skipped?.length ? `  ·  **Skipped (not needed):** ${selection.skipped.length}` : ''}`);
+    if (selection.needs) lines.push(`**Detected needs:** backend=${!!selection.needs.needsBackend}, animation=${!!selection.needs.wantsAnimation}`);
+  }
   lines.push(`**Generated:** ${new Date().toISOString()}`);
   lines.push('');
 
@@ -231,6 +236,12 @@ export async function buildApp(options = {}) {
     concurrency = 3,
     maxFixRounds = 2,
     onProgress,
+    // Adaptive selection: run only the agents the job needs (token-efficient). 'auto' lets the
+    // brief+stack pick the tier; force with tier:'lean'|'standard'|'premium'. include/exclude by id.
+    tier,
+    includeRoles,
+    excludeRoles,
+    maxAgents,
     // Test injection overrides (underscore convention).
     _runRole,
     _roles,
@@ -317,6 +328,14 @@ export async function buildApp(options = {}) {
       }
       // roles.mjs absent or threw — allRoles stays []
     }
+
+    // ── 5b. Adaptive selection — only run the agents this job needs (skip when roles are injected) ──
+    let selection = { roles: allRoles, tier: 'all', skipped: [], needs: {} };
+    if (!_roles) {
+      selection = selectRoles(allRoles, { brief, stack }, { tier, includeRoles, excludeRoles, maxAgents });
+      allRoles = selection.roles;
+    }
+    onProgress?.({ phase: 'plan', role: '*', status: 'selected', tier: selection.tier, count: allRoles.length, skipped: selection.skipped.length });
 
     // ── 6. Resolve runRole ──────────────────────────────────────────────────
     let runRoleFn = _runRole;
@@ -461,6 +480,7 @@ export async function buildApp(options = {}) {
       verify,
       gates,
       dryRun,
+      selection,
     });
 
     const overallOk = dryRun
@@ -475,6 +495,8 @@ export async function buildApp(options = {}) {
       verify:      verify ?? null,
       gates:       gates  ?? null,
       phases:      phaseResultsMap,
+      tier:        selection.tier,
+      skipped:     selection.skipped,
     };
 
   } catch (fatal) {

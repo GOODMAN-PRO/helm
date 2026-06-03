@@ -2128,13 +2128,36 @@ function fail(label, reason) {
     if (!v.ok) throw new Error('role validation: ' + v.errors.join('; '));
     const { buildApp } = await imp(path.join(WORKSPACE, 'builder/orchestrator.mjs'));
     const done = [];
-    const r = await buildApp({ brief: 'smoke: a notes app', dryRun: true, onProgress: e => { if (e && e.status === 'done') done.push(e.role); } });
+    // Premium tier forces the full suite so we can validate dependency ordering across all phases.
+    const r = await buildApp({ brief: 'smoke: a notes app', dryRun: true, tier: 'premium', onProgress: e => { if (e && e.status === 'done') done.push(e.role); } });
     if (!r.ok) throw new Error('dry-run not ok');
-    if (done.length !== roles.length) throw new Error(`dry-run ran ${done.length}/${roles.length} roles`);
-    const pos = new Map(done.map((id, i) => [id, i]));   // dependency order: a role never precedes its deps
-    for (const role of roles) for (const d of (role.deps || [])) {
-      if (pos.has(d) && pos.has(role.id) && pos.get(d) > pos.get(role.id)) throw new Error(`${role.id} ran before dep ${d}`);
+    if (done.length < 20) throw new Error(`premium dry-run ran only ${done.length} roles`);
+    const byId = new Map(roles.map(rr => [rr.id, rr]));
+    const ran = new Set(done);
+    const pos = new Map(done.map((id, i) => [id, i]));   // dependency order: a role never precedes a dep that also ran
+    for (const id of done) for (const d of (byId.get(id)?.deps || [])) {
+      if (ran.has(d) && pos.get(d) > pos.get(id)) throw new Error(`${id} ran before dep ${d}`);
     }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
+// ---- full-stack builder: adaptive selection runs fewer agents for simple jobs ----
+{
+  const label = 'builder: adaptive selection (simple job < premium job; deps pruned, scheduler valid)';
+  try {
+    const { buildApp } = await imp(path.join(WORKSPACE, 'builder/orchestrator.mjs'));
+    const run = async (brief, opts = {}) => {
+      const done = [];
+      const r = await buildApp({ brief, dryRun: true, onProgress: e => { if (e && e.status === 'done') done.push(e.role); }, ...opts });
+      return { ok: r.ok, n: done.length, tier: r.tier };
+    };
+    const simple = await run('a simple static portfolio landing page');
+    const animated = await run('a cinematic product launch site with scroll animations like apple');
+    if (!simple.ok || !animated.ok) throw new Error('a dry-run was not ok');
+    if (!(simple.n < animated.n)) throw new Error(`simple (${simple.n}) should use fewer agents than animated (${animated.n})`);
+    if (animated.tier !== 'premium') throw new Error(`animated brief should be premium tier, got ${animated.tier}`);
+    if (simple.n > 28) throw new Error(`simple job should be lean, ran ${simple.n}`);
     ok(label);
   } catch (e) { fail(label, e.message); }
 }
