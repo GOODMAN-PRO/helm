@@ -497,7 +497,9 @@ function recallMemories(text) {
   try {
     const q = String(text || '').replace(/\s+/g, ' ').slice(0, 240);
     if (q.length < 3) return '';
-    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', q], { cwd: __dirname, encoding: 'utf8', timeout: 6000 });
+    // 12s: the first recall after a process start loads the local embedding model (all-MiniLM) for
+    // semantic ranking; subsequent calls hit the cached vectors and are fast.
+    const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'memory/memory.mjs'), 'recall', q], { cwd: __dirname, encoding: 'utf8', timeout: 12000 });
     if (r.status !== 0) return '';
     const arr = JSON.parse(r.stdout || '[]');
     // Skip the CLAUDE.md/helm.md persona-doc fragments (already in the prompt) — keep real learned facts.

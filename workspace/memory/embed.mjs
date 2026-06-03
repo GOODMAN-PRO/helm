@@ -3,6 +3,14 @@
 // @xenova/transformers and the model weights are loaded lazily — importing this
 // module never fails even when the package is absent or the model undownloaded.
 
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Stable model cache OUTSIDE node_modules so it survives `npm install` / a Helm reinstall (otherwise the
+// model would vanish and semantic recall would silently drop back to TF-IDF). Override with HELM_MODEL_DIR.
+export const MODEL_CACHE = process.env.HELM_MODEL_DIR || path.join(os.homedir(), '.helm-models');
+
 let _pipeline = null;
 // Single shared promise prevents concurrent callers from double-initializing.
 let _loadPromise = null;
@@ -41,8 +49,9 @@ async function getPipeline() {
   if (_pipeline) return _pipeline;
   if (!_loadPromise) {
     _loadPromise = import('@xenova/transformers').then(mod => {
-      mod.env.allowRemoteModels = false;
+      mod.env.allowRemoteModels = false;   // load from the local cache only — never download at runtime
       mod.env.allowLocalModels = true;
+      mod.env.cacheDir = MODEL_CACHE;
       return mod.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
     }).then(p => {
       _pipeline = p;
@@ -93,4 +102,15 @@ export async function getOrComputeVector(db, factId, text) {
     factId, JSON.stringify(vec)
   );
   return vec;
+}
+
+// One-time provisioning: `node workspace/memory/embed.mjs download` fetches all-MiniLM-L6-v2 into the
+// stable cache so semantic recall works (runtime never downloads — allowRemoteModels stays false there).
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === 'download') {
+  const mod = await import('@xenova/transformers');
+  mod.env.allowRemoteModels = true; mod.env.allowLocalModels = true; mod.env.cacheDir = MODEL_CACHE;
+  console.error(`Downloading all-MiniLM-L6-v2 -> ${MODEL_CACHE} …`);
+  const p = await mod.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+  await p('warmup', { pooling: 'mean', normalize: true });
+  console.error('done — semantic memory is ready.');
 }

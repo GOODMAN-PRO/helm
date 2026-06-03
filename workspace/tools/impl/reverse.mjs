@@ -777,8 +777,15 @@ async function captureNetwork(url) {
   const { chromium } = await import('playwright');
   await ensureChromium(chromium);
   const requests = [];
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
-  const ctx = await browser.newContext({ userAgent: UA });
+  // If the owner has signed in via `browser.login`, reuse that persistent profile so the capture is
+  // AUTHENTICATED (the real reel + its GraphQL/API responses load). Otherwise a fresh anonymous context.
+  const PROFILE = path.join(WORKSPACE, 'browser-profile');
+  const args = ['--no-sandbox', '--disable-dev-shm-usage'];
+  let browser = null, ctx;
+  if (existsSync(path.join(PROFILE, 'Default')) || existsSync(path.join(PROFILE, 'Cookies'))) {
+    try { ctx = await chromium.launchPersistentContext(PROFILE, { headless: true, userAgent: UA, args }); } catch { /* profile locked/busy — fall back */ }
+  }
+  if (!ctx) { browser = await chromium.launch({ headless: true, args }); ctx = await browser.newContext({ userAgent: UA }); }
   const page = await ctx.newPage();
   page.on('request', req => requests.push({
     url: req.url(), method: req.method(), type: req.resourceType(),
@@ -814,7 +821,8 @@ async function captureNetwork(url) {
   try { await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 }); } catch { /* timeout/nav error acceptable */ }
   try { await Promise.allSettled(bodyJobs); } catch { /* best effort */ }
   try { domHtml = await page.content(); } catch { /* page closed/navigated */ }
-  await browser.close();
+  try { await ctx.close(); } catch {}
+  if (browser) { try { await browser.close(); } catch {} }
   return { requests, html: domHtml };
 }
 
