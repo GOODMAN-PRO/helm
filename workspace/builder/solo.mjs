@@ -18,13 +18,14 @@ import { verifyProject } from './verify.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const PLAYBOOK_PATH = path.join(__dirname, 'WEBSITE_PLAYBOOK.md');
+const CRAFT_PATH = path.join(__dirname, 'CRAFT_PLAYBOOK.md');
 
 const slugify = s => String(s || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'site';
 const tsNow = () => new Date().toISOString().replace(/[:.tz]/gi, '-').slice(0, 19);   // npm-name-safe (no 'T')
 
-function readPlaybook() {
-  try { return readFileSync(PLAYBOOK_PATH, 'utf8'); } catch { return ''; }
-}
+function readFileSafe(p) { try { return readFileSync(p, 'utf8'); } catch { return ''; } }
+function readPlaybook() { return readFileSafe(PLAYBOOK_PATH); }
+function readCraft() { return readFileSafe(CRAFT_PATH); }
 
 // Run one agentic `claude -p` session in the project dir. Returns { ok, output, durationMs }.
 function runAgent(prompt, projectDir, { model = 'sonnet', timeoutMs = 2_700_000, onProgress } = {}) {
@@ -58,33 +59,59 @@ function quickBuild(projectDir) {
   } catch (e) { return { ok: false, errors: String(e?.message ?? e) }; }
 }
 
-const SYSTEM = `You are an award-winning senior frontend + design engineer. You build websites at the level of
-apple.com / Stripe / Linear / Awwwards Site of the Day: striking, cohesive, polished, and genuinely
-high-craft — never generic or template-looking. You write complete, real, production code (no stubs, no
-lorem, no "coming soon"), and you VERIFY your work compiles before you finish.`;
+const SYSTEM = `You are an award-winning senior frontend + design engineer from a top studio (think Obys / Active
+Theory / Locomotive). You build BESPOKE websites at Awwwards Site-of-the-Day level — not generic, never
+template-looking, and never "AI-generated"-looking. You have strong art-directed taste: a distinctive
+visual identity, custom interactions, real craft and texture, and confident composition. You write
+complete, real, production code (no stubs, no lorem), and you VERIFY it compiles before finishing.`;
 
-function buildPrompt({ brief, stack, playbook }) {
+function buildPrompt({ brief, stack, playbook, craft }) {
   return [
     SYSTEM, '',
-    '# YOUR TASK: build a complete, premium website',
+    '# YOUR TASK: design + build a BESPOKE, award-tier website (not a generic AI landing page)',
     `## What to build\n${brief}`, '',
-    `## Stack (already scaffolded in this directory)\n${stack.summary}\n${stack.notes || ''}`,
-    'The project is already created (Next.js App Router + TypeScript + Tailwind, with gsap, lenis, framer-motion, three, @react-three/fiber, @react-three/drei installed). You are working INSIDE the project root. Build the real site here.', '',
-    '## THE DESIGN PLAYBOOK — follow it precisely (this is how you hit the quality bar)',
-    playbook || '(playbook unavailable — apply apple/stripe/linear-grade craft: cohesive dark design tokens, a fluid display type scale, generous whitespace, Lenis smooth scroll + GSAP ScrollTrigger reveals, Framer Motion micro-interactions, a striking hero, prefers-reduced-motion support, and impeccable polish.)', '',
-    '## Deliverables (do ALL of this, coherently, in one cohesive design language)',
-    '1. **Design system first:** implement the playbook tokens — color (dark theme, surfaces, ONE accent + glow), the fluid type scale (Tailwind fontSize + clamp), spacing/container, radius/shadow, motion tokens — in tailwind config + globals.css + a motion-tokens module + app/fonts.ts (next/font). Everything else uses these tokens.',
-    '2. **Real brand + copy:** invent a fitting brand name and write real, specific, premium marketing copy throughout. No placeholders, no lorem.',
-    '3. **A striking hero** (pick the right pattern from the playbook for this product) with real motion — a reliable CSS animated-gradient or kinetic-type or scroll-scrub hero. It must look expensive.',
-    '4. **All the sections** a great landing page needs for THIS product, well-sequenced and each visually distinct (hero → proof → features → showcase → specs/details → CTA → footer). Real content.',
-    '5. **Scroll choreography:** Lenis smooth scroll synced with GSAP ScrollTrigger; reveal-on-scroll, a pinned/scrubbed or parallax moment. SSR-safe, cleaned up.',
-    '6. **Micro-interactions:** Framer Motion — button springs, magnetic CTA, scroll-aware nav, hover states on every interactive element.',
-    '7. **Polish & correctness:** responsive (re-tune motion on mobile, don\'t just shrink), full prefers-reduced-motion fallback, WCAG AA + keyboard + semantics + alt text, 60fps (transform/opacity only).', '',
+    `## Stack (already scaffolded here)\n${stack.summary}\n${stack.notes || ''}`,
+    'The project is already created (Next.js App Router + TS + Tailwind, with gsap, lenis, framer-motion, three, @react-three/fiber, @react-three/drei installed). Work INSIDE the project root. Build the real site here.', '',
+    '## PLAYBOOK 1 — design foundation (tokens, scroll/motion code patterns). Use it.',
+    playbook || '(foundation playbook unavailable)', '',
+    '## PLAYBOOK 2 — CRAFT: how to look BESPOKE, not AI-generated. OBEY the ANTI-AI BAN LIST.',
+    craft || '(craft playbook unavailable — at minimum: pick a DISTINCTIVE identity (NOT Inter + navy→purple gradient), use a display typeface with personality + an owned non-blue accent, add grain/texture, build CUSTOM buttons with real hover/press/focus, include ONE signature interaction, and use art-directed asymmetric layouts — never centered-hero + even 3-column emoji cards.)', '',
+    '## Deliverables (one cohesive, art-directed design language)',
+    '1. **Pick a DISTINCTIVE identity** from the craft playbook that fits THIS product — a non-Inter type pairing (a display face with character) + an OWNED color identity that is NOT the default navy/indigo→purple gradient. Implement it as tokens (tailwind + globals.css + app/fonts.ts via next/font).',
+    '2. **Real brand + premium copy** throughout (invent a fitting brand; specific, confident, no lorem).',
+    '3. **A striking, art-directed hero** — asymmetric/editorial composition with oversized type and a real focal visual; NOT a centered headline on a glowing gradient. Add a first-visit intro/hero entrance choreography.',
+    '4. **Custom components:** ship the craft playbook\'s custom buttons (magnetic/spotlight CTA, text-slide button, animated nav link) — every interactive element has a custom hover/press/focus state. No browser/shadcn defaults.',
+    '5. **ONE signature "wow" interaction** (pick one from the craft playbook: velocity marquee / clip-reveal links / count-up tickers / hover-image-reveal / custom cursor) — done well.',
+    '6. **Texture + detail:** a grain/noise overlay, the 1px top-highlight border trick, custom animated underlines, monospace eyebrows/section counters — at least 5 craft micro-details.',
+    '7. **Art-directed sections:** vary the layout per section (use the craft layout kit — asymmetric, full-bleed, overlap, scale-contrast, alternating rows, big numbered list, sticky-scroll). NO two adjacent sections share the same layout. Each section feels different.',
+    '8. **Scroll storytelling:** Lenis + GSAP ScrollTrigger — ONE pinned/scrubbed or layered-parallax moment + tasteful reveals. SSR-safe, cleaned up.',
+    '9. **Expensive motion:** use the craft motion tokens (custom easings + springs); fast snappy UI, choreographed reveals — never linear/uniform/everything-fades-at-once.',
+    '10. **Polish & correctness:** responsive (re-tune motion on mobile), full prefers-reduced-motion fallback, WCAG AA + keyboard + semantics + alt, 60fps (transform/opacity only).', '',
     '## HARD RULES (non-negotiable)',
     '- Do NOT enable `exactOptionalPropertyTypes` or `noUncheckedIndexedAccess` in tsconfig — they break builds. Keep the scaffold\'s sane tsconfig.',
-    '- Use high-quality placeholder media that always loads (CSS/gradients/SVG art, or stable Unsplash URLs) — NEVER broken images.',
+    '- Use art-directed media that always loads (CSS/SVG art, gradients, or stable Unsplash URLs with params) — NEVER broken images.',
     '- Code-split heavy 3D (`dynamic(() => import(...), { ssr: false })`); keep initial JS lean.',
-    '- **It MUST `npm run build` with ZERO errors.** When you finish writing the site, RUN `npm run build` yourself, read the errors, FIX them, and repeat until it builds cleanly. Do not declare done until `npm run build` passes.',
+    '- It must NOT look like a generic AI/template site — re-read the ANTI-AI BAN LIST and make sure you violate none of it.',
+    '- **It MUST `npm run build` with ZERO errors.** When done, RUN `npm run build` yourself, fix every error, and repeat until it builds cleanly. Do not finish until it passes.',
+    ANTI_STUB_RULES,
+  ].join('\n');
+}
+
+// De-AI craft elevation pass: a fresh critical look that hunts the generic tells and elevates the site.
+function polishPrompt({ brief, craft }) {
+  return [
+    SYSTEM, '',
+    '# CRAFT REVIEW + ELEVATION PASS',
+    `The website in this directory (a "${brief}") is built and compiles. Your job: critically review it like an Awwwards judge and ELEVATE it so it looks BESPOKE and hand-crafted — not AI-generated. Actually edit the files.`, '',
+    '## Use this CRAFT playbook — especially the ANTI-AI BAN LIST',
+    craft || '(craft playbook unavailable)', '',
+    '## Do this',
+    '1. Open the site\'s pages/components and judge them against the ANTI-AI BAN LIST. For EVERY tell present, fix it: replace any generic navy/indigo→purple gradient + soft-glow background with the owned identity; ensure the typeface has personality (not plain Inter); break any centered-hero / even-3-column-emoji-card cliché into art-directed asymmetric layouts; add grain/texture if missing.',
+    '2. Ensure CUSTOM buttons + a custom state on every interactive element; ensure ONE strong signature interaction exists and works; add craft micro-details (animated underlines, mono eyebrows, section counters, 1px highlight borders).',
+    '3. Upgrade the motion to the craft tokens (custom easings/springs, choreographed — not uniform fades).',
+    '4. Make adjacent sections visually distinct (vary layouts).',
+    'Keep all real content/sections — elevate, don\'t delete. Keep it responsive + reduced-motion + accessible.', '',
+    '## HARD RULE: when finished, RUN `npm run build` and confirm it still passes with ZERO errors. Fix anything you broke. Do not finish until it builds.',
     ANTI_STUB_RULES,
   ].join('\n');
 }
@@ -101,17 +128,20 @@ function fixPrompt(errors) {
 }
 
 export async function buildSolo(options = {}) {
-  const { brief = '', stack: stackHint, outDir, onProgress, maxFixRounds = 4, model = 'sonnet', dryRun = false } = options;
+  const { brief = '', stack: stackHint, outDir, onProgress, maxFixRounds = 4, model = 'sonnet', dryRun = false, polish = true } = options;
   const stack = stackHint && typeof stackHint === 'object' ? stackHint : resolveStack(stackHint || brief);
   const projectDir = outDir || path.join(REPO_ROOT, 'workspace', 'builder', 'out', `${slugify(brief)}-${tsNow()}`);
   const log = [];
   const emit = (phase, status, extra = {}) => { onProgress?.({ phase, status, ...extra }); log.push(`[${phase}] ${status}`); };
 
   if (dryRun) {
-    return { ok: true, projectDir, mode: 'solo', report: `# Solo build (dry-run)\nBrief: ${brief}\nStack: ${stack.id}\nWould: scaffold → 1 build agent (${model}) → build-until-green loop (≤${maxFixRounds}).`, dryRun: true };
+    return { ok: true, projectDir, mode: 'solo', report: `# Solo build (dry-run)\nBrief: ${brief}\nStack: ${stack.id}\nWould: scaffold → 1 build agent (${model}, playbook+craft) → build-green → ${polish ? 'de-AI polish pass → build-green' : '(no polish)'} (≤${maxFixRounds} fixes).`, dryRun: true };
   }
 
-  // 1. Scaffold (create-next-app + animation libs; guaranteed-buildable base via stack.scaffold)
+  const playbook = readPlaybook();
+  const craft = readCraft();
+
+  // 1. Scaffold (create-next-app + animation libs; guaranteed-buildable base)
   emit('scaffold', 'start');
   let scaffold = { ok: true };
   try { if (stack.scaffold) scaffold = await stack.scaffold(projectDir); } catch (e) { scaffold = { ok: false, error: String(e?.message ?? e) }; }
@@ -120,38 +150,51 @@ export async function buildSolo(options = {}) {
   }
   emit('scaffold', scaffold.fallback ? 'done (fallback)' : 'done');
 
-  // 2. ONE agent builds the whole site, guided by the research playbook.
-  const playbook = readPlaybook();
-  emit('build', 'start', { model, playbook: playbook ? `${playbook.length} chars` : 'missing' });
-  const built = await runAgent(buildPrompt({ brief, stack, playbook }), projectDir, { model, timeoutMs: 2_700_000, onProgress: e => emit('build', `working ${e.elapsed}s`) });
-  emit('build', built.ok ? 'agent done' : `agent exited (${built.output.slice(0, 80)})`);
-
-  // 3. Build-until-green loop — deterministic guarantee that it compiles.
-  let verify = quickBuild(projectDir);
+  // deterministic build-until-green loop — guarantees it compiles.
   let rounds = 0;
-  while (!verify.ok && rounds < maxFixRounds) {
-    rounds++;
-    emit('fix', `round ${rounds} — build failing, repairing`);
-    const fixed = await runAgent(fixPrompt(verify.errors), projectDir, { model: 'sonnet', timeoutMs: 1_500_000, onProgress: e => emit('fix', `round ${rounds} working ${e.elapsed}s`) });
-    if (!fixed.ok && !existsSync(path.join(projectDir, 'package.json'))) break;
-    verify = quickBuild(projectDir);
-  }
-  emit('verify', verify.ok ? 'BUILD PASSES ✓' : `build still failing after ${rounds} fix round(s)`);
+  const buildGreen = async () => {
+    let v = quickBuild(projectDir);
+    while (!v.ok && rounds < maxFixRounds) {
+      rounds++;
+      emit('fix', `round ${rounds} — build failing, repairing`);
+      const fixed = await runAgent(fixPrompt(v.errors), projectDir, { model: 'sonnet', timeoutMs: 1_500_000, onProgress: e => emit('fix', `round ${rounds} working ${e.elapsed}s`) });
+      if (!fixed.ok && !existsSync(path.join(projectDir, 'package.json'))) break;
+      v = quickBuild(projectDir);
+    }
+    return v;
+  };
 
-  // 4. Final full verify (typecheck/lint/build/test) for the report.
+  // 2. ONE agent designs + builds the whole bespoke site (foundation + craft playbooks).
+  emit('build', 'start', { model, playbook: playbook ? `${playbook.length}c` : 'missing', craft: craft ? `${craft.length}c` : 'missing' });
+  const built = await runAgent(buildPrompt({ brief, stack, playbook, craft }), projectDir, { model, timeoutMs: 2_700_000, onProgress: e => emit('build', `working ${e.elapsed}s`) });
+  emit('build', built.ok ? 'agent done' : `agent exited (${(built.output || '').slice(0, 80)})`);
+  let verify = await buildGreen();
+  emit('verify', verify.ok ? 'build passes ✓' : `build failing after ${rounds} fix(es)`);
+
+  // 3. De-AI craft polish pass — elevate against the anti-AI ban list, then re-green.
+  if (polish && verify.ok && craft) {
+    emit('polish', 'start (de-AI craft elevation)');
+    await runAgent(polishPrompt({ brief, craft }), projectDir, { model, timeoutMs: 2_100_000, onProgress: e => emit('polish', `working ${e.elapsed}s`) });
+    verify = await buildGreen();
+    emit('polish', verify.ok ? 'polished + builds ✓' : 'polished but build failing');
+  }
+
+  // 4. Final full verify for the report.
   let full = null;
   try { full = await verifyProject(projectDir); } catch {}
 
   const report = [
     '# Helm Website Build (solo mode)', '',
     `**Brief:** ${brief}`,
-    `**Stack:** ${stack.id} · **Build agent:** 1 (${model}) + ${rounds} fix round(s)`,
+    `**Stack:** ${stack.id} · **Build:** 1 agent (${model}) + ${polish ? 'de-AI polish pass + ' : ''}${rounds} fix round(s)`,
+    `**Playbooks:** foundation ${playbook ? '✓' : '✗'} · craft ${craft ? '✓' : '✗'}`,
     `**Project:** \`${projectDir}\``,
     `**Compiles:** ${verify.ok ? '✓ npm run build passes' : '✗ still failing'}`,
     full ? `**Verify:** ${full.steps.map(s => `${s.name}:${s.ok ? '✓' : '✗'}`).join('  ')}` : '',
     '', '## How it was built',
-    '- One cohesive agent built the entire site from the research-distilled design playbook (no swarm).',
-    '- A deterministic build-until-green loop fixed any compile errors before finishing.',
+    '- ONE cohesive agent designed + built the whole site from the foundation + craft (anti-AI) playbooks.',
+    '- A de-AI polish pass elevated it against the anti-AI ban list (bespoke identity, custom buttons, a signature interaction, texture, art-directed layouts).',
+    '- A deterministic build-until-green loop guaranteed it compiles.',
     verify.ok ? '\nRun it: `cd ' + projectDir + ' && npm run dev`' : '\n(Build still has errors — see verify output.)',
   ].filter(Boolean).join('\n');
 
