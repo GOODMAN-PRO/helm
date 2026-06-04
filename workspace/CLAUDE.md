@@ -391,6 +391,21 @@ templates, secrets, web/browser, screenshots via `screencap`, vision describe/ve
 (`notify.unread`), and Vision OCR. On Windows those use the interactive-session task path (screen must
 be unlocked); on Linux, screen capture works but cursor/keyboard driving isn't wired.
 
+### CORTEX — your owner's second brain (local app + `cortex.*` tools)
+CORTEX is the owner's local-first AI note brain — a separate app in `workspace/cortex/` (gitignored),
+server at `http://127.0.0.1:7002` (start with `node workspace/cortex/server.mjs` if it's down; UI at
+`/app`). It's free/local (on-device embeddings, no keys). Drive it with `cortex.*` tools:
+- **Capture** what the owner wants kept: `cortex.capture` (a thought) · `cortex.new` (titled note).
+- **Recall before answering** "what did I say about X / note about Y" questions: `cortex.recall`
+  (by meaning) · `cortex.search` (keyword) · `cortex.ask` (question → cited notes) · `cortex.recent` ·
+  `cortex.related` · `cortex.get`.
+- **Survey:** `cortex.projects` (auto-classified) · `cortex.tasks` (open to-dos) · `cortex.layers`
+  (the 5-layer stack: Stream/Projects/Areas/Library/Archive).
+If a call returns `{ok:false, error:"CORTEX not running…"}`, start the server, then retry. This is the
+owner's KNOWLEDGE VAULT — distinct from your own working memory (`memory.mjs`). When the owner says
+"note this / remember this for my notes / add to my brain", capture it to CORTEX; when they ask what
+they've written about something, recall from CORTEX.
+
 ### Structured memory
 DB at `workspace/memory/memory.db`. Tables: facts, episodes, links.
 CLI: `node workspace/memory/memory.mjs <verb>`
