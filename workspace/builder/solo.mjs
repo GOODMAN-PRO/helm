@@ -14,11 +14,13 @@ import path from 'node:path';
 import { resolveStack } from './stack.mjs';
 import { resolveClaudeBin, ANTI_STUB_RULES } from './agent-runner.mjs';
 import { verifyProject } from './verify.mjs';
+import { auditSite, failuresForAgent } from './audit.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const PLAYBOOK_PATH = path.join(__dirname, 'WEBSITE_PLAYBOOK.md');
 const CRAFT_PATH = path.join(__dirname, 'CRAFT_PLAYBOOK.md');
+const CHECKLIST_PATH = path.join(__dirname, 'CHECKLIST.md');
 
 const slugify = s => String(s || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'site';
 const tsNow = () => new Date().toISOString().replace(/[:.tz]/gi, '-').slice(0, 19);   // npm-name-safe (no 'T')
@@ -26,6 +28,7 @@ const tsNow = () => new Date().toISOString().replace(/[:.tz]/gi, '-').slice(0, 1
 function readFileSafe(p) { try { return readFileSync(p, 'utf8'); } catch { return ''; } }
 function readPlaybook() { return readFileSafe(PLAYBOOK_PATH); }
 function readCraft() { return readFileSafe(CRAFT_PATH); }
+function readChecklist() { return readFileSafe(CHECKLIST_PATH); }
 
 // Run one agentic `claude -p` session in the project dir. Returns { ok, output, durationMs }.
 function runAgent(prompt, projectDir, { model = 'sonnet', timeoutMs = 2_700_000, onProgress } = {}) {
@@ -65,7 +68,7 @@ template-looking, and never "AI-generated"-looking. You have strong art-directed
 visual identity, custom interactions, real craft and texture, and confident composition. You write
 complete, real, production code (no stubs, no lorem), and you VERIFY it compiles before finishing.`;
 
-function buildPrompt({ brief, stack, playbook, craft }) {
+function buildPrompt({ brief, stack, playbook, craft, checklist }) {
   return [
     SYSTEM, '',
     '# YOUR TASK: design + build a BESPOKE, award-tier website (not a generic AI landing page)',
@@ -76,6 +79,11 @@ function buildPrompt({ brief, stack, playbook, craft }) {
     playbook || '(foundation playbook unavailable)', '',
     '## PLAYBOOK 2 — CRAFT: how to look BESPOKE, not AI-generated. OBEY the ANTI-AI BAN LIST.',
     craft || '(craft playbook unavailable — at minimum: pick a DISTINCTIVE identity (NOT Inter + navy→purple gradient), use a display typeface with personality + an owned non-blue accent, add grain/texture, build CUSTOM buttons with real hover/press/focus, include ONE signature interaction, and use art-directed asymmetric layouts — never centered-hero + even 3-column emoji cards.)', '',
+    ...(checklist ? [
+      '## DEFINITION OF DONE — the quality checklist this site will be AUTO-AUDITED against',
+      'An automated auditor (build + Playwright at 1440 & 375) will FAIL the build on any unmet critical/major item below, and you will be sent back to fix them. Satisfy them the FIRST time. Pay special attention to the things auto-audits catch: zero console/hydration/page errors, no 404s, no broken images, no horizontal scroll, no text clipped past the viewport edge, no raw HTML entities (&amp; etc.), no lorem/placeholder, real <title>+meta description+og tags, html lang + img alt, a custom display font (not Inter/Arial), and — for animated/3D sites — the <canvas> must render VISIBLE pixels (not black-on-black) and reveal targets must NOT be stuck at opacity:0 after scroll. If you use an R3F/WebGL <canvas>, set `gl={{ preserveDrawingBuffer: true }}` so the auditor can sample it, and make the scene LIT + on-camera (never gated off under reduced-motion — show a static pose instead).',
+      checklist, '',
+    ] : []),
     '## Deliverables (one cohesive, art-directed design language)',
     '1. **Pick a DISTINCTIVE identity** from the craft playbook that fits THIS product — a non-Inter type pairing (a display face with character) + an OWNED color identity that is NOT the default navy/indigo→purple gradient. Implement it as tokens (tailwind + globals.css + app/fonts.ts via next/font).',
     '2. **Real brand + premium copy** throughout (invent a fitting brand; specific, confident, no lorem).',
@@ -127,19 +135,44 @@ function fixPrompt(errors) {
   ].join('\n');
 }
 
+// Audit-fix pass: the site builds, but the automated auditor found real defects (broken images, console
+// errors, cutoff text, invisible canvas, stuck reveals, missing meta…). Send the agent the exact failures.
+function auditPrompt({ brief, failures, craft }) {
+  return [
+    SYSTEM, '',
+    '# FIX AUDIT FAILURES',
+    `The website in this directory (a "${brief}") compiles, but an automated auditor (a real build + a headless Chromium walkthrough at 1440px and 375px, scrolling the whole page) found defects that a top studio would never ship. Fix EVERY item below at its ROOT CAUSE — actually edit the files. These are real, observed problems, not style opinions.`, '',
+    '## Auditor failures (severity · category · check-id: detail)',
+    failures || '(none)', '',
+    '## How to fix the high-signal ones',
+    '- **anim.canvasRenders (canvas blank / visiblePixels low):** the 3D/canvas is rendering but invisible — almost always black-on-black material, an unlit scene, an object off-camera/too small, a never-loading external HDR (drei <Environment preset> that fetches and suspends), or the component gated off (e.g. returns null under prefers-reduced-motion). Give it a LIGHT material + real lights, frame it on-camera, drop external-HDR dependencies, and on reduced-motion render a STATIC visible pose (do not hide it). ALSO set `gl={{ preserveDrawingBuffer: true }}` on the R3F <Canvas> (or the WebGLRenderer) so the canvas pixels can be verified — without it a perfectly-rendering canvas reads as blank.',
+    '- **anim.revealsVisible (content stuck invisible after scroll):** a ScrollTrigger/IntersectionObserver reveal set opacity:0 (or clip-path inset 100%) and never fired. Ensure triggers actually run (correct start/trigger, refresh on load, SSR-safe), and that the final state is opacity:1. Never let content be permanently hidden.',
+    '- **layout.noCutoff / noHScroll:** text or boxes spill past the viewport edge — fix with clamp() type, min-w-0, flex/grid wrapping, overflow management, and responsive sizing. Re-check at BOTH 1440 and 375.',
+    '- **assets.noBrokenImages / no404:** replace any failing image/URL with art that always loads (CSS/SVG/gradient or a stable Unsplash URL with sizing params). Remove requests that 404.',
+    '- **runtime.noConsoleErrors / noHydration / noPageErrors:** eliminate the cause (SSR/client mismatch, undefined access, bad hook deps) — do not suppress.',
+    '- **content.noRawEntities:** render real characters in JSX ("Care & recycle", not "Care &amp; recycle").',
+    '- **seo.* / a11y.* / design.customDisplayFont:** add real <title>+meta description+og tags via Next metadata, html lang, img alt; ensure the display font is a real custom face (not Inter/Arial/system).',
+    craft ? '\n(Keep within the craft language already established — elevate, do not blandify.)' : '',
+    '\n## HARD RULE: when finished, RUN `npm run build` and confirm it still passes with ZERO errors. Fix anything you broke. Do not remove real sections — fix them.',
+    ANTI_STUB_RULES,
+  ].join('\n');
+}
+
 export async function buildSolo(options = {}) {
-  const { brief = '', stack: stackHint, outDir, onProgress, maxFixRounds = 4, model = 'sonnet', dryRun = false, polish = true } = options;
+  const { brief = '', stack: stackHint, outDir, onProgress, maxFixRounds = 4, model = 'sonnet', dryRun = false, polish = true,
+          audit = true, maxAuditRounds = 3 } = options;
   const stack = stackHint && typeof stackHint === 'object' ? stackHint : resolveStack(stackHint || brief);
   const projectDir = outDir || path.join(REPO_ROOT, 'workspace', 'builder', 'out', `${slugify(brief)}-${tsNow()}`);
   const log = [];
   const emit = (phase, status, extra = {}) => { onProgress?.({ phase, status, ...extra }); log.push(`[${phase}] ${status}`); };
 
   if (dryRun) {
-    return { ok: true, projectDir, mode: 'solo', report: `# Solo build (dry-run)\nBrief: ${brief}\nStack: ${stack.id}\nWould: scaffold → 1 build agent (${model}, playbook+craft) → build-green → ${polish ? 'de-AI polish pass → build-green' : '(no polish)'} (≤${maxFixRounds} fixes).`, dryRun: true };
+    return { ok: true, projectDir, mode: 'solo', report: `# Solo build (dry-run)\nBrief: ${brief}\nStack: ${stack.id}\nWould: scaffold → 1 build agent (${model}, playbook+craft+checklist) → build-green → ${polish ? 'de-AI polish pass → build-green → ' : ''}${audit ? `audit→fix loop (≤${maxAuditRounds} rounds) until the auto-checklist is green` : '(no audit)'} (≤${maxFixRounds} build fixes).`, dryRun: true };
   }
 
   const playbook = readPlaybook();
   const craft = readCraft();
+  const checklist = readChecklist();
 
   // 1. Scaffold (create-next-app + animation libs; guaranteed-buildable base)
   emit('scaffold', 'start');
@@ -164,9 +197,9 @@ export async function buildSolo(options = {}) {
     return v;
   };
 
-  // 2. ONE agent designs + builds the whole bespoke site (foundation + craft playbooks).
-  emit('build', 'start', { model, playbook: playbook ? `${playbook.length}c` : 'missing', craft: craft ? `${craft.length}c` : 'missing' });
-  const built = await runAgent(buildPrompt({ brief, stack, playbook, craft }), projectDir, { model, timeoutMs: 2_700_000, onProgress: e => emit('build', `working ${e.elapsed}s`) });
+  // 2. ONE agent designs + builds the whole bespoke site (foundation + craft + checklist).
+  emit('build', 'start', { model, playbook: playbook ? `${playbook.length}c` : 'missing', craft: craft ? `${craft.length}c` : 'missing', checklist: checklist ? `${checklist.length}c` : 'missing' });
+  const built = await runAgent(buildPrompt({ brief, stack, playbook, craft, checklist }), projectDir, { model, timeoutMs: 2_700_000, onProgress: e => emit('build', `working ${e.elapsed}s`) });
   emit('build', built.ok ? 'agent done' : `agent exited (${(built.output || '').slice(0, 80)})`);
   let verify = await buildGreen();
   emit('verify', verify.ok ? 'build passes ✓' : `build failing after ${rounds} fix(es)`);
@@ -179,26 +212,54 @@ export async function buildSolo(options = {}) {
     emit('polish', verify.ok ? 'polished + builds ✓' : 'polished but build failing');
   }
 
-  // 4. Final full verify for the report.
+  // 4. AUDIT → FIX loop — the deterministic "follow the checklist until done" gate. Build + Playwright
+  //    walkthrough at 1440 & 375; feed the exact failures to a fix agent; re-green; re-audit; repeat.
+  let auditReport = null;
+  let auditRounds = 0;
+  if (audit && verify.ok) {
+    const wantCanvas = /\b(3d|webgl|three|shoe|model|scene|canvas|particle)\b/i.test(brief);
+    emit('audit', 'start (build + headless walkthrough at 1440 & 375)');
+    auditReport = await auditSite(projectDir, { screenshotDir: projectDir, requireCanvas: wantCanvas }).catch(e => ({ ok: false, fails: [{ severity: 'major', category: 'audit', id: 'audit.error', detail: String(e?.message ?? e), pass: false }], checks: [], summary: { total: 0, passed: 0, failed: 1, critical: 0, major: 1, minor: 0 }, screenshots: [] }));
+    emit('audit', `round 0 — ${auditReport.summary.passed}/${auditReport.summary.total} pass · ${auditReport.summary.critical}C/${auditReport.summary.major}M failing`);
+    while (!auditReport.ok && auditRounds < maxAuditRounds) {
+      auditRounds++;
+      const failures = failuresForAgent(auditReport);
+      emit('audit', `round ${auditRounds} — fixing ${auditReport.summary.critical + auditReport.summary.major} blocking issue(s)`);
+      await runAgent(auditPrompt({ brief, failures, craft }), projectDir, { model, timeoutMs: 2_100_000, onProgress: e => emit('audit', `round ${auditRounds} working ${e.elapsed}s`) });
+      verify = await buildGreen();                       // they may have touched code; keep it compiling
+      if (!verify.ok) { emit('audit', `round ${auditRounds} — build broke during fixes; repairing`); }
+      auditReport = await auditSite(projectDir, { screenshotDir: projectDir, requireCanvas: wantCanvas }).catch(e => auditReport);
+      emit('audit', `round ${auditRounds} — ${auditReport.summary.passed}/${auditReport.summary.total} pass · ${auditReport.summary.critical}C/${auditReport.summary.major}M failing`);
+    }
+    emit('audit', auditReport.ok ? `green ✓ (${auditRounds} round(s))` : `${auditReport.summary.critical}C/${auditReport.summary.major}M still failing after ${auditRounds} round(s)`);
+  }
+
+  // 5. Final full verify for the report.
   let full = null;
   try { full = await verifyProject(projectDir); } catch {}
 
+  const auditGreen = !audit || (auditReport ? auditReport.ok : false);
+  const failList = auditReport ? failuresForAgent(auditReport) : '';
   const report = [
     '# Helm Website Build (solo mode)', '',
     `**Brief:** ${brief}`,
-    `**Stack:** ${stack.id} · **Build:** 1 agent (${model}) + ${polish ? 'de-AI polish pass + ' : ''}${rounds} fix round(s)`,
-    `**Playbooks:** foundation ${playbook ? '✓' : '✗'} · craft ${craft ? '✓' : '✗'}`,
+    `**Stack:** ${stack.id} · **Build:** 1 agent (${model}) + ${polish ? 'de-AI polish pass + ' : ''}${rounds} build fix(es)${audit ? ` + ${auditRounds} audit round(s)` : ''}`,
+    `**Playbooks:** foundation ${playbook ? '✓' : '✗'} · craft ${craft ? '✓' : '✗'} · checklist ${checklist ? '✓' : '✗'}`,
     `**Project:** \`${projectDir}\``,
     `**Compiles:** ${verify.ok ? '✓ npm run build passes' : '✗ still failing'}`,
+    audit && auditReport ? `**Audit:** ${auditReport.ok ? '✓ all critical + major checks pass' : '⚠️ failures remain'} — ${auditReport.summary.passed}/${auditReport.summary.total} pass (${auditReport.summary.critical} critical, ${auditReport.summary.major} major, ${auditReport.summary.minor} minor failing)` : '',
     full ? `**Verify:** ${full.steps.map(s => `${s.name}:${s.ok ? '✓' : '✗'}`).join('  ')}` : '',
     '', '## How it was built',
-    '- ONE cohesive agent designed + built the whole site from the foundation + craft (anti-AI) playbooks.',
+    '- ONE cohesive agent designed + built the whole site from the foundation + craft (anti-AI) playbooks + the quality checklist (definition of done).',
     '- A de-AI polish pass elevated it against the anti-AI ban list (bespoke identity, custom buttons, a signature interaction, texture, art-directed layouts).',
     '- A deterministic build-until-green loop guaranteed it compiles.',
-    verify.ok ? '\nRun it: `cd ' + projectDir + ' && npm run dev`' : '\n(Build still has errors — see verify output.)',
+    audit ? '- An automated auditor (real build + headless Chromium walkthrough at 1440 & 375) checked the auto-verifiable checklist items and looped a fix agent until the critical + major items were green.' : '',
+    audit && auditReport && !auditReport.ok ? `\n## Remaining audit failures\n${failList}` : '',
+    (verify.ok && auditGreen) ? '\nRun it: `cd ' + projectDir + ' && npm run dev`' : '\n(Issues remain — see above.)',
   ].filter(Boolean).join('\n');
 
-  return { ok: verify.ok, projectDir, mode: 'solo', report, verify: full, compiles: verify.ok, fixRounds: rounds };
+  return { ok: verify.ok && auditGreen, projectDir, mode: 'solo', report, verify: full, compiles: verify.ok,
+           fixRounds: rounds, audit: auditReport, auditRounds };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

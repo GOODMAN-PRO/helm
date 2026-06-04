@@ -1,0 +1,2850 @@
+[
+  {
+    "id": "LM-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Single banner landmark",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LM-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Navigation landmark present",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LM-03",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Single main landmark",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LM-04",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Footer/contentinfo landmark present",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LM-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No duplicate landmark types",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LM-06",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "All content within landmarks",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LM-07",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Multiple navs uniquely labeled",
+    "verify": "AUTO"
+  },
+  {
+    "id": "HD-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Exactly one h1",
+    "verify": "AUTO"
+  },
+  {
+    "id": "HD-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No skipped heading levels",
+    "verify": "AUTO"
+  },
+  {
+    "id": "HD-03",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "h1 matches page title conceptually",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "HD-04",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Headings used for structure not style",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "IM-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "All img have alt attribute",
+    "verify": "AUTO"
+  },
+  {
+    "id": "IM-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Decorative images alt empty or aria-hidden",
+    "verify": "AUTO"
+  },
+  {
+    "id": "IM-03",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Informative images have meaningful alt",
+    "verify": "AUTO+VISUAL"
+  },
+  {
+    "id": "IM-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Informative CSS backgrounds have text alternative",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "IM-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Informative SVGs have role=img and accessible name",
+    "verify": "AUTO"
+  },
+  {
+    "id": "IM-06",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Decorative SVGs have aria-hidden",
+    "verify": "AUTO"
+  },
+  {
+    "id": "IM-07",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Video has accurate captions",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "IM-08",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Autoplay animation has pause control",
+    "verify": "AUTO+VISUAL"
+  },
+  {
+    "id": "FM-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "All form inputs have associated labels",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FM-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Placeholder not sole label",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FM-03",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Required fields marked programmatically",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FM-04",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Error messages linked via aria-describedby",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FM-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Focus moves to first error on submit",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "FM-06",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Submit status announced via aria-live",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FM-07",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Autocomplete attributes on common fields",
+    "verify": "AUTO"
+  },
+  {
+    "id": "IB-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Icon-only buttons have aria-label",
+    "verify": "AUTO"
+  },
+  {
+    "id": "IB-02",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Icon-only links have accessible name",
+    "verify": "AUTO"
+  },
+  {
+    "id": "IB-03",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Icon aria-label is meaningful",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "IB-04",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Icons inside labeled buttons are aria-hidden",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FK-01",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Skip-to-content link is first focusable element",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FK-02",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "All interactive elements keyboard reachable",
+    "verify": "AUTO+VISUAL"
+  },
+  {
+    "id": "FK-03",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No keyboard trap outside modal",
+    "verify": "AUTO+VISUAL"
+  },
+  {
+    "id": "FK-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No positive tabindex",
+    "verify": "AUTO"
+  },
+  {
+    "id": "FK-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Focus order matches visual reading order",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "FK-06",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "All mouse functionality keyboard accessible",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "FK-07",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Custom widgets use correct keyboard patterns",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "VI-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No outline:none without :focus-visible replacement",
+    "verify": "AUTO"
+  },
+  {
+    "id": "VI-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Focus indicator contrast >= 3:1",
+    "verify": "AUTO+VISUAL"
+  },
+  {
+    "id": "VI-03",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Focus indicator clearly visible on dark theme",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "VI-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": ":focus-visible rule exists in stylesheet",
+    "verify": "AUTO"
+  },
+  {
+    "id": "VI-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Focus not obscured by sticky elements",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "CC-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Normal text contrast >= 4.5:1",
+    "verify": "AUTO"
+  },
+  {
+    "id": "CC-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Large text contrast >= 3:1",
+    "verify": "AUTO"
+  },
+  {
+    "id": "CC-03",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "UI components contrast >= 3:1",
+    "verify": "AUTO+VISUAL"
+  },
+  {
+    "id": "CC-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Text over gradient/image meets contrast",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "CC-05",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Disabled states visually distinct without color alone",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "CC-06",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Information not conveyed by color alone",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "PM-01",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "prefers-reduced-motion media query exists",
+    "verify": "AUTO"
+  },
+  {
+    "id": "PM-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "All animations disabled under reduced-motion",
+    "verify": "AUTO"
+  },
+  {
+    "id": "PM-03",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "JS animations check prefers-reduced-motion",
+    "verify": "AUTO"
+  },
+  {
+    "id": "PM-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Parallax disabled under reduced-motion",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "PM-05",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No content flashes > 3 times per second",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "PM-06",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Autoplay animation has visible pause mechanism",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "LA-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "html element has valid lang attribute",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LA-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "lang attribute value is valid BCP 47",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LA-03",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Foreign language passages have lang attribute",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "LA-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Page title element is present and descriptive",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LA-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Page title updates on SPA navigation",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "axe-core 0 critical/serious violations",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-02",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No invalid ARIA role values",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-03",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "ARIA attributes valid for element role",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "aria-expanded toggled correctly",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "aria-live regions for dynamic updates",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-06",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "aria-hidden not applied to focusable children",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-07",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "role=presentation not misused on interactive elements",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AR-08",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "aria-labelledby/describedby reference valid IDs",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LT-01",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No generic link text (click here / read more)",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LT-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Identical link texts pointing to different URLs disambiguated",
+    "verify": "AUTO"
+  },
+  {
+    "id": "LT-03",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "New-tab links warn users",
+    "verify": "AUTO+VISUAL"
+  },
+  {
+    "id": "LT-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Link purpose determinable from text or context",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "DM-01",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Focus moves to dialog on open",
+    "verify": "AUTO"
+  },
+  {
+    "id": "DM-02",
+    "category": "a11y",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Focus trapped within open dialog",
+    "verify": "AUTO"
+  },
+  {
+    "id": "DM-03",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Dialog closes on Escape key",
+    "verify": "AUTO"
+  },
+  {
+    "id": "DM-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Focus returns to trigger on dialog close",
+    "verify": "AUTO"
+  },
+  {
+    "id": "DM-05",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Dialog has correct role and aria-modal",
+    "verify": "AUTO"
+  },
+  {
+    "id": "DM-06",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Dialog has accessible name",
+    "verify": "AUTO"
+  },
+  {
+    "id": "TS-01",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "All targets >= 24x24 CSS pixels",
+    "verify": "AUTO"
+  },
+  {
+    "id": "TS-02",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Sub-24px targets have sufficient offset spacing",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "TS-03",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Primary CTAs >= 44x44 CSS pixels (recommended)",
+    "verify": "AUTO"
+  },
+  {
+    "id": "TS-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Mobile touch targets >= 44x44 CSS pixels",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AD-01",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No sensory-only instructions",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "AD-02",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Content reflows at 400% zoom",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "AD-03",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Text spacing overridable without content loss",
+    "verify": "AUTO"
+  },
+  {
+    "id": "AD-04",
+    "category": "a11y",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Session timeout warning with extension option",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "AD-05",
+    "category": "a11y",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Hover/focus content dismissable and persistent",
+    "verify": "VISUAL"
+  },
+  {
+    "id": "anim-1.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Lenis instance mounted and ticking",
+    "verify": "await page.evaluate(() => typeof window.__lenis !== 'undefined' || !!document.querySelector('[data-lenis-root]')); then scroll 400px and confirm window.scrollY moved > 100px within 600ms"
+  },
+  {
+    "id": "anim-1.2",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No CSS scroll-behavior:smooth conflict with Lenis",
+    "verify": "await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior === 'smooth') → expect false"
+  },
+  {
+    "id": "anim-1.3",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Lenis + GSAP ticker synced with lagSmoothing(0)",
+    "verify": "Simulate visibilitychange event, then check no elements have opacity < 0.05 after 300ms"
+  },
+  {
+    "id": "anim-2.1",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Scroll-reveal targets visible after entering viewport",
+    "verify": "For each section: scrollIntoViewIfNeeded(), wait 900ms, then check all [data-reveal] / [class*='reveal'] have opacity > 0.9 and no clipPath stuck at inset(100%)"
+  },
+  {
+    "id": "anim-2.2",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No element permanently stuck at opacity:0 after full-page scroll",
+    "verify": "window.scrollTo(0, document.body.scrollHeight), wait 1200ms, find all elements with opacity < 0.1 and non-empty textContent — expect 0"
+  },
+  {
+    "id": "anim-2.3",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Framer Motion whileInView uses viewport margin",
+    "verify": "Source analysis: all whileInView uses include viewport={{ margin: '-10%' }} or equivalent"
+  },
+  {
+    "id": "anim-2.4",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "ScrollTrigger.refresh() called after fonts/images load",
+    "verify": "Scroll to 50% of page height, check elements in viewport have opacity > 0.5"
+  },
+  {
+    "id": "anim-2.5",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "ScrollTriggers killed on route change",
+    "verify": "Navigate to /about then back to /, confirm hero elements start their entrance animation and do not skip to final state"
+  },
+  {
+    "id": "anim-3.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Exactly ONE signature wow interaction present",
+    "verify": "Describe the signature interaction. Is there exactly one clearly distinct wow moment?"
+  },
+  {
+    "id": "anim-3.2",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Signature interaction works on first load",
+    "verify": "Marquee: confirm DOMMatrix transform.m41 changes over 300ms. CountUp: confirm textContent changes after scroll reveal. Cursor: confirm cursor div moves on mousemove."
+  },
+  {
+    "id": "anim-3.3",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Marquee loops seamlessly without gap or stutter",
+    "verify": "Scroll fast while watching marquee — no flash of a gap at the loop seam. Total rendered items >= unique items * 2."
+  },
+  {
+    "id": "anim-3.4",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Custom cursor gated to fine-pointer devices only",
+    "verify": "Emulate touch (maxTouchPoints=1): cursor element should be display:none and document.documentElement cursor !== 'none'"
+  },
+  {
+    "id": "anim-4.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Every button has hover transform or box-shadow change",
+    "verify": "Hover first 5 buttons, wait 200ms, check computed transform !== identity matrix OR boxShadow !== 'none'"
+  },
+  {
+    "id": "anim-4.2",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Every button has press/active scale-down state",
+    "verify": "Click and hold primary CTA — does it compress (scale 0.97–0.99)? Does it spring back on release?"
+  },
+  {
+    "id": "anim-4.3",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Every interactive element has visible focus-visible ring",
+    "verify": "Tab to each focusable element; computed outline !== 'none' or boxShadow !== 'none' when :focus-visible"
+  },
+  {
+    "id": "anim-4.4",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Nav links have animated underline or hover state",
+    "verify": "Check nav a::after has transition including transform or scaleX in computed styles"
+  },
+  {
+    "id": "anim-4.5",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No transition:all on interactive elements",
+    "verify": "Sample first 5 buttons/links — getComputedStyle(el).transition must not start with 'all'"
+  },
+  {
+    "id": "anim-5.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Navigation changes visual state on scroll",
+    "verify": "Record nav className+background+borderWidth at scrollY=0 and scrollY=300 — values must differ"
+  },
+  {
+    "id": "anim-5.2",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Nav returns on scroll-up if hide-on-scroll pattern is used",
+    "verify": "Scroll to 600px (nav hides), then scroll to 400px — nav should be visible again within 500ms"
+  },
+  {
+    "id": "anim-5.3",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Active nav link highlights current section during scroll",
+    "verify": "Scroll through sections and watch nav — active indicator should update in sync"
+  },
+  {
+    "id": "anim-6.1",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "canvas element present, visible, and non-zero size (if 3D specified)",
+    "verify": "page.$('canvas') !== null, boundingBox width > 0 and height > 0, display !== 'none', opacity > 0.05"
+  },
+  {
+    "id": "anim-6.2",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Canvas renders non-blank pixels (not solid black or transparent)",
+    "verify": "gl.readPixels at center and two off-center samples — at least one sample has alpha > 0 and (r > 10 OR g > 10 OR b > 10)"
+  },
+  {
+    "id": "anim-6.3",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "3D bundle code-split with dynamic + ssr:false",
+    "verify": "Page HTML (SSR output) does not contain 'THREE', 'WebGLRenderer', or 'BufferGeometry' — canvas only appears after JS runs"
+  },
+  {
+    "id": "anim-6.4",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "3D scene not gated off by over-eager mobile or reduced-motion check",
+    "verify": "Emulate iPhone 14 (390px) and reduced-motion: canvas still present in DOM (may be paused/static but not null)"
+  },
+  {
+    "id": "anim-6.5",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "WebGL context creation failure does not throw uncaught error",
+    "verify": "Collect page errors during load — filter for WebGL/THREE/gl_ errors — expect 0. Fallback image shown if WebGL unavailable."
+  },
+  {
+    "id": "anim-7.1",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No layout properties (width/height/top/left/margin) in scroll or hover transitions",
+    "verify": "Grep compiled CSS for 'transition: width', 'transition: height', 'transition: top', 'transition: left', 'transition: margin' — expect 0 matches"
+  },
+  {
+    "id": "anim-7.2",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "will-change:transform on GPU-animated scroll layers",
+    "verify": "Parallax layer elements have getComputedStyle().willChange === 'transform'"
+  },
+  {
+    "id": "anim-7.3",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "will-change not applied globally to more than ~20 elements",
+    "verify": "Count elements with willChange !== 'auto' — flag if > 50"
+  },
+  {
+    "id": "anim-7.4",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No transition:all on any element in the page",
+    "verify": "Sample first 300 elements — getComputedStyle(el).transition.startsWith('all') must be false for all"
+  },
+  {
+    "id": "anim-8.1",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "With reduced-motion emulated, no critical content stuck at opacity:0",
+    "verify": "emulateMedia({ reducedMotion: 'reduce' }), scroll to bottom, find elements with opacity < 0.1 and textContent.length > 5 — expect 0"
+  },
+  {
+    "id": "anim-8.2",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Preloader exits in under 800ms with reduced-motion",
+    "verify": "emulateMedia({ reducedMotion: 'reduce' }), waitForFunction preloader opacity < 0.05 with timeout 800ms"
+  },
+  {
+    "id": "anim-8.3",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "GSAP animations wrapped in gsap.matchMedia() reduced-motion guard",
+    "verify": "Source analysis: gsap.from/gsap.to calls inside matchMedia('(prefers-reduced-motion: no-preference)') context or prefersReduced check"
+  },
+  {
+    "id": "anim-8.4",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Marquee stops moving with reduced-motion active",
+    "verify": "emulateMedia({ reducedMotion: 'reduce' }), sample DOMMatrix.m41 at t=0 and t=400ms — delta must be < 1px"
+  },
+  {
+    "id": "anim-9.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Preloader visible and animating on first visit",
+    "verify": "Clear sessionStorage, navigate, immediately check [data-preloader] opacity > 0.5"
+  },
+  {
+    "id": "anim-9.2",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Preloader skipped on repeat visit via sessionStorage",
+    "verify": "sessionStorage.setItem('helm_intro_seen','1'), navigate, hero visible within 500ms"
+  },
+  {
+    "id": "anim-9.3",
+    "category": "animation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Hero entrance completes — words not stuck off-screen",
+    "verify": "Wait for preloader to clear (opacity < 0.1), then check all [data-reveal='word'] have DOMMatrix.m42 < 5px and opacity > 0.9"
+  },
+  {
+    "id": "anim-9.4",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Preloader total duration ≤ 1800ms (non-reduced-motion)",
+    "verify": "Clear sessionStorage, navigate, waitForFunction preloader opacity < 0.1 with 2500ms budget — elapsed must be < 1800ms"
+  },
+  {
+    "id": "anim-10.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Page transition overlay animates in and out on route change",
+    "verify": "Click internal nav link, check at 100ms overlay is visible (scaleX > 0.1), check at 1000ms overlay is gone (opacity < 0.1 or display:none)"
+  },
+  {
+    "id": "anim-10.2",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "ScrollTriggers killed on route change (no duplicate stacking)",
+    "verify": "Navigate away and back, confirm hero words animate in from start position (not already at final state, and not duplicated)"
+  },
+  {
+    "id": "anim-11.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "One pinned/scrub scroll-storytelling section exists",
+    "verify": "Find element with position:sticky or GSAP pin attribute — expect count > 0. VISUAL: slow-scroll through it and confirm 2+ beats reveal."
+  },
+  {
+    "id": "anim-11.2",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Pinned section uses anticipatePin:1 and invalidateOnRefresh:true",
+    "verify": "Source analysis: scrollTrigger config objects include both anticipatePin:1 and invalidateOnRefresh:true"
+  },
+  {
+    "id": "anim-12.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No console errors from GSAP, Framer Motion, Lenis, or Three.js",
+    "verify": "Collect all page errors during load + full-page scroll. Filter for /gsap|ScrollTrigger|lenis|framer|motion|three|fiber|WebGL/i — expect 0"
+  },
+  {
+    "id": "anim-12.2",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "GSAP plugins registered once at module level",
+    "verify": "Source analysis: gsap.registerPlugin() calls are outside React component functions"
+  },
+  {
+    "id": "anim-12.3",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No linear easing on spatial (transform) animations",
+    "verify": "Grep compiled JS for ease:\"linear\" on gsap.from/to calls or Framer Motion variants that animate x/y/transform — expect 0"
+  },
+  {
+    "id": "anim-12.4",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Exit animations 15–25% shorter than entrance animations",
+    "verify": "Open and close a modal or trigger page transition. Does exit feel snappy vs entrance? Entrance 600ms → exit ≤ 480ms."
+  },
+  {
+    "id": "anim-13.1",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Entrance animations use same easing family across sections",
+    "verify": "Scroll full page. Does motion feel cohesive — same curve family throughout — or do sections each have their own arbitrary easing?"
+  },
+  {
+    "id": "anim-13.2",
+    "category": "animation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Motion timing tokens imported from single source (lib/motion-tokens)",
+    "verify": "Source analysis: no inline duration: 0.3 or ease: [0.16, 1, ...] values outside motion-tokens.ts"
+  },
+  {
+    "id": "anim-14.1",
+    "category": "animation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Marquees aria-hidden; count-up tickers have aria-label with final value",
+    "verify": "All [class*='marquee'] have aria-hidden='true'. All count-up spans have aria-label set to the final number + suffix."
+  },
+  {
+    "id": "AM-01",
+    "category": "assets",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No broken <img> or next/image elements",
+    "verify": "Array.from(document.images).filter(i => !i.complete || i.naturalWidth === 0) — expect empty array"
+  },
+  {
+    "id": "AM-02",
+    "category": "assets",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No 404 / network errors for any resource",
+    "verify": "page.on('response') collect status >= 400 — expect empty array after networkidle"
+  },
+  {
+    "id": "AM-03",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No broken CSS background-images",
+    "verify": "Extract all background-image URLs from computed styles, fetch each, expect status < 400; visual check for blank background areas"
+  },
+  {
+    "id": "AM-04",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Fonts actually load — no FOIT / fallback-only text",
+    "verify": "await document.fonts.ready; Array.from(document.fonts).every(f => f.status === 'loaded') — expect true"
+  },
+  {
+    "id": "AM-05",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "next/font used — no raw @font-face without font-display",
+    "verify": "Iterate cssRules for CSSFontFaceRule; expect every rule has explicit font-display: swap/optional/block"
+  },
+  {
+    "id": "AM-06",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "<video> elements load and have poster attribute",
+    "verify": "document.querySelectorAll('video') — each must have .poster non-empty and .error === null"
+  },
+  {
+    "id": "AM-07",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "3D assets (.glb/.gltf/.hdr) load — no 404 or CORS errors",
+    "verify": "Network failures filtered for /\\.(glb|gltf|hdr|bin)$/i must be empty; console errors matching /cors|cross.?origin/ must be empty"
+  },
+  {
+    "id": "AM-08",
+    "category": "assets",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Favicon and apple-touch-icon load",
+    "verify": "GET /favicon.ico + all <link rel='icon'> hrefs + all <link rel='apple-touch-icon'> hrefs — expect status < 400"
+  },
+  {
+    "id": "AM-09",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Images have explicit width/height or sizes (no CLS)",
+    "verify": "document.images — each must have width+height attributes, or sizes attribute, or CSS aspect-ratio set"
+  },
+  {
+    "id": "AM-10",
+    "category": "assets",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "SVGs render visibly with non-zero dimensions",
+    "verify": "document.querySelectorAll('svg') — each getBoundingClientRect() must have width > 0 and height > 0"
+  },
+  {
+    "id": "AM-11",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No placeholder or unverified external image URLs",
+    "verify": "All image srcs and background-image values must not match picsum.photos|via.placeholder.com|loremflickr.com|placeimg.com|images.unsplash.com/photo-<random>"
+  },
+  {
+    "id": "AM-12",
+    "category": "assets",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "All images have a non-empty alt attribute",
+    "verify": "document.images — every img must have hasAttribute('alt') === true (empty string allowed for decorative)"
+  },
+  {
+    "id": "AM-13",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No console errors from media or asset loading",
+    "verify": "page.on('console') collect type==='error'; filter for /failed to load|net::err|decode error|not found|404|webgl|texture/i — expect empty"
+  },
+  {
+    "id": "AM-14",
+    "category": "assets",
+    "severity": "major",
+    "mode": "auto",
+    "title": "JSON data files load and are valid",
+    "verify": "All .json responses must return status 200 and parse without throwing — res.json() must not throw"
+  },
+  {
+    "id": "AM-15",
+    "category": "assets",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Open Graph and Twitter meta images resolve",
+    "verify": "GET meta[property='og:image'] content + meta[name='twitter:image'] content — expect status < 400"
+  },
+  {
+    "id": "AM-16",
+    "category": "assets",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Large images served as WebP or AVIF (next/image optimization active)",
+    "verify": "All image responses > 10 KB must have content-type containing 'webp' or 'avif'"
+  },
+  {
+    "id": "AM-17",
+    "category": "assets",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No mixed-content (HTTP assets on HTTPS page)",
+    "verify": "page.on('request') — if page URL is https://, no request URL may start with http:// — expect empty array"
+  },
+  {
+    "id": "AM-18",
+    "category": "assets",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Asset CDN/origin TTFB < 600 ms for image/font/video",
+    "verify": "res.timing().responseStart - res.timing().requestStart < 600 for all image/font/video responses"
+  },
+  {
+    "id": "BC-001",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "npm run build exits with code 0",
+    "verify": "npm run build; echo \"EXIT:$?\" — assert printed exit code is EXIT:0"
+  },
+  {
+    "id": "BC-002",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "tsc --noEmit clean (no TypeScript errors)",
+    "verify": "npx tsc --noEmit 2>&1 | tee /tmp/tsc.out; [ ! -s /tmp/tsc.out ] && echo PASS || echo FAIL — output file must be 0 bytes"
+  },
+  {
+    "id": "BC-003",
+    "category": "build",
+    "severity": "major",
+    "mode": "auto",
+    "title": "ESLint 0 errors",
+    "verify": "npx next lint --max-warnings 0; echo \"EXIT:$?\" — expect EXIT:0"
+  },
+  {
+    "id": "BC-004",
+    "category": "build",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "ESLint 0 warnings",
+    "verify": "npx next lint 2>&1 | grep -c 'Warning' — expect 0"
+  },
+  {
+    "id": "BC-005",
+    "category": "build",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No console.log in production source",
+    "verify": "grep -rn 'console\\.log' --include='*.ts' --include='*.tsx' src/ app/ components/ lib/ | grep -v '\\.test\\.' | grep -v '\\.spec\\.' | wc -l — expect 0"
+  },
+  {
+    "id": "BC-006",
+    "category": "build",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No console.warn/error/debug in production source",
+    "verify": "grep -rn 'console\\.\\(warn\\|error\\|debug\\|info\\)' --include='*.ts' --include='*.tsx' src/ app/ components/ lib/ | grep -v '\\.test\\.' | grep -v '\\.spec\\.' | wc -l — expect 0"
+  },
+  {
+    "id": "BC-007",
+    "category": "build",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No TODO/FIXME/placeholder strings shipped",
+    "verify": "grep -rni 'TODO\\|FIXME\\|not implemented\\|placeholder\\|lorem ipsum\\|coming soon\\|under construction' --include='*.ts' --include='*.tsx' --include='*.mdx' src/ app/ components/ | grep -v '\\.test\\.' | wc -l — expect 0"
+  },
+  {
+    "id": "BC-008",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": ".next/ output directory exists post-build",
+    "verify": "[ -d .next/static ] && [ -d .next/server ] && echo PASS || echo FAIL — both subdirs must exist"
+  },
+  {
+    "id": "BC-009",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No secrets or API keys in client bundle",
+    "verify": "grep -r 'sk-\\|sk_live\\|secret_key\\|api_secret' .next/static/chunks/ 2>/dev/null | wc -l — expect 0; also grep NEXT_PUBLIC_ .next/static/chunks/ for unintended secret vars"
+  },
+  {
+    "id": "BC-010",
+    "category": "build",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Env vars match documented requirements in .env.example",
+    "verify": "diff <(grep 'NEXT_PUBLIC_' .env.example | cut -d= -f1 | sort) <(grep -rho 'process\\.env\\.[A-Z_]*' src/ app/ lib/ | grep 'NEXT_PUBLIC_' | cut -d. -f3 | sort -u) — expect empty diff"
+  },
+  {
+    "id": "BC-011",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "next.config.* has no syntax errors",
+    "verify": "node -e \"require('./next.config.js')\" 2>&1 | wc -l — expect 0 lines; also covered by BC-001 build exit code"
+  },
+  {
+    "id": "BC-012",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Dev server starts without errors",
+    "verify": "timeout 30 npx next dev 2>&1 | head -40 | grep -iE 'error|failed|cannot find' | wc -l — expect 0; server must print 'Ready' within 30s"
+  },
+  {
+    "id": "BC-013",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Dev server localhost:3000 returns HTTP 200",
+    "verify": "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 — expect 200"
+  },
+  {
+    "id": "BC-014",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "next start (production) serves HTTP 200 on /",
+    "verify": "npm run build && npx next start & sleep 3 && curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 — expect 200"
+  },
+  {
+    "id": "BC-015",
+    "category": "build",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "All app routes return HTTP 200 (no 404s)",
+    "verify": "Enumerate routes: find app -name 'page.tsx' | sed 's|app||; s|/page\\.tsx||; s|^$|/|'. For each route, curl -s -o /dev/null -w '%{http_code}' http://localhost:3000$ROUTE — expect all 200"
+  },
+  {
+    "id": "BC-016",
+    "category": "build",
+    "severity": "major",
+    "mode": "auto",
+    "title": "favicon.ico present and returns HTTP 200",
+    "verify": "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/favicon.ico — expect 200; also [ -f public/favicon.ico ] || [ -f app/favicon.ico ] && echo PASS || echo FAIL"
+  },
+  {
+    "id": "BC-017",
+    "category": "runtime",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Zero browser console errors at runtime",
+    "verify": "Playwright: const errors=[]; page.on('console', msg => { if (msg.type()==='error') errors.push(msg.text()); }); await page.goto(url); expect(errors).toHaveLength(0) — run per route"
+  },
+  {
+    "id": "BC-018",
+    "category": "runtime",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Zero browser console warnings at runtime",
+    "verify": "Playwright: same as BC-017 but filter msg.type()==='warning' — expect 0 per route"
+  },
+  {
+    "id": "BC-019",
+    "category": "runtime",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No React hydration mismatch warning",
+    "verify": "Playwright console listener — scan msg.text() for /hydrat|did not match|server.*client/i — any match is FAIL; also page.on('pageerror') for same pattern"
+  },
+  {
+    "id": "BC-020",
+    "category": "runtime",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No uncaught runtime exceptions",
+    "verify": "Playwright: const uncaught=[]; page.on('pageerror', err => uncaught.push(err.message)); await page.goto(url); expect(uncaught).toHaveLength(0) — run per route"
+  },
+  {
+    "id": "BC-021",
+    "category": "runtime",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No unhandled promise rejections",
+    "verify": "Playwright: page.on('pageerror') filter for 'UnhandledPromiseRejection' or 'Promise rejection'; page.on('console') filter for same — expect 0 per route"
+  },
+  {
+    "id": "BC-022",
+    "category": "runtime",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No missing React key prop warnings",
+    "verify": "Playwright console listener: scan for 'Each child in a list should have a unique key' or 'Warning: Each child' — any match is FAIL across all list-rendering routes"
+  },
+  {
+    "id": "BC-023",
+    "category": "navigation",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "All primary nav links resolve (no dead hrefs)",
+    "verify": "Playwright: page.$$eval('nav a[href], header a[href]', els => els.map(el=>el.getAttribute('href')).filter(h=>h&&h.startsWith('/'))) — for each href, request.get(url) expect status < 400"
+  },
+  {
+    "id": "BC-024",
+    "category": "navigation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No href='#' stub links on primary CTAs or nav",
+    "verify": "grep -rn 'href=\"#\"' src/ app/ components/ | wc -l — expect 0; also Playwright page.$$eval('nav a, header a', els => els.filter(el=>el.getAttribute('href')==='#').length) — expect 0"
+  },
+  {
+    "id": "BC-025",
+    "category": "navigation",
+    "severity": "major",
+    "mode": "auto",
+    "title": "All internal body links resolve (no 404/500)",
+    "verify": "Playwright per route: collect all a[href] starting with /, deduplicate, HEAD each: request.head('http://localhost:3000'+href) expect status < 400"
+  },
+  {
+    "id": "BC-026",
+    "category": "navigation",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "External links use rel='noopener noreferrer'",
+    "verify": "grep -rn 'target=\"_blank\"' src/ app/ components/ | grep -v 'noopener' | wc -l — expect 0"
+  },
+  {
+    "id": "BC-027",
+    "category": "visual",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No visible placeholder or lorem ipsum text on any page",
+    "verify": "Load each route in browser; scan page body for 'Lorem ipsum', 'Placeholder', 'Coming soon', 'TODO', '[Name]', '[Description]', 'Sample text' — any visible match is FAIL"
+  },
+  {
+    "id": "BC-028",
+    "category": "visual",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Favicon renders correctly in browser tab",
+    "verify": "Open http://localhost:3000 in browser — confirm correct favicon appears in tab, not default Next.js globe or broken icon"
+  },
+  {
+    "id": "BC-029",
+    "category": "visual",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No broken images on any page",
+    "verify": "Playwright per route: page.$$eval('img', imgs => imgs.filter(img => !img.complete || img.naturalWidth === 0).map(img => img.src)) — expect empty array"
+  },
+  {
+    "id": "BC-030",
+    "category": "visual",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No layout overflow or horizontal scrollbar at 1440px",
+    "verify": "Playwright viewport {width:1440,height:900}: page.evaluate(() => document.body.scrollWidth > window.innerWidth) — expect false; confirm visually no scrollbar appears"
+  },
+  {
+    "id": "BC-031",
+    "category": "visual",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No layout overflow at 375px mobile viewport",
+    "verify": "Playwright viewport {width:375,height:812}: page.evaluate(() => document.body.scrollWidth > window.innerWidth) — expect false; confirm visually"
+  },
+  {
+    "id": "BC-032",
+    "category": "runtime",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No failed network requests (4xx/5xx) during page load",
+    "verify": "Playwright: const failures=[]; page.on('response', res => { if(res.status()>=400) failures.push({url:res.url(),status:res.status()}); }); await page.goto(url); expect(failures).toHaveLength(0) — run per route"
+  },
+  {
+    "id": "BC-033",
+    "category": "runtime",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No mixed content (HTTP assets on HTTPS pages)",
+    "verify": "Playwright console listener for 'Mixed Content' messages — expect 0; grep -rn 'http://' src/ app/ | grep -v 'localhost\\|127\\.0\\.0\\.1\\|example\\.com\\|//' for static review"
+  },
+  {
+    "id": "BC-034",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Each page has a non-empty <title>",
+    "verify": "Playwright per route: await page.title() — expect non-empty string, not 'Untitled' or default fallback"
+  },
+  {
+    "id": "BC-035",
+    "category": "seo",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Each page has a <meta name='description'> tag",
+    "verify": "Playwright per route: page.$eval('meta[name=\"description\"]', el => el.getAttribute('content')) — expect non-empty string; missing element throws = FAIL"
+  },
+  {
+    "id": "CC-001",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No lorem ipsum",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-002",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No 'placeholder' as content",
+    "verify": "AUTO: Playwright grep rendered innerText, skip input attrs"
+  },
+  {
+    "id": "CC-003",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No 'coming soon' in shipped sections",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-004",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No raw TODO/FIXME/TBD visible",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-005",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No 'sample text'/'dummy text'",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-006",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No 'insert X here' patterns",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-007",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No 'your text here'/'type here'",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-010",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No generic 'Brand' as brand name",
+    "verify": "AUTO: Playwright exact word match"
+  },
+  {
+    "id": "CC-011",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No 'Your Company' in rendered text",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-012",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No 'Acme' placeholder brand",
+    "verify": "AUTO: Playwright grep rendered innerText"
+  },
+  {
+    "id": "CC-013",
+    "category": "content",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Brand name spelling consistent",
+    "verify": "VISUAL: Read every heading and nav element for consistent casing"
+  },
+  {
+    "id": "CC-014",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Logo alt text contains real brand name",
+    "verify": "AUTO: document.querySelectorAll('img[alt]') scan"
+  },
+  {
+    "id": "CC-015",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "<title> contains real brand name",
+    "verify": "AUTO: document.title check"
+  },
+  {
+    "id": "CC-016",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Meta description is real, brand-specific",
+    "verify": "VISUAL: Read meta description; confirm specificity"
+  },
+  {
+    "id": "CC-020",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Hero section above fold",
+    "verify": "VISUAL: Screenshot at 1440×900 viewport"
+  },
+  {
+    "id": "CC-021",
+    "category": "content",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Value proposition section present",
+    "verify": "VISUAL: Scroll page; identify explicit value prop block"
+  },
+  {
+    "id": "CC-022",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Features section present",
+    "verify": "VISUAL: Confirm features section with real content"
+  },
+  {
+    "id": "CC-023",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Product detail/specs present",
+    "verify": "VISUAL: Identify section with concrete product detail"
+  },
+  {
+    "id": "CC-024",
+    "category": "content",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Social proof present (if relevant)",
+    "verify": "VISUAL: Confirm at least one real trust signal"
+  },
+  {
+    "id": "CC-025",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Pricing or CTA section present",
+    "verify": "VISUAL: Confirm pricing/CTA section exists"
+  },
+  {
+    "id": "CC-026",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "FAQ section present (if relevant)",
+    "verify": "VISUAL: Confirm FAQ exists with real questions and answers"
+  },
+  {
+    "id": "CC-027",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Footer with real content",
+    "verify": "VISUAL: Inspect footer for all required link types"
+  },
+  {
+    "id": "CC-030",
+    "category": "content",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Primary CTA visible in hero",
+    "verify": "VISUAL: Screenshot both viewports; confirm CTA presence"
+  },
+  {
+    "id": "CC-031",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "CTA text is specific, not generic",
+    "verify": "VISUAL: Read every primary CTA button label"
+  },
+  {
+    "id": "CC-032",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "CTA href is a real destination",
+    "verify": "AUTO: page.$$eval('.hero a', els => els.map(el => el.getAttribute('href')))"
+  },
+  {
+    "id": "CC-040",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Footer nav links resolve",
+    "verify": "AUTO: footerDeadLinks / footerTotalLinks < 0.2"
+  },
+  {
+    "id": "CC-041",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Privacy Policy link in footer",
+    "verify": "AUTO: document.querySelectorAll('footer a') text scan"
+  },
+  {
+    "id": "CC-042",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Terms link in footer",
+    "verify": "AUTO: document.querySelectorAll('footer a') text scan"
+  },
+  {
+    "id": "CC-043",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Copyright year is current",
+    "verify": "AUTO: grep footer innerText for current year"
+  },
+  {
+    "id": "CC-044",
+    "category": "content",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Social media links present",
+    "verify": "VISUAL: Confirm at least one social link exists"
+  },
+  {
+    "id": "CC-045",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Not all footer links dead",
+    "verify": "AUTO: document.querySelectorAll('footer a[href=\"#\"]').length / document.querySelectorAll('footer a').length < 0.2"
+  },
+  {
+    "id": "CC-050",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No &amp; in rendered text",
+    "verify": "AUTO: Playwright innerText includes check"
+  },
+  {
+    "id": "CC-051",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No &lt;/&gt; in rendered text",
+    "verify": "AUTO: Playwright innerText includes check"
+  },
+  {
+    "id": "CC-052",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "No numeric HTML entities visible",
+    "verify": "AUTO: Playwright regex match on innerText"
+  },
+  {
+    "id": "CC-053",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "No literal &nbsp; rendered as text",
+    "verify": "AUTO: innerHTML scan for double-encoded entity"
+  },
+  {
+    "id": "CC-060",
+    "category": "content",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No spelling errors in h1–h3",
+    "verify": "VISUAL: Extract all headings; run spell-check tool or manual read"
+  },
+  {
+    "id": "CC-061",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "No full-paragraph ALL-CAPS",
+    "verify": "VISUAL: Scan body copy for all-caps paragraphs"
+  },
+  {
+    "id": "CC-062",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "h1 not generic",
+    "verify": "AUTO: document.querySelectorAll('h1') text check"
+  },
+  {
+    "id": "CC-063",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Subheadings are distinct",
+    "verify": "VISUAL: Read all h2/h3 elements for uniqueness"
+  },
+  {
+    "id": "CC-070",
+    "category": "content",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Product name capitalisation consistent",
+    "verify": "VISUAL: Text search for all product name variants"
+  },
+  {
+    "id": "CC-071",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "No mixed US/UK spelling",
+    "verify": "VISUAL: Check colour/color, centre/center etc. in headings"
+  },
+  {
+    "id": "CC-072",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Consistent tone throughout",
+    "verify": "VISUAL: Read page top-to-bottom for tone consistency"
+  },
+  {
+    "id": "CC-073",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Consistent brand voice (we/they)",
+    "verify": "VISUAL: Grep for 'we'/'our' vs brand-name-only references"
+  },
+  {
+    "id": "CC-080",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No verbatim duplicated sections",
+    "verify": "AUTO: Map all sections to text; check Set size === array length"
+  },
+  {
+    "id": "CC-081",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Feature cards have unique descriptions",
+    "verify": "AUTO: Extract card text; confirm all unique"
+  },
+  {
+    "id": "CC-082",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Testimonials are unique",
+    "verify": "VISUAL: Read all testimonials for uniqueness"
+  },
+  {
+    "id": "CC-090",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No XX%/NNN placeholder stats",
+    "verify": "AUTO: Playwright regex on innerText"
+  },
+  {
+    "id": "CC-091",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No $0 or $000 in pricing",
+    "verify": "AUTO: Pricing section innerText scan"
+  },
+  {
+    "id": "CC-092",
+    "category": "content",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Stats use real numbers",
+    "verify": "VISUAL: Read all stat callouts; confirm real values"
+  },
+  {
+    "id": "CC-093",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No date placeholders",
+    "verify": "AUTO: Playwright regex on innerText"
+  },
+  {
+    "id": "CC-100",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Contact/newsletter form has real fields",
+    "verify": "VISUAL: Inspect any form present on page"
+  },
+  {
+    "id": "CC-101",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Form submit not disabled by default",
+    "verify": "AUTO: document.querySelector('form button[type=submit]').disabled"
+  },
+  {
+    "id": "CC-102",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Form action is real endpoint",
+    "verify": "AUTO: document.querySelectorAll('form') action attribute check"
+  },
+  {
+    "id": "CC-103",
+    "category": "content",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Form has success/error feedback",
+    "verify": "VISUAL: Trigger form submission; confirm feedback state appears"
+  },
+  {
+    "id": "CC-110",
+    "category": "content",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "All brief sections exist",
+    "verify": "VISUAL: Cross-reference brief line-by-line against live page"
+  },
+  {
+    "id": "CC-111",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Requested integrations mentioned",
+    "verify": "VISUAL: Search page for each integration named in brief"
+  },
+  {
+    "id": "CC-112",
+    "category": "content",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Screenshots are real product UI",
+    "verify": "VISUAL: Inspect all product screenshots for real UI content"
+  },
+  {
+    "id": "CC-113",
+    "category": "content",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Demo/video embed present (if requested)",
+    "verify": "VISUAL: Confirm video element or embed is present and plays"
+  },
+  {
+    "id": "dc-01",
+    "category": "design",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Not the default AI palette",
+    "verify": "Does the site use the navy/indigo→purple gradient + soft white glow combination as its primary brand expression? PASS if it does NOT."
+  },
+  {
+    "id": "dc-02",
+    "category": "design",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Display face is not Inter/Arial/system default",
+    "verify": "computed font-family of h1 must not match: Inter, Arial, Helvetica, system-ui, -apple-system, Roboto, Geist (as sole display face)."
+  },
+  {
+    "id": "dc-03",
+    "category": "design",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Exactly one accent hue, used in ≥4 rules",
+    "verify": "Count distinct hue values (±15° tolerance) in interactive CSS. Must equal 1. Accent CSS var must appear in ≥ 4 CSS rule locations."
+  },
+  {
+    "id": "dc-04",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Identity is deliberate, not defaulted",
+    "verify": "Does the palette + typeface pairing reflect a deliberate identity decision? Could you swap the brand name for a competitor and nothing would change? PASS if it is product-specific."
+  },
+  {
+    "id": "dc-05",
+    "category": "design",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Display typeface has visual personality",
+    "verify": "AUTO: h1 font-family not in ban list. VISUAL: heading face has distinctive character — not a perfectly neutral grotesque at default weight. PASS if both pass."
+  },
+  {
+    "id": "dc-06",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "4× type scale contrast minimum per section",
+    "verify": "In any section, largest-to-smallest font-size ratio must be ≥ 4:1. PASS if TRUE."
+  },
+  {
+    "id": "dc-07",
+    "category": "design",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Display text has negative letter-spacing",
+    "verify": "Elements with font-size >= 40px: letter-spacing <= -0.01em. Elements with font-size >= 64px: letter-spacing <= -0.025em."
+  },
+  {
+    "id": "dc-08",
+    "category": "design",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Body text contrast ≥ 4.5:1",
+    "verify": "Contrast ratio of primary body text color vs immediate background must be >= 4.5:1 (WCAG AA)."
+  },
+  {
+    "id": "dc-09",
+    "category": "design",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No decorative text below 11px",
+    "verify": "All visible text nodes must have computed font-size >= 11px. Exception: disabled/placeholder states."
+  },
+  {
+    "id": "dc-10",
+    "category": "design",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Hero is not centered-headline-on-gradient cliché",
+    "verify": "Hero layout must NOT be: centered headline + centered subline + centered CTA pair on a gradient background with glow blob. PASS if layout is offset, editorial, full-bleed image, or typographically dominant."
+  },
+  {
+    "id": "dc-11",
+    "category": "design",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No even 3-column emoji/icon feature grid",
+    "verify": "No section may use 3 equal-width columns each with a centered emoji/icon, short title, and 1–2 lines of copy. PASS if this pattern is absent from every section."
+  },
+  {
+    "id": "dc-12",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No two adjacent sections share the same layout shape",
+    "verify": "Inspect every consecutive section pair. PASS if no two neighbors share the same structural pattern (column count, alignment, and density must differ)."
+  },
+  {
+    "id": "dc-13",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Asymmetric layout present (5/7, 7/5, 60/40, or off-axis)",
+    "verify": "At least one section must use an off-axis layout or a column that bleeds past the container. PASS if TRUE."
+  },
+  {
+    "id": "dc-14",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "At least one full-bleed element",
+    "verify": "VISUAL: at least one element stretches to viewport edge. AUTO hint: find element with width:100vw or negative margin equal to gutter."
+  },
+  {
+    "id": "dc-15",
+    "category": "design",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Background weight alternates across sections",
+    "verify": "No three consecutive sections may share the same luminance band (all-light or all-dark). PASS if light↔dark rhythm exists."
+  },
+  {
+    "id": "dc-16",
+    "category": "design",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Section vertical rhythm is varied",
+    "verify": "padding-top values across all <section> elements must include at least 3 distinct values. FAIL if all sections share identical padding."
+  },
+  {
+    "id": "dc-17",
+    "category": "design",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Every button has custom :hover style",
+    "verify": "For every <button> and <a class~=btn>: a :hover rule must set background, transform, box-shadow, or color change beyond browser default cursor:pointer. 100% coverage required."
+  },
+  {
+    "id": "dc-18",
+    "category": "design",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Every button has :focus-visible ring",
+    "verify": "For every <button> and <a class~=btn>: a :focus-visible rule must set outline or box-shadow ring. outline:none without replacement = FAIL."
+  },
+  {
+    "id": "dc-19",
+    "category": "design",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Primary CTA has press/active state",
+    "verify": "Primary CTA must have :active CSS rule with transform:scale(<1) or translateY(+n), OR a Framer Motion whileTap / GSAP press handler in source."
+  },
+  {
+    "id": "dc-20",
+    "category": "design",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Nav links have custom hover treatment beyond color",
+    "verify": "<nav> anchor :hover rules must go beyond color change: underline draw, pseudo-element indicator, opacity shift, or translateX. Browser underline default = FAIL."
+  },
+  {
+    "id": "dc-21",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Button design is custom — not browser/shadcn default",
+    "verify": "Primary CTA must have a border-radius, padding, weight, and color that reflect the site's identity tokens. Generic gray-border or unstyled = FAIL."
+  },
+  {
+    "id": "dc-22",
+    "category": "design",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Grain overlay is present",
+    "verify": "body::after or a fixed overlay must have: SVG feTurbulence or noise texture background-image, opacity 0.03–0.12, pointer-events:none, position:fixed, z-index > 100."
+  },
+  {
+    "id": "dc-23",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "At least 5 craft micro-details present",
+    "verify": "PASS if ≥ 5 of: mono eyebrows, section counters, animated underlines on links, 1px inset highlight border, em-dash list markers, custom dividers, card hover-reveal, consistent caption scale (11–12px tracked-out)."
+  },
+  {
+    "id": "dc-24",
+    "category": "design",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Radius is from a token system (≤4 distinct values)",
+    "verify": "border-radius values on buttons, cards, inputs, badges must derive from ≤ 4 distinct token values. More than 5 distinct values = no token system = FAIL."
+  },
+  {
+    "id": "dc-25",
+    "category": "design",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No uniform default box-shadow on all cards",
+    "verify": "If > 60% of card elements share the exact value '0 4px 24px rgba(0,0,0,0.08)' or Tailwind shadow-md default, FAIL. Expected: flat, directional, or inset-highlight + directional."
+  },
+  {
+    "id": "dc-26",
+    "category": "design",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No pure #000000 or #ffffff backgrounds",
+    "verify": "computed background-color of <html>, <body>, and first full-bleed section must not equal rgb(0,0,0) or rgb(255,255,255) exactly."
+  },
+  {
+    "id": "dc-27",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No aurora blob / stacked blur circles in hero",
+    "verify": "VISUAL: hero must not use multiple overlapping blur(80px+) divs producing mesh-gradient effect. AUTO: elements with filter:blur(>=60px) — more than 3 decorative blur elements = FAIL."
+  },
+  {
+    "id": "dc-28",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Hero headline is a visual object, not a label",
+    "verify": "Hero headline must be >= 56px, use a non-default font, intentional leading, and command the page like an image. A <p> with bigger font floating on a gradient = FAIL."
+  },
+  {
+    "id": "dc-29",
+    "category": "design",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "No generic hero badge with emoji and gradient border",
+    "verify": "No gradient-border pill badge with emoji above hero headline. PASS if absent or replaced with a plain editorial flag."
+  },
+  {
+    "id": "dc-30",
+    "category": "design",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Hero visual is not a perspective-tilted screenshot",
+    "verify": "VISUAL: hero does not use perspective() rotateX(5deg) product screenshot on gradient. AUTO: no inline style or CSS rule with perspective + rotateX/rotateY on images in hero section."
+  },
+  {
+    "id": "dc-31",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Exactly ONE signature wow interaction",
+    "verify": "Exactly one memorable interaction describable in a sentence (marquee, custom cursor, hover reveal, count-up tickers, clip-reveal links, or pinned scroll reveal). Zero = static/dead. Two+ = diluted. PASS if exactly one."
+  },
+  {
+    "id": "dc-32",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Scroll-driven storytelling moment present",
+    "verify": "At least one section must use scroll position to drive a narrative (pinned beats, sticky product panel, compositional parallax). Simple intersection fade-once does NOT count."
+  },
+  {
+    "id": "dc-33",
+    "category": "design",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Preloader fires first visit, skips repeat",
+    "verify": "On first visit (no sessionStorage intro key): loading screen appears before hero. After preloader: sessionStorage key set. On second visit: preloader skipped, hero visible immediately."
+  },
+  {
+    "id": "dc-34",
+    "category": "design",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No broken or placeholder images",
+    "verify": "All <img> elements: naturalWidth > 0. src must not contain: placeholder, lorem, picsum, via.placeholder.com, dummyimage.com."
+  },
+  {
+    "id": "dc-35",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No stock photo with watermark or generic business imagery",
+    "verify": "All images are product screenshots, custom illustration, abstract graphic treatment, or intentional photography. Generic stock business imagery = FAIL."
+  },
+  {
+    "id": "dc-36",
+    "category": "design",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No lorem ipsum or 'coming soon' copy",
+    "verify": "document.body.innerText must not contain: 'lorem ipsum', 'coming soon', 'placeholder', 'TODO', 'your text here', or any 5+ repeated-word sequence."
+  },
+  {
+    "id": "dc-37",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Site could only be for THIS product",
+    "verify": "Could you swap the logo and product name for a competitor and nothing need redesigning? PASS if swapping would require layout/visual redesign — identity is product-specific."
+  },
+  {
+    "id": "dc-38",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Generous intentional whitespace (≥35% void per viewport)",
+    "verify": "In any viewport screenshot, at least 35% is negative space (background with no content). Packed/cramped = FAIL."
+  },
+  {
+    "id": "dc-39",
+    "category": "design",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Asymmetry is the default — centered sections < 40%",
+    "verify": "Count all content sections. Fewer than 40% may use centered/symmetric composition. PASS if asymmetry dominates."
+  },
+  {
+    "id": "dc-40",
+    "category": "design",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "No plain horizontal logo strip under hero",
+    "verify": "Social proof section is NOT a plain row of grayscale logos with 'Trusted by teams at...' directly below the hero. PASS if absent or replaced with designed alternative."
+  },
+  {
+    "id": "dc-41",
+    "category": "design",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Nav is not all-glass sticky bar from scroll position 0",
+    "verify": "VISUAL: nav must not be a full-width backdrop-blur bar visible from the very top. AUTO: check backdrop-filter:blur on <header>/<nav> at scroll=0. If present at rest (not only after scroll), flag."
+  },
+  {
+    "id": "dc-42",
+    "category": "design",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Footer is not a dense link grid",
+    "verify": "Footer has personality: minimal one-line copyright, display-type editorial footer, or interactive element. Standard 4-column enterprise link grid = FAIL."
+  },
+  {
+    "id": "dc-43",
+    "category": "design",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Holistic: looks hand-crafted, not generated",
+    "verify": "10-second screenshot test: 'Was this built by a specific designer with a point of view, or generated for a generic SaaS brief?' PASS only if the answer is clearly the former. Any doubt = identify failing items and fix."
+  },
+  {
+    "id": "perf-01",
+    "category": "perf",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "First Load JS ≤ 300 KB (gzipped)",
+    "verify": "Run `next build` and parse stdout route table for `/` First Load JS column, or sum .next/build-manifest.json chunk sizes and gzip-measure them. PASS if ≤ 300 KB."
+  },
+  {
+    "id": "perf-02",
+    "category": "perf",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "GSAP / Three.js / R3F not in initial chunk",
+    "verify": "grep source for static top-level `import ... from 'gsap'|'three'|'@react-three/*'` in non-dynamic page/layout files. Also `strings .next/static/chunks/framework-*.js | grep -i 'three\\|gsap'` — expect no matches."
+  },
+  {
+    "id": "perf-03",
+    "category": "perf",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "3D/animation components use dynamic() with ssr:false",
+    "verify": "grep -rn 'dynamic(' src/ app/ pages/ --include='*.tsx' | grep -v 'ssr: false' — any dynamic() import of a heavy component without ssr:false = FAIL."
+  },
+  {
+    "id": "perf-04",
+    "category": "perf",
+    "severity": "major",
+    "mode": "auto",
+    "title": "All images use next/image or have explicit width/height + modern format",
+    "verify": "grep -rn '<img ' src/ app/ pages/ --include='*.tsx' | grep -v 'next/image' — each hit must have width= and height= attributes. PNG/JPG without WebP/AVIF conversion = HIGH flag."
+  },
+  {
+    "id": "perf-05",
+    "category": "perf",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No single asset > 500 KB",
+    "verify": "find public/ -type f \\( -name '*.jpg' -o -name '*.png' -o -name '*.gif' -o -name '*.webp' -o -name '*.mp4' \\) -size +500k -ls — any result = FAIL."
+  },
+  {
+    "id": "perf-06",
+    "category": "perf",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Fonts loaded via next/font, no render-blocking font CSS",
+    "verify": "grep -rn 'fonts.googleapis.com' src/ app/ pages/ --include='*.tsx' — any hit = FAIL. Confirm font imports come from 'next/font/*' only."
+  },
+  {
+    "id": "perf-07",
+    "category": "perf",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "LCP hero image has next/image priority prop",
+    "verify": "grep -rn 'priority' components/ app/ pages/ --include='*.tsx' | grep -i 'hero\\|landing' — missing priority on above-fold next/image = FAIL. Hero image should be < 200 KB."
+  },
+  {
+    "id": "perf-08",
+    "category": "perf",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "CLS < 0.1",
+    "verify": "Playwright PerformanceObserver layout-shift: accumulate entry.value where !hadRecentInput over 5 s after navigation. expect(cls).toBeLessThan(0.1). Also visually audit font swap, unsized images, animated reveals."
+  },
+  {
+    "id": "perf-09",
+    "category": "perf",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Animations use transform/opacity only — no layout thrash",
+    "verify": "grep -rn 'transition:.*width\\|height\\|top\\|left\\|margin' src/ app/ --include='*.css' and grep gsap.to calls for width/height/top/left tweens — any hit = FAIL. Chrome Rendering > Paint flashing should show no green flashes during animation."
+  },
+  {
+    "id": "perf-10",
+    "category": "perf",
+    "severity": "major",
+    "mode": "auto",
+    "title": "GSAP / ScrollTrigger / addEventListener cleaned up in useEffect",
+    "verify": "Files with addEventListener must also contain removeEventListener. Files with gsap animations must use gsap.context().revert() or explicit .kill() in useEffect cleanup. Grep for violations."
+  },
+  {
+    "id": "perf-11",
+    "category": "perf",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Scroll handlers use RAF / no synchronous layout reads",
+    "verify": "grep raw scroll handlers (not ScrollTrigger) and check for getBoundingClientRect/offsetTop calls inside without RAF wrapping — any synchronous layout read in a scroll callback = FAIL."
+  },
+  {
+    "id": "perf-12",
+    "category": "perf",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Offscreen/below-fold heavy content lazy-loaded",
+    "verify": "grep for IntersectionObserver/useInView/whileInView gating heavy below-fold components. Network tab on Slow 4G — heavy sections must not initiate requests until viewport entry."
+  },
+  {
+    "id": "perf-13",
+    "category": "perf",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Lighthouse performance score ≥ 90",
+    "verify": "npx lighthouse <prod-url> --only-categories=performance --output=json | parse .categories.performance.score * 100 >= 90. Sub-metrics: LCP<2.5s, INP<200ms, CLS<0.1, TBT<200ms, FCP<1.8s."
+  },
+  {
+    "id": "perf-14",
+    "category": "perf",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "GSAP tree-shaken — only registered plugins imported",
+    "verify": "grep 'gsap.registerPlugin' — each plugin registered must have a specific named import. Blanket `import gsap from 'gsap'` in non-dynamic files = HIGH warning."
+  },
+  {
+    "id": "perf-15",
+    "category": "perf",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "preload/preconnect hints for critical third-party origins",
+    "verify": "grep -rn 'preload\\|preconnect' src/ app/ pages/ — if external origins used with no preconnect hints = MEDIUM warning. next/image priority handles preload automatically for hero images."
+  },
+  {
+    "id": "perf-16",
+    "category": "perf",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "next.config image domains/remotePatterns no wildcard",
+    "verify": "grep -A 20 'images:' next.config.* | grep -E 'hostname.*\\*\\*|domains.*\\*' — wildcard hostname = FAIL."
+  },
+  {
+    "id": "perf-17",
+    "category": "perf",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "No document.write or synchronous XHR",
+    "verify": "grep -rn 'document.write\\|XMLHttpRequest.*open.*false' src/ app/ pages/ --include='*.tsx' --include='*.ts' — any hit = FAIL."
+  },
+  {
+    "id": "perf-18",
+    "category": "perf",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Background videos are muted with preload=none",
+    "verify": "grep -rn '<video' src/ app/ pages/ --include='*.tsx' — any <video> without `muted` = FAIL. Below-fold video without preload='none' = MEDIUM warning."
+  },
+  {
+    "id": "RL-01",
+    "category": "layout",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No horizontal page scroll",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-02",
+    "category": "layout",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "No element overflowing viewport edge",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-03",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No element wider than viewport without clipping parent",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-04",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "No unintentional content overlap",
+    "verify": "visual"
+  },
+  {
+    "id": "RL-05",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Text not clipped by fixed-height containers",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-06",
+    "category": "layout",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Navigation usable at all breakpoints",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-07",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Mobile menu opens and closes correctly",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-08",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Images scale within viewport, no overflow",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-09",
+    "category": "layout",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Tap targets >= 44x44px on mobile",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-10",
+    "category": "layout",
+    "severity": "major",
+    "mode": "auto",
+    "title": "No unreadably small text on mobile",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-11",
+    "category": "layout",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Sections stack correctly on mobile",
+    "verify": "visual"
+  },
+  {
+    "id": "RL-12",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Sticky/fixed elements do not obscure content",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-13",
+    "category": "layout",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "No empty large gaps between sections",
+    "verify": "visual"
+  },
+  {
+    "id": "RL-14",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Layout holds at 320px minimum width",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-15",
+    "category": "layout",
+    "severity": "critical",
+    "mode": "visual",
+    "title": "Correct viewport meta tag present, no zoom lock",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-16",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Page not visually zoomed or scaled abnormally",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-17",
+    "category": "layout",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Text visible and not invisible after responsive CSS",
+    "verify": "visual"
+  },
+  {
+    "id": "RL-18",
+    "category": "layout",
+    "severity": "major",
+    "mode": "visual",
+    "title": "Interactive elements reachable by keyboard",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-19",
+    "category": "layout",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Form fields usable and not clipped on mobile",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-20",
+    "category": "layout",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "Hero/banner section scales correctly on mobile",
+    "verify": "visual"
+  },
+  {
+    "id": "RL-21",
+    "category": "layout",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Dropdowns and tooltips appear above content",
+    "verify": "visual"
+  },
+  {
+    "id": "RL-22",
+    "category": "layout",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Animations do not cause layout shift (CLS <= 0.1)",
+    "verify": "auto"
+  },
+  {
+    "id": "RL-23",
+    "category": "layout",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Print media query does not destroy screen layout",
+    "verify": "visual"
+  },
+  {
+    "id": "RL-24",
+    "category": "layout",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "1920px ultra-wide: content constrained, not stretched",
+    "verify": "visual"
+  },
+  {
+    "id": "seo-title",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Page title is non-default and meaningful",
+    "verify": "document.title is non-empty, != 'Create Next App', length between 10 and 60"
+  },
+  {
+    "id": "seo-meta-description",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Meta description present with valid length",
+    "verify": "document.querySelector('meta[name=\"description\"]').content.length between 50 and 160"
+  },
+  {
+    "id": "seo-og-title",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "og:title present and non-empty",
+    "verify": "document.querySelector('meta[property=\"og:title\"]') !== null and content.trim().length > 0"
+  },
+  {
+    "id": "seo-og-description",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "og:description present with valid length",
+    "verify": "document.querySelector('meta[property=\"og:description\"]').content.length between 50 and 200"
+  },
+  {
+    "id": "seo-og-image",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "og:image present and URL returns HTTP 200",
+    "verify": "meta[property='og:image'] exists and non-empty; curl og:image URL returns 200 with image MIME type"
+  },
+  {
+    "id": "seo-og-type",
+    "category": "seo",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "og:type set to a valid Open Graph type",
+    "verify": "document.querySelector('meta[property=\"og:type\"]').content in ['website','article','product']"
+  },
+  {
+    "id": "seo-og-url",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "og:url is an absolute HTTPS URL",
+    "verify": "document.querySelector('meta[property=\"og:url\"]').content matches /^https:\\/\\/.+/"
+  },
+  {
+    "id": "seo-twitter-card",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "All four twitter: card meta tags present",
+    "verify": "meta[name='twitter:card'], meta[name='twitter:title'], meta[name='twitter:description'], meta[name='twitter:image'] all present and non-empty"
+  },
+  {
+    "id": "seo-twitter-image-loads",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "twitter:image URL returns HTTP 200",
+    "verify": "curl meta[name='twitter:image'] content URL returns 200 with image MIME type"
+  },
+  {
+    "id": "seo-canonical",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Canonical URL present, absolute HTTPS, no localhost",
+    "verify": "document.querySelector('link[rel=\"canonical\"]').href matches /^https:\\/\\// and does not include 'localhost'"
+  },
+  {
+    "id": "seo-viewport",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Meta viewport has width=device-width and initial-scale=1",
+    "verify": "document.querySelector('meta[name=\"viewport\"]').content includes 'width=device-width' and 'initial-scale=1'"
+  },
+  {
+    "id": "seo-html-lang",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "html lang attribute is a valid BCP 47 tag",
+    "verify": "document.documentElement.lang matches /^[a-z]{2}(-[A-Z]{2})?$/ and length >= 2"
+  },
+  {
+    "id": "seo-favicon",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Favicon link tag present and /favicon.ico returns 200",
+    "verify": "link[rel='icon'] or link[rel='shortcut icon'] present; fetch /favicon.ico returns 200"
+  },
+  {
+    "id": "seo-apple-touch-icon",
+    "category": "seo",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "apple-touch-icon link present and href returns 200",
+    "verify": "document.querySelector('link[rel=\"apple-touch-icon\"]') !== null; curl href returns 200"
+  },
+  {
+    "id": "seo-h1",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "Exactly one H1 with meaningful content",
+    "verify": "document.querySelectorAll('h1').length === 1 and textContent.trim().length >= 5 and not a placeholder string"
+  },
+  {
+    "id": "seo-heading-hierarchy",
+    "category": "seo",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Semantic heading hierarchy with no skipped levels",
+    "verify": "Extract heading level sequence from DOM; confirm no level skips > 1 step (e.g., h1 directly to h3)"
+  },
+  {
+    "id": "seo-robots-txt",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "/robots.txt returns 200 and contains User-agent directive",
+    "verify": "fetch /robots.txt returns 200; response body contains 'User-agent:'; Sitemap: directive present; production does not have Disallow: / for *"
+  },
+  {
+    "id": "seo-sitemap",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "/sitemap.xml returns 200 with valid XML and at least one <url>",
+    "verify": "fetch /sitemap.xml returns 200; XML parses successfully; contains >= 1 <url><loc> entry"
+  },
+  {
+    "id": "seo-jsonld",
+    "category": "seo",
+    "severity": "minor",
+    "mode": "auto",
+    "title": "At least one valid JSON-LD structured data block present",
+    "verify": "document.querySelectorAll('script[type=\"application/ld+json\"]').length >= 1; each block parses as valid JSON with @context and @type"
+  },
+  {
+    "id": "seo-noindex",
+    "category": "seo",
+    "severity": "critical",
+    "mode": "auto",
+    "title": "No accidental noindex in meta robots or X-Robots-Tag header",
+    "verify": "meta[name='robots'].content does not include 'noindex'; curl -I response X-Robots-Tag header does not include 'noindex'"
+  },
+  {
+    "id": "seo-img-alt",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "All <img> elements have an alt attribute",
+    "verify": "document.querySelectorAll('img:not([alt])').length === 0"
+  },
+  {
+    "id": "seo-img-alt-quality",
+    "category": "seo",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Image alt text is descriptive (not generic)",
+    "verify": "No img alt equals 'image', 'photo', 'picture', 'img', 'graphic', 'icon', 'logo', 'banner', 'hero', 'untitled', or a bare filename"
+  },
+  {
+    "id": "seo-link-text",
+    "category": "seo",
+    "severity": "minor",
+    "mode": "visual",
+    "title": "Links use descriptive anchor text (no bare 'click here')",
+    "verify": "No <a> with textContent in ['click here','here','read more','more','learn more','this','link'] without an aria-label override"
+  },
+  {
+    "id": "seo-generate-metadata",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "Next.js generateMetadata used; no scaffold boilerplate in metadata",
+    "verify": "grep -r 'generateMetadata|export const metadata' app/ returns >= 1 result; grep for 'Create Next App' returns 0 results"
+  },
+  {
+    "id": "seo-og-image-dimensions",
+    "category": "seo",
+    "severity": "major",
+    "mode": "auto",
+    "title": "OG image is ≥ 600×315 px, aspect ratio ~1.91:1, and ≤ 5 MB",
+    "verify": "Download og:image; confirm width >= 600, height >= 315, file size <= 5242880 bytes, aspect ratio ~1.91:1"
+  },
+  {
+    "id": "seo-og-image-visual",
+    "category": "seo",
+    "severity": "major",
+    "mode": "visual",
+    "title": "OG image contains brand identity and readable text",
+    "verify": "Open og:image URL directly; confirm brand name/logo visible, title text legible at thumbnail scale; validate via Twitter Card Validator or opengraph.xyz"
+  }
+]

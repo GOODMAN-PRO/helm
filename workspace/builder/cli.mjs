@@ -24,7 +24,8 @@ import { buildSolo } from './solo.mjs';
 const truthy = v => v === undefined || /^(1|true|yes|on)$/i.test(String(v));
 function parseArgs(argv) {
   const out = { brief: '', stack: undefined, outDir: undefined, dryRun: false, concurrency: 3, maxFixRounds: undefined, json: false,
-    tier: undefined, maxAgents: undefined, includeRoles: undefined, excludeRoles: undefined, swarm: false, model: undefined };
+    tier: undefined, maxAgents: undefined, includeRoles: undefined, excludeRoles: undefined, swarm: false, model: undefined, polish: true,
+    audit: true, maxAuditRounds: undefined };
   const rest = [];
   const list = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -46,6 +47,9 @@ function parseArgs(argv) {
     else if (a === '--swarm') out.swarm = true;       // opt back into the old 40-agent pipeline
     else if (a === '--solo') out.swarm = false;       // explicit single-agent (the default)
     else if (a === '--model') out.model = argv[++i];  // build-agent model for solo (sonnet|opus)
+    else if (a === '--no-polish') out.polish = false; // skip the de-AI polish pass (faster)
+    else if (a === '--no-audit') out.audit = false;   // skip the auto-audit→fix loop (faster, less thorough)
+    else if (a === '--audit-rounds' || a === '--maxAuditRounds') out.maxAuditRounds = parseInt(argv[++i], 10) || undefined;
     else rest.push(a);
   }
   if (!out.brief) out.brief = rest.join(' ').trim();
@@ -72,7 +76,8 @@ async function main() {
       })
     : await buildSolo({
         brief: opts.brief, stack: opts.stack, outDir: opts.outDir, dryRun: opts.dryRun,
-        maxFixRounds: opts.maxFixRounds || 4, model: opts.model || 'sonnet',
+        maxFixRounds: opts.maxFixRounds || 4, model: opts.model || 'sonnet', polish: opts.polish !== false,
+        audit: opts.audit !== false, maxAuditRounds: opts.maxAuditRounds || 3,
         onProgress: e => console.error(`  · [${e.phase}] ${e.status}`),
       });
   const mins = ((Date.now() - startedAt) / 60000).toFixed(1);
