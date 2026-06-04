@@ -16,7 +16,7 @@
   },
   {
     "name": "image.generate",
-    "summary": "Generate an image from a text prompt (free, no API key) and save it to a file.",
+    "summary": "Generate an image from a text prompt (free, no API key, FLUX). Retries + validates output; supports aspect presets, prompt-enhance, batch variations, and negative prompt.",
     "exec": "node tools/impl/image.generate.mjs",
     "args_schema": {
       "prompt": {
@@ -31,7 +31,12 @@
       "width": { "type": "number", "description": "Pixels, 64-2048. Default 1024" },
       "height": { "type": "number", "description": "Pixels, 64-2048. Default 1024" },
       "model": { "type": "string", "description": "Provider model, default 'flux'" },
-      "seed": { "type": "number", "description": "Optional seed for reproducibility" }
+      "seed": { "type": "number", "description": "Optional seed for reproducibility" },
+      "aspect": { "type": "string", "description": "square | landscape | wide | portrait | story (sets size unless width/height given)" },
+      "enhance": { "type": "boolean", "description": "LLM prompt-enhance for richer images (default true)" },
+      "negative": { "type": "string", "description": "Things to avoid, e.g. 'blurry, watermark, text'" },
+      "batch": { "type": "number", "description": "How many variations to generate, 1-8 (default 1)" },
+      "retries": { "type": "number", "description": "Retry attempts on transient/rate-limit errors (default 4)" }
     },
     "requires": [
       "internet access"
@@ -1333,7 +1338,7 @@
   },
   {
     "name": "video.generate",
-    "summary": "Text-to-video: expand a prompt into N scenes, generate AI images, assemble an H.264 mp4 with Ken Burns motion + crossfades; optional voice narration.",
+    "summary": "Text-to-video: expand a prompt into N scenes, generate AI images, assemble an H.264 mp4 with varied Ken Burns motion + crossfades. Aspect presets (incl. vertical 9:16), optional burned-in captions, background music, and voice narration.",
     "exec": "node tools/impl/video.gen.mjs",
     "args_schema": {
       "prompt": {
@@ -1360,7 +1365,11 @@
       "size": {
         "type": "string",
         "description": "WxH, default 1280x720"
-      }
+      },
+      "aspect": { "type": "string", "description": "landscape | portrait | square | wide | story (vertical 9:16 = portrait/story)" },
+      "res": { "type": "number", "description": "Short-side resolution with --aspect, e.g. 720 or 1080" },
+      "captions": { "type": "boolean", "description": "Burn a short caption per scene" },
+      "music": { "type": "string", "description": "Path to a background music file mixed under the video" }
     },
     "side_effects": "writes an mp4 (image gen + ffmpeg)",
     "confirm": false,

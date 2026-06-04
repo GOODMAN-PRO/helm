@@ -1,49 +1,151 @@
 #!/usr/bin/env node
-// image.generate — text-to-image for Helm via Pollinations (free, no API key, any OS).
-// Saves a generated image to a temp file and prints its path; the gateway attaches it to chat
-// when the brain ends its reply with `ATTACH: <that path>`.
+// image.generate — hardened text-to-image for Helm via Pollinations (free, no API key, any OS).
+// FLUX by default. Robust: retries with backoff, magic-byte validation (never saves an HTML error
+// page as an image), free prompt-`enhance`, aspect presets, batch/variations, negative prompt.
 //
 // Usage: node image.generate.mjs --prompt "a red fox in snow" [--out <file>] [--width 1024]
-//        [--height 1024] [--model flux] [--seed 42]
+//        [--height 1024] [--aspect square|landscape|wide|portrait|story] [--model flux]
+//        [--seed 42] [--enhance true] [--negative "blurry, text"] [--batch 1] [--retries 4]
+//
+// Output: single JSON object. Back-compatible: always includes top-level {ok,path,bytes,...};
+// batch>1 also returns an `images` array. Writes the image(s) under the OS temp dir or workspace.
 import { writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
-const get = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
+const get  = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
+const bool = (k, def) => { const v = get(k); if (v === null) return def; return !/^(false|0|no|off)$/i.test(v); };
 
 const prompt = get('prompt');
 if (!prompt) { console.error('--prompt required'); process.exit(1); }
-const width  = Math.min(2048, Math.max(64, parseInt(get('width') || '1024', 10) || 1024));
-const height = Math.min(2048, Math.max(64, parseInt(get('height') || '1024', 10) || 1024));
-const model  = (get('model') || 'flux').replace(/[^\w.-]/g, '');
-const seed   = get('seed');
+
+// Aspect presets → base dimensions (overridden by explicit --width/--height). Clamped to 64..2048.
+const ASPECTS = {
+  square:    [1024, 1024],
+  landscape: [1280, 720],
+  wide:      [1456, 816],
+  portrait:  [896, 1152],
+  tall:      [896, 1152],
+  story:     [1080, 1920],
+  vertical:  [1080, 1920],
+};
+const clamp = n => Math.min(2048, Math.max(64, n | 0));
+let [baseW, baseH] = [1024, 1024];
+const aspect = (get('aspect') || '').toLowerCase();
+if (ASPECTS[aspect]) [baseW, baseH] = ASPECTS[aspect];
+
+const width   = clamp(parseInt(get('width')  || String(baseW), 10) || baseW);
+const height  = clamp(parseInt(get('height') || String(baseH), 10) || baseH);
+const model   = (get('model') || 'flux').replace(/[^\w.-]/g, '');
+const seedArg = get('seed');
+const enhance = bool('enhance', true);
+const negative = get('negative');
+const batch   = Math.min(8, Math.max(1, parseInt(get('batch')   || '1', 10) || 1));
+const retries = Math.min(8, Math.max(0, parseInt(get('retries') || '4', 10)));
 
 // Output path: default to OS temp; guard against writing outside temp/workspace.
 const WORKSPACE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const SAFE_ROOTS = [os.tmpdir(), WORKSPACE, '/tmp', '/private/tmp'];
-const out = path.resolve(get('out') || path.join(os.tmpdir(), `helm-image-${Date.now()}.jpg`));
-if (!SAFE_ROOTS.some(r => out === r || out.startsWith(r + path.sep) || out.startsWith(r + '/'))) {
-  console.error(`refusing --out outside safe roots (${SAFE_ROOTS.join(', ')}): ${out}`);
+const safe = p => SAFE_ROOTS.some(r => p === r || p.startsWith(r + path.sep) || p.startsWith(r + '/'));
+const baseOut = path.resolve(get('out') || path.join(os.tmpdir(), `helm-image-${Date.now()}.jpg`));
+if (!safe(baseOut)) {
+  console.error(`refusing --out outside safe roots (${SAFE_ROOTS.join(', ')}): ${baseOut}`);
   process.exit(1);
 }
 
-const params = new URLSearchParams({ width: String(width), height: String(height), model, nologo: 'true' });
-if (seed) params.set('seed', String(seed));
-const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params}`;
-
-const ac = new AbortController();
-const timer = setTimeout(() => ac.abort(), 90_000);   // generation can take a while
-try {
-  const res = await fetch(url, { signal: ac.signal, headers: { accept: 'image/*' } });
-  clearTimeout(timer);
-  if (!res.ok) { console.error(`image provider returned ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`); process.exit(1); }
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length < 256) { console.error('image provider returned empty/too-small response'); process.exit(1); }
-  writeFileSync(out, buf);
-  console.log(JSON.stringify({ ok: true, path: out, bytes: buf.length, width, height, model, prompt }));
-} catch (e) {
-  clearTimeout(timer);
-  console.error(e.name === 'AbortError' ? 'image generation timed out (90s)' : String(e.message || e));
-  process.exit(1);
+// Optional free Pollinations token (lifts the anonymous 1-request/IP rate limit). Stays anonymous
+// if absent. Read from env first, else the secrets vault — never required, never echoed.
+function polltoken() {
+  if (process.env.POLLINATIONS_TOKEN) return process.env.POLLINATIONS_TOKEN.trim();
+  try {
+    const secrets = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'secrets', 'secrets.mjs');
+    const r = spawnSync(process.execPath, [secrets, 'get', 'POLLINATIONS_TOKEN'], { encoding: 'utf8', timeout: 8000 });
+    if (r.status === 0 && r.stdout && r.stdout.trim()) return r.stdout.trim();
+  } catch { /* no vault / no token → anonymous */ }
+  return null;
 }
+const TOKEN = polltoken();
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Pollinations returns 402 when its free queue is saturated; 429/5xx are transient too.
+const RETRY_STATUS = new Set([402, 408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
+
+// Validate that the bytes are actually an image, not an HTML/JSON error page served with 200.
+function isImage(b) {
+  if (!b || b.length < 100) return false;
+  if (b[0] === 0xFF && b[1] === 0xD8) return true;                                   // JPEG
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return true; // PNG
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return true;                  // GIF
+  if (b.slice(0, 4).toString('ascii') === 'RIFF' && b.slice(8, 12).toString('ascii') === 'WEBP') return true; // WEBP
+  if (b[0] === 0x42 && b[1] === 0x4D) return true;                                   // BMP
+  return false;
+}
+
+function buildUrl(seed) {
+  const params = new URLSearchParams({
+    width: String(width), height: String(height), model,
+    nologo: 'true', private: 'true', nofeed: 'true',
+  });
+  if (enhance) params.set('enhance', 'true');
+  params.set('referrer', 'helm');
+  if (TOKEN) params.set('token', TOKEN);
+  if (seed != null) params.set('seed', String(seed));
+  let full = prompt;
+  if (negative) full += `\n\nAvoid: ${negative}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?${params}`;
+}
+
+async function genOne(outPath, seed) {
+  let lastErr = 'unknown';
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) await sleep(Math.min(4000 * 2 ** (attempt - 1), 32000) + Math.floor(Math.random() * 1500));
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 120_000);  // generation can take a while
+    try {
+      const headers = { accept: 'image/*' };
+      if (TOKEN) headers.Authorization = `Bearer ${TOKEN}`;
+      const res = await fetch(buildUrl(seed), { signal: ac.signal, headers });
+      clearTimeout(timer);
+      if (!res.ok) {
+        lastErr = `provider returned ${res.status}`;
+        if (RETRY_STATUS.has(res.status)) continue;
+        return { ok: false, error: `${lastErr}: ${(await res.text().catch(() => '')).slice(0, 160)}` };
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (!isImage(buf)) { lastErr = `non-image response (${buf.length}b)`; continue; }
+      writeFileSync(outPath, buf);
+      return { ok: true, path: outPath, bytes: buf.length, seed: seed ?? null };
+    } catch (e) {
+      clearTimeout(timer);
+      lastErr = e.name === 'AbortError' ? 'timeout (120s)' : String(e.message || e);
+    }
+  }
+  return { ok: false, error: `image generation failed after ${retries + 1} attempt(s): ${lastErr}` };
+}
+
+function outFor(i) {
+  if (i === 0) return baseOut;
+  const ext = path.extname(baseOut) || '.jpg';
+  return baseOut.slice(0, baseOut.length - ext.length) + `-${i + 1}` + ext;
+}
+
+const images = [];
+for (let i = 0; i < batch; i++) {
+  const seed = (seedArg != null && seedArg !== '') ? (parseInt(seedArg, 10) || 0) + i : undefined;
+  const r = await genOne(outFor(i), seed);
+  if (r.ok) { images.push(r); continue; }
+  // First image must succeed; for a partial batch keep what we already have.
+  if (images.length === 0) { console.error(r.error); process.exit(1); }
+  break;
+}
+if (images.length === 0) { console.error('no images generated'); process.exit(1); }
+
+const first = images[0];
+console.log(JSON.stringify({
+  ok: true, path: first.path, bytes: first.bytes,
+  width, height, model, enhance, prompt,
+  count: images.length, images,
+}));

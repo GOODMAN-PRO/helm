@@ -2274,6 +2274,29 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- media: image.generate + video.gen upgrades wired ----
+{
+  const label = 'media: image/video gens parse + registry args + upgrade markers present';
+  try {
+    for (const f of ['image.generate.mjs', 'video.gen.mjs']) {
+      const p = path.join(WORKSPACE, 'tools/impl', f);
+      if (!existsSync(p)) throw new Error('missing impl: ' + f);
+      const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' });
+      if (r.status !== 0) throw new Error('node --check failed for ' + f);
+    }
+    const imgSrc = readFileSync(path.join(WORKSPACE, 'tools/impl/image.generate.mjs'), 'utf8');
+    if (!/isImage/.test(imgSrc) || !/RETRY_STATUS/.test(imgSrc)) throw new Error('image.generate missing retry/validation hardening');
+    const vidSrc = readFileSync(path.join(WORKSPACE, 'tools/impl/video.gen.mjs'), 'utf8');
+    if (!/MOTIONS/.test(vidSrc) || !/TRANSITIONS/.test(vidSrc)) throw new Error('video.gen missing varied motion/transitions');
+    const reg = JSON.parse(readFileSync(path.join(WORKSPACE, 'tools/registry.json'), 'utf8'));
+    const img = reg.find(t => t.name === 'image.generate');
+    const vid = reg.find(t => t.name === 'video.generate');
+    if (!img.args_schema.aspect || !img.args_schema.batch || !img.args_schema.enhance) throw new Error('registry image.generate missing new args');
+    if (!vid.args_schema.aspect || !vid.args_schema.captions || !vid.args_schema.music) throw new Error('registry video.generate missing new args');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);
