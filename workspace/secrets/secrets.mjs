@@ -109,7 +109,7 @@ switch (verb) {
   }
   case 'set': {
     if (!name) die('usage: set <NAME>  (value is read from stdin)');
-    const value = readStdin().replace(/\n$/, '');
+    const value = readStdin().replace(/\r?\n$/, '');
     if (!value) die('no value on stdin. e.g.  echo -n "secret" | secrets.mjs set ' + name);
     const v = loadVault(); v[name] = encrypt(getKey(), value); saveVault(v);
     out({ action: 'stored', name, bytes: value.length });

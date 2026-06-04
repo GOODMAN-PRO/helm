@@ -1083,6 +1083,9 @@ client.on(Events.MessageCreate, async msg => {
           if (!e.stopped) await channelRef.send(`Plan execution error: ${String(e.message || e).slice(0, 800)}`).catch(() => {});
         }
       }, 60_000);
+      // Clear any prior pending plan for this channel so it can't fire orphaned (untracked by `stop`).
+      const prevTimer = autopilotTimers.get(msg.channel.id);
+      if (prevTimer) clearTimeout(prevTimer);
       autopilotTimers.set(msg.channel.id, timer);
     } else {
       for (const part of chunks(body || '(see attachment)')) await msg.reply(part);

@@ -40,6 +40,9 @@ export function cronMatches(expr, date = new Date()) {
   const dom    = parseField(domF,    1, 31);
   const month  = parseField(monthF,  1, 12);
   const dow    = parseField(dowF,    0,  6);
+  // Vixie cron: day-of-week 7 is also Sunday. getUTCDay() only returns 0-6, so a literal 7
+  // (e.g. "* * * * 7" or a range like "5-7") would never match — normalise 7 -> 0.
+  if (dow && dow.has(7)) dow.add(0);
 
   if (minute && !minute.has(date.getUTCMinutes()))   return false;
   if (hour   && !hour.has(date.getUTCHours()))       return false;

@@ -184,6 +184,10 @@ export async function runRole(role, ctx, opts = {}) {
       return;
     }
 
+    // Guard stdin against EPIPE: if claude exits before reading the (large) prompt, the error is
+    // emitted asynchronously on the stream — a surrounding try/catch won't catch it, and an
+    // unhandled stream 'error' is a fatal uncaught exception. proc.on('error') is the child, not stdin.
+    proc.stdin.on('error', () => {});
     // Write prompt to stdin then close so the process knows input is done
     try {
       proc.stdin.write(prompt, 'utf8');

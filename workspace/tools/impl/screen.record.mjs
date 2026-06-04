@@ -213,7 +213,7 @@ if (verb === 'stop') {
   // 2. If that doesn't kill it within 3s, fall back to taskkill /F.
 
   const psScript = `
-$pid = ${pid}
+$procId = ${pid}
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -225,16 +225,16 @@ public class ConsoleCtrl {
 "@
 # Try to attach to ffmpeg's console group and send Ctrl+C
 [ConsoleCtrl]::FreeConsole() | Out-Null
-$attached = [ConsoleCtrl]::AttachConsole([uint32]$pid)
+$attached = [ConsoleCtrl]::AttachConsole([uint32]$procId)
 if ($attached) {
   [ConsoleCtrl]::GenerateConsoleCtrlEvent(0, 0) | Out-Null
   Start-Sleep -Milliseconds 2500
   [ConsoleCtrl]::FreeConsole() | Out-Null
 }
 # Check if still alive; if so, force kill
-$proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+$proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
 if ($proc) {
-  Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+  Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
   Write-Output "FORCED"
 } else {
   Write-Output "GRACEFUL"

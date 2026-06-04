@@ -123,6 +123,7 @@ function runClaude(args, prompt) {
       if (code === 0) resolve(out);
       else reject(new Error(err.trim() || `claude exited ${code}`));
     });
+    child.stdin.on('error', () => {}); // EPIPE if claude exits before reading stdin
     child.stdin.write(prompt);
     child.stdin.end();
   });

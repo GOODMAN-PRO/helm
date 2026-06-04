@@ -47,7 +47,7 @@ const batch   = Math.min(8, Math.max(1, parseInt(get('batch')   || '1', 10) || 1
 const retries = Math.min(8, Math.max(0, parseInt(get('retries') || '4', 10)));
 
 // Output path: default to OS temp; guard against writing outside temp/workspace.
-const WORKSPACE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
+const WORKSPACE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SAFE_ROOTS = [os.tmpdir(), WORKSPACE, '/tmp', '/private/tmp'];
 const safe = p => SAFE_ROOTS.some(r => p === r || p.startsWith(r + path.sep) || p.startsWith(r + '/'));
 const baseOut = path.resolve(get('out') || path.join(os.tmpdir(), `helm-image-${Date.now()}.jpg`));

@@ -12,6 +12,7 @@ const args = process.argv.slice(2);
 const sIdx = args.indexOf('--seconds');
 const MAX_SECONDS = 300;
 let seconds = sIdx !== -1 ? parseInt(args[sIdx + 1], 10) : 30;
+if (!Number.isFinite(seconds)) seconds = 30;
 if (seconds > MAX_SECONDS) seconds = MAX_SECONDS;
 if (seconds < 1) seconds = 1;
 

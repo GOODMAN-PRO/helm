@@ -91,6 +91,10 @@ function probeServer(name, entry) {
       settle({ name, status: 'DOWN', error: `exited ${code}` });
     });
 
+    // EPIPE if the server exits before reading stdin — emitted async on the stream, so a
+    // surrounding try/catch can't catch it. Without this listener it's an uncaught exception
+    // that would crash the (fire-and-forget) bot at startup.
+    child.stdin?.on('error', () => {});
     try {
       child.stdin?.write(INIT_REQUEST);
       child.stdin?.end();

@@ -149,9 +149,11 @@ async function runPhase(phaseName, roles, ctx, runRoleFn, opts, globalDone) {
     if (toStart.length === 0) {
       // Concurrency cap hit — wait for any in-flight role to finish.
       await raceNonEmpty([...inFlight.values()]);
-      // Clean up settled entries.
+      // Clean up settled entries. (active is a Set — must use .has, not the `in` operator,
+      // which checks object keys and is always false here, wrongly evicting still-running
+      // promises and busy-spinning the scheduler while at the concurrency cap.)
       for (const [id, p] of inFlight) {
-        if (!(id in active)) inFlight.delete(id);
+        if (!active.has(id)) inFlight.delete(id);
       }
       continue;
     }

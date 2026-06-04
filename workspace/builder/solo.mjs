@@ -48,6 +48,9 @@ function runAgent(prompt, projectDir, { model = 'sonnet', timeoutMs = 2_700_000,
     const tick = setInterval(() => { onProgress?.({ status: 'working', elapsed: Math.round((Date.now() - t0) / 1000) }); }, 15_000);
     child.on('error', e => { clearTimeout(timer); clearInterval(tick); resolve({ ok: false, output: String(e?.message ?? e), durationMs: Date.now() - t0 }); });
     child.on('close', code => { clearTimeout(timer); clearInterval(tick); resolve({ ok: code === 0, output: out, durationMs: Date.now() - t0 }); });
+    // EPIPE guard: claude may exit before reading the large prompt; the stream 'error' fires async
+    // (try/catch can't catch it) and is otherwise a fatal uncaught exception.
+    child.stdin?.on('error', () => {});
     try { child.stdin?.write(prompt); child.stdin?.end(); } catch {}
   });
 }

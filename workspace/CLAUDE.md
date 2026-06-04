@@ -196,6 +196,15 @@ NAME (enter, esc, tab, up, f5…), not a macOS keycode.
   screen is locked.)
 - **Show the owner:** add a line `ATTACH: /tmp/sm-screen.png` to your reply — both Discord and
   iMessage will attach the file. You can attach any file this way (one `ATTACH:` line each).
+- **VERIFY EVERY SCREENSHOT BEFORE YOU SEND IT — non-negotiable.** Before you put an `ATTACH:` line
+  for a screenshot (or any image) in a reply to the owner, you MUST first **Read that image file
+  yourself** (you are multimodal — use the Read tool on the path) and confirm it actually contains what
+  the owner asked for. If it's the wrong window, a black / loading / empty frame, the target is
+  off-screen, minimized, or covered by another window, or it simply doesn't show what they need — do
+  NOT attach it. Re-capture properly first (focus the right window with `window.focus` / `uia.find`,
+  scroll/resize, wait for load) and re-check, or tell the owner plainly that you couldn't get a usable
+  shot and why. Never attach an unverified or unhelpful screenshot, and never describe what a
+  screenshot shows without having actually read it.
 - **Mouse/keyboard (macOS):** use the bundled helper `bin/guicontrol`
   (needs Accessibility permission):
   - `guicontrol click X Y` · `doubleclick X Y` · `rightclick X Y` · `move X Y`
