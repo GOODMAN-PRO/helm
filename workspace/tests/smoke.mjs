@@ -2297,6 +2297,23 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- cortex bridge: Helm can drive the CORTEX app ----
+{
+  const label = 'cortex: bridge impl parses + registry registers cortex.* tools';
+  try {
+    const p = path.join(WORKSPACE, 'tools/impl/cortex.mjs');
+    if (!existsSync(p)) throw new Error('missing tools/impl/cortex.mjs');
+    const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' });
+    if (r.status !== 0) throw new Error('node --check failed: ' + (r.stderr || '').trim().slice(0, 120));
+    const reg = JSON.parse(readFileSync(path.join(WORKSPACE, 'tools/registry.json'), 'utf8'));
+    const names = new Set(reg.map(t => t.name));
+    for (const x of ['cortex.capture', 'cortex.recall', 'cortex.search', 'cortex.ask', 'cortex.layers']) {
+      if (!names.has(x)) throw new Error('registry missing ' + x);
+    }
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

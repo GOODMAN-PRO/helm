@@ -2312,5 +2312,148 @@
     "side_effects": "writes a gif",
     "confirm": false,
     "platform": "win32"
+  },
+  {
+    "name": "cortex.capture",
+    "summary": "Capture a thought into CORTEX (your second brain); auto-titled, embedded, and linkable.",
+    "exec": "node tools/impl/cortex.mjs capture",
+    "args_schema": {
+      "text": {
+        "type": "string",
+        "required": true,
+        "description": "the note text"
+      },
+      "tags": {
+        "type": "string",
+        "description": "comma-separated tags"
+      }
+    },
+    "side_effects": "creates a note in CORTEX",
+    "confirm": false
+  },
+  {
+    "name": "cortex.new",
+    "summary": "Create a titled note in CORTEX.",
+    "exec": "node tools/impl/cortex.mjs new",
+    "args_schema": {
+      "title": {
+        "type": "string",
+        "required": true
+      },
+      "content": {
+        "type": "string"
+      },
+      "tags": {
+        "type": "string",
+        "description": "comma-separated tags"
+      }
+    },
+    "side_effects": "creates a note in CORTEX",
+    "confirm": false
+  },
+  {
+    "name": "cortex.search",
+    "summary": "Keyword (full-text) search across CORTEX notes.",
+    "exec": "node tools/impl/cortex.mjs search",
+    "args_schema": {
+      "q": {
+        "type": "string",
+        "required": true,
+        "description": "search query"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.recall",
+    "summary": "Semantic search of CORTEX by MEANING (not just keywords).",
+    "exec": "node tools/impl/cortex.mjs recall",
+    "args_schema": {
+      "q": {
+        "type": "string",
+        "required": true,
+        "description": "what to recall"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.recent",
+    "summary": "Most recent CORTEX captures (the Stream layer).",
+    "exec": "node tools/impl/cortex.mjs recent",
+    "args_schema": {
+      "limit": {
+        "type": "number",
+        "description": "how many (default 20)"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.get",
+    "summary": "Get one CORTEX note with its links + backlinks.",
+    "exec": "node tools/impl/cortex.mjs get",
+    "args_schema": {
+      "id": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.related",
+    "summary": "Notes most related by meaning to a given CORTEX note.",
+    "exec": "node tools/impl/cortex.mjs related",
+    "args_schema": {
+      "id": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.ask",
+    "summary": "Ask your CORTEX brain a question; returns the most relevant notes as cited context.",
+    "exec": "node tools/impl/cortex.mjs ask",
+    "args_schema": {
+      "q": {
+        "type": "string",
+        "required": true,
+        "description": "the question"
+      }
+    },
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.projects",
+    "summary": "List CORTEX projects (auto-classified note clusters).",
+    "exec": "node tools/impl/cortex.mjs projects",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.tasks",
+    "summary": "Open tasks extracted from CORTEX note checkboxes.",
+    "exec": "node tools/impl/cortex.mjs tasks",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false
+  },
+  {
+    "name": "cortex.layers",
+    "summary": "The CORTEX 5-layer memory stack (Stream/Projects/Areas/Library/Archive).",
+    "exec": "node tools/impl/cortex.mjs layers",
+    "args_schema": {},
+    "side_effects": "none (read-only)",
+    "confirm": false
   }
 ]
