@@ -1,41 +1,37 @@
-// fullstack-build skill — build a REAL, top-quality full-stack website or app by orchestrating 20+
-// specialist agents (PM, architect, DB, API, backend, auth, UX, visual design, frontend, components,
-// features, integration, testing, security, a11y, performance, SEO, devops, docs, anti-stub reviewer).
-//
-// This is the heavy-duty builder: use it when the owner asks to "build me a website / web app / SaaS /
-// full-stack app". It runs a phased pipeline that produces a real, installable, verified project (build +
-// tests run, no stubs), not a UI shell. Each agent is a focused `claude` expert; the pipeline ends with a
-// verify+fix loop so the project actually builds.
+// fullstack-build skill — build a REAL, premium website with ONE cohesive agent guided by a research-
+// distilled design playbook (apple/awwwards/stripe/linear craft), then a build-until-green loop that
+// guarantees it compiles. This replaced the 40-agent swarm, which produced incoherent sites and failed
+// under rate limits. Use it whenever the owner asks to "build me a website / landing / web app".
 
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { buildSolo } from '../builder/solo.mjs';
 import { buildApp } from '../builder/orchestrator.mjs';
-import { getAllRoles } from '../builder/roles.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const description =
-  'Build a REAL, production-quality FULL-STACK website or app by orchestrating 20+ specialist agents ' +
-  '(product, architecture, database, API, backend, auth, UX, visual design, frontend, components, features, ' +
-  'integration, testing, security, accessibility, performance, SEO, devops, docs, anti-stub review). ' +
-  'Usage: fullstack-build "<idea>" [--stack next-fullstack|astro-site|vite-react-spa|showcase-site] [--dry-run] [--out <dir>]. ' +
-  'Default stack: Next.js + TypeScript + Tailwind + shadcn/ui + Prisma + Auth.js + Zod + Vitest/Playwright. ' +
-  'For award-grade ANIMATED sites that rival apple.com (scroll-driven, super-interactive, GSAP+Lenis+Framer Motion+3D), ' +
-  'use --stack showcase-site (auto-selected when the idea mentions animation/interactive/immersive/scroll/parallax/3d). ' +
-  'The pipeline runs a verify+fix loop so the project actually installs, builds and tests — NO stubs, NO ' +
-  'fake data, NO "coming soon". Use this (not app-build) whenever asked to build a website or web app. ' +
-  'A real build runs many agents and takes a while; pass --dry-run first to preview the agent plan instantly. ' +
-  'The generated project + a build report land in workspace/builder/out/<slug>/.';
+  'Build a REAL, premium, production-quality WEBSITE that rivals apple.com / Stripe / Linear. ONE cohesive ' +
+  'agent builds the whole site — guided by a research-distilled design playbook (type scale, color system, ' +
+  'scroll choreography with GSAP+Lenis, Framer Motion micro-interactions, hero recipes, premium components) ' +
+  '— then a build-until-green loop runs `npm run build` and fixes errors until it compiles cleanly. NO stubs, ' +
+  'NO lorem, NO "coming soon", and it is GUARANTEED to build before it finishes. ' +
+  'Usage: fullstack-build "<idea>" [--stack showcase-site|next-fullstack|astro-site|vite-react-spa] [--model sonnet|opus] [--dry-run]. ' +
+  'Default stack auto-selects (animated/landing → showcase-site). Use --swarm only to opt back into the old ' +
+  'multi-agent pipeline (slower, less coherent). The finished site + report land in workspace/builder/out/<slug>/. ' +
+  'A real build takes ~10-25 min (one agent + fixes); pass --dry-run to preview instantly.';
 
 function parse(argsStr) {
   const tokens = String(argsStr || '').trim();
-  const o = { stack: undefined, outDir: undefined, dryRun: false, tier: undefined };
+  const o = { stack: undefined, outDir: undefined, dryRun: false, tier: undefined, swarm: false, model: undefined };
   let s = tokens;
   const flag = (re, set) => { const m = s.match(re); if (m) { set(m); s = s.replace(m[0], ' '); } };
   flag(/--dry-run|--plan/, () => { o.dryRun = true; });
+  flag(/--swarm/, () => { o.swarm = true; });
   flag(/--lean/, () => { o.tier = 'lean'; });
   flag(/--premium/, () => { o.tier = 'premium'; });
   flag(/--tier\s+(\S+)/, m => { o.tier = m[1]; });
+  flag(/--model\s+(\S+)/, m => { o.model = m[1]; });
   flag(/--stack\s+(\S+)/, m => { o.stack = m[1]; });
   flag(/--out\s+(\S+)/, m => { o.outDir = m[1]; });
   o.brief = s.replace(/\s+/g, ' ').trim().replace(/^["']|["']$/g, '');
@@ -43,23 +39,18 @@ function parse(argsStr) {
 }
 
 export async function execute(argsStr = '') {
-  const { brief, stack, outDir, dryRun, tier } = parse(argsStr);
+  const { brief, stack, outDir, dryRun, tier, swarm, model } = parse(argsStr);
   if (!brief) {
-    const roles = getAllRoles();
-    return 'Usage: fullstack-build "<what to build>" [--stack next-fullstack|astro-site|vite-react-spa] [--dry-run]\n' +
-      `Pipeline: ${roles.length} specialist agents across discovery → architecture → design → scaffold → data → backend → auth → frontend → integration → quality → finalize.\n` +
-      'Tip: add --dry-run to preview the agent plan instantly before committing to a full build.';
+    return 'Usage: fullstack-build "<what to build>" [--stack showcase-site] [--model sonnet|opus] [--dry-run] [--swarm]\n' +
+      'Default: ONE cohesive agent builds a premium, apple/stripe-grade site from a research design playbook, then a build-until-green loop guarantees it compiles. Add --dry-run to preview instantly.';
   }
-  const result = await buildApp({
-    brief, stack, outDir, dryRun, tier,
-    onProgress: e => {
-      if (e && e.status === 'selected') console.error(`[fullstack-build] tier=${e.tier}, ${e.count} agents (${e.skipped} skipped)`);
-      else if (e && e.role) console.error(`[fullstack-build] [${e.phase}] ${e.role} — ${e.status}`);
-    },
-  });
-  const n = result.roleResults ? result.roleResults.length : 0;
+  if (swarm) {   // opt-in legacy multi-agent path
+    const r = await buildApp({ brief, stack, outDir, dryRun, tier, onProgress: e => { if (e && e.role) console.error(`[fullstack-build:swarm] [${e.phase}] ${e.role} — ${e.status}`); } });
+    return `${dryRun ? 'Planned' : (r.ok ? 'Built' : 'Build had issues for')} (swarm): "${brief}".\nProject: ${r.projectDir}\n\n${r.report || ''}`.trim();
+  }
+  const r = await buildSolo({ brief, stack, outDir, dryRun, model: model || 'sonnet', onProgress: e => console.error(`[fullstack-build] [${e.phase}] ${e.status}`) });
   const head = dryRun
-    ? `Planned a ${n}-agent (tier: ${result.tier || 'auto'}) full-stack build for: "${brief}". (Dry run — no files written.)`
-    : `${result.ok ? 'Built' : 'Build finished with issues for'}: "${brief}" with ${n} agents (tier: ${result.tier || 'auto'}).\nProject: ${result.projectDir}`;
-  return `${head}\n\n${result.report || ''}`.trim();
+    ? `Planned a single-agent premium build for: "${brief}". (Dry run.)`
+    : `${r.ok ? 'Built (compiles ✓)' : 'Build finished but does NOT compile yet'}: "${brief}".\nProject: ${r.projectDir}`;
+  return `${head}\n\n${r.report || ''}`.trim();
 }

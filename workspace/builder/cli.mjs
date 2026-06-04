@@ -17,13 +17,14 @@
 
 import { fileURLToPath } from 'node:url';
 import { buildApp } from './orchestrator.mjs';
+import { buildSolo } from './solo.mjs';
 
 // Accepts both direct CLI style (`"<brief>" --dry-run`) and the tool-dispatcher style
 // (`--brief "<text>" --stack <id> --dryRun true`), so `tools.mjs call builder.fullstack` works too.
 const truthy = v => v === undefined || /^(1|true|yes|on)$/i.test(String(v));
 function parseArgs(argv) {
-  const out = { brief: '', stack: undefined, outDir: undefined, dryRun: false, concurrency: 3, maxFixRounds: 2, json: false,
-    tier: undefined, maxAgents: undefined, includeRoles: undefined, excludeRoles: undefined };
+  const out = { brief: '', stack: undefined, outDir: undefined, dryRun: false, concurrency: 3, maxFixRounds: undefined, json: false,
+    tier: undefined, maxAgents: undefined, includeRoles: undefined, excludeRoles: undefined, swarm: false, model: undefined };
   const rest = [];
   const list = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
   for (let i = 0; i < argv.length; i++) {
@@ -42,6 +43,9 @@ function parseArgs(argv) {
     else if (a === '--max-agents' || a === '--maxAgents') out.maxAgents = parseInt(argv[++i], 10) || undefined;
     else if (a === '--include' || a === '--includeRoles') out.includeRoles = list(argv[++i]);
     else if (a === '--exclude' || a === '--excludeRoles') out.excludeRoles = list(argv[++i]);
+    else if (a === '--swarm') out.swarm = true;       // opt back into the old 40-agent pipeline
+    else if (a === '--solo') out.swarm = false;       // explicit single-agent (the default)
+    else if (a === '--model') out.model = argv[++i];  // build-agent model for solo (sonnet|opus)
     else rest.push(a);
   }
   if (!out.brief) out.brief = rest.join(' ').trim();
@@ -55,22 +59,22 @@ async function main() {
     process.exit(1);
   }
   const startedAt = Date.now();
-  const result = await buildApp({
-    brief: opts.brief,
-    stack: opts.stack,
-    outDir: opts.outDir,
-    dryRun: opts.dryRun,
-    concurrency: opts.concurrency,
-    maxFixRounds: opts.maxFixRounds,
-    tier: opts.tier,
-    maxAgents: opts.maxAgents,
-    includeRoles: opts.includeRoles,
-    excludeRoles: opts.excludeRoles,
-    onProgress: e => {
-      if (e && e.status === 'selected') console.error(`  → tier=${e.tier}, ${e.count} agents selected (${e.skipped} skipped as unneeded)`);
-      else if (e && e.role) console.error(`  ⚙️  [${e.phase}] ${e.role} — ${e.status}`);
-    },
-  });
+  // DEFAULT = solo (one cohesive agent + research playbook + build-until-green loop). --swarm for the old.
+  const result = opts.swarm
+    ? await buildApp({
+        brief: opts.brief, stack: opts.stack, outDir: opts.outDir, dryRun: opts.dryRun,
+        concurrency: opts.concurrency, maxFixRounds: opts.maxFixRounds, tier: opts.tier,
+        maxAgents: opts.maxAgents, includeRoles: opts.includeRoles, excludeRoles: opts.excludeRoles,
+        onProgress: e => {
+          if (e && e.status === 'selected') console.error(`  → tier=${e.tier}, ${e.count} agents selected (${e.skipped} skipped as unneeded)`);
+          else if (e && e.role) console.error(`  ⚙️  [${e.phase}] ${e.role} — ${e.status}`);
+        },
+      })
+    : await buildSolo({
+        brief: opts.brief, stack: opts.stack, outDir: opts.outDir, dryRun: opts.dryRun,
+        maxFixRounds: opts.maxFixRounds || 4, model: opts.model || 'sonnet',
+        onProgress: e => console.error(`  · [${e.phase}] ${e.status}`),
+      });
   const mins = ((Date.now() - startedAt) / 60000).toFixed(1);
   if (opts.json) { console.log(JSON.stringify({ ...result, elapsedMin: mins })); return; }
   console.log('\n' + (result.report || '(no report)'));

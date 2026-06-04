@@ -2255,6 +2255,25 @@ function fail(label, reason) {
   } catch (e) { fail(label, e.message); }
 }
 
+// ---- builder: solo (single-agent) mode is the default + dry-run is safe ----
+{
+  const label = 'builder: solo mode exports + dry-run (no spawn, npm-safe folder) + skill wired';
+  try {
+    const { buildSolo } = await imp(path.join(WORKSPACE, 'builder/solo.mjs'));
+    const r = await buildSolo({ brief: 'A Cinematic Earbuds LANDING', dryRun: true });
+    if (!r.ok || r.mode !== 'solo') throw new Error('solo dry-run did not return ok/solo');
+    const base = String(r.projectDir || '').split(/[\\/]/).pop();
+    if (/[A-Z]/.test(base)) throw new Error('solo project folder has uppercase: ' + base);
+    const { listSkills } = await imp(path.join(WORKSPACE, 'skills/loader.mjs'));
+    const skills = await listSkills();
+    if (!skills.find(s => s.name === 'fullstack-build')) throw new Error('fullstack-build skill not loaded');
+    // cli defaults to solo (no --swarm)
+    const cli = readFileSync(path.join(WORKSPACE, 'builder/cli.mjs'), 'utf8');
+    if (!/buildSolo/.test(cli) || !/opts\.swarm/.test(cli)) throw new Error('cli not wired to default-solo');
+    ok(label);
+  } catch (e) { fail(label, e.message); }
+}
+
 // ---- summary ----
 console.log('');
 console.log(`Smoke: ${passed} passed, ${failed} failed`);

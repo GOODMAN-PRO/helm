@@ -151,3 +151,6 @@ workspace/builder/.build.lock
 
 # Helm network runtime state (per-machine identity — never commit)
 workspace/network/*.json
+
+# workflow files need a token with 'workflow' scope to push — keep local
+.github/workflows/
