@@ -12,52 +12,48 @@
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='40' fill='%23f0e9d8'/%3E%3Cg transform='translate(256,256)' fill='none' stroke='%232b4a86' stroke-linecap='round'%3E%3Cg stroke-width='14'%3E%3Cline y2='-184'/%3E%3Cline y2='-184' transform='rotate(45)'/%3E%3Cline y2='-184' transform='rotate(90)'/%3E%3Cline y2='-184' transform='rotate(135)'/%3E%3Cline y2='-184' transform='rotate(180)'/%3E%3Cline y2='-184' transform='rotate(225)'/%3E%3Cline y2='-184' transform='rotate(270)'/%3E%3Cline y2='-184' transform='rotate(315)'/%3E%3C/g%3E%3Ccircle r='126' stroke-width='16'/%3E%3Ccircle r='52' stroke-width='10'/%3E%3C/g%3E%3Ccircle cx='256' cy='256' r='15' fill='%23c8472a'/%3E%3C/svg%3E">
 
-<!-- Fonts: Switzer (display + body) + JetBrains Mono (drafting annotations) via Fontshare -->
+
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
 <link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700,800&f[]=jetbrains-mono@400,500,700&display=swap" rel="stylesheet">
 
 <style>
-/* ============================================================
-   HELM — Nautical Engineering Blueprint / Admiralty Chart.
-   Light chart paper · Prussian-blue line-work · vermilion signal.
-   Flat, precise, hand-drafted, technical. No dark, no cyan, no glow.
-   ============================================================ */
+
 :root{
-  /* --- color: OKLCH chart paper + drafting blue + one vermilion signal --- */
-  --paper:     oklch(0.955 0.014 85);   /* warm bone / chart paper */
-  --paper2:    oklch(0.93 0.018 82);    /* insets / panels */
-  --paper3:    oklch(0.90 0.020 80);    /* deeper inset (terminal/app field) */
-  --ink:       oklch(0.23 0.02 255);    /* deep cool near-black — body */
-  --blue:      oklch(0.46 0.11 252);    /* Prussian/drafting blue — all line-work */
-  --blue-deep: oklch(0.34 0.10 255);    /* heavier construction lines, mono headings */
-  --grid:      oklch(0.46 0.07 252 / 0.10); /* faint ruled grid */
-  --grid-5:    oklch(0.46 0.08 252 / 0.17); /* every 5th line, stronger */
-  --signal:    oklch(0.60 0.20 33);     /* VERMILION — the one accent */
+
+  --paper:     oklch(0.955 0.014 85);
+  --paper2:    oklch(0.93 0.018 82);
+  --paper3:    oklch(0.90 0.020 80);
+  --ink:       oklch(0.23 0.02 255);
+  --blue:      oklch(0.46 0.11 252);
+  --blue-deep: oklch(0.34 0.10 255);
+  --grid:      oklch(0.46 0.07 252 / 0.10);
+  --grid-5:    oklch(0.46 0.08 252 / 0.17);
+  --signal:    oklch(0.60 0.20 33);
   --signal-deep: oklch(0.52 0.19 33);
-  --muted:     oklch(0.46 0.03 255);    /* secondary ink */
-  --hair:      oklch(0.46 0.10 252 / 0.32); /* hairlines */
+  --muted:     oklch(0.46 0.03 255);
+  --hair:      oklch(0.46 0.10 252 / 0.32);
   --hair-soft: oklch(0.46 0.10 252 / 0.18);
   --signal-soft: oklch(0.60 0.20 33 / 0.10);
   --blue-soft: oklch(0.46 0.11 252 / 0.07);
   --blue-tint: oklch(0.46 0.11 252 / 0.045);
-  /* opaque signal-tinted column for the Helm spec row (no bleed-through) */
+
   --signal-col: oklch(0.935 0.035 55);
   --signal-col-hover: oklch(0.905 0.055 50);
   --blue-tint-solid: oklch(0.94 0.018 180);
-  --on-accent: oklch(0.975 0.012 250);  /* text on signal / colored fills */
+  --on-accent: oklch(0.975 0.012 250);
 
-  /* legend marks */
+
   --yes: var(--signal);
-  --part: oklch(0.55 0.10 65);   /* muted ochre */
+  --part: oklch(0.55 0.10 65);
   --no: oklch(0.55 0.02 255);
 
-  /* --- type --- */
+
   --font-display: "Switzer", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-body: "Switzer", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  /* fluid type scale (Utopia-style) */
+
   --step--2: clamp(0.70rem, 0.68rem + 0.08vw, 0.76rem);
   --step--1: clamp(0.81rem, 0.78rem + 0.13vw, 0.90rem);
   --step-0:  clamp(1.00rem, 0.96rem + 0.18vw, 1.13rem);
@@ -67,11 +63,11 @@
   --step-4:  clamp(2.55rem, 1.95rem + 2.85vw, 4.30rem);
   --step-5:  clamp(3.10rem, 2.10rem + 4.60vw, 5.40rem);
 
-  /* drafting = sharp, near-zero radius */
+
   --r: 2px;
   --r-sm: 1px;
 
-  /* --- easing --- */
+
   --ease-out: cubic-bezier(.16,1,.3,1);
   --ease-std: cubic-bezier(.2,0,0,1);
 
@@ -110,7 +106,7 @@ a{color:var(--blue);text-decoration:none}
 img,svg{display:block}
 ::selection{ background:var(--signal-soft); color:var(--ink); }
 
-/* accessible focus — a signal/blue ring */
+
 :focus-visible{ outline:2px solid var(--signal); outline-offset:3px; border-radius:var(--r-sm); }
 *:focus:not(:focus-visible){ outline:none; }
 
@@ -118,9 +114,7 @@ img,svg{display:block}
 .skip-link{position:fixed;left:12px;top:-60px;z-index:200;background:var(--paper);border:1px solid var(--blue);color:var(--ink);padding:10px 14px;border-radius:var(--r-sm);transition:top .2s var(--ease-out)}
 .skip-link:focus{top:12px}
 
-/* ============================================================
-   THE BLUEPRINT TEXTURE — fixed ruled grid + paper grain
-   ============================================================ */
+
 .gridpaper{
   position:fixed; inset:0; z-index:0; pointer-events:none;
   background-image:
@@ -135,19 +129,19 @@ img,svg{display:block}
     linear-gradient(90deg, var(--grid-5) 1px, transparent 1px);
   background-size:150px 150px;
 }
-/* subtle paper grain */
+
 .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.045;mix-blend-mode:multiply;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
 
-/* container */
+
 .wrap{ width:100%; max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(20px,5vw,40px); position:relative; }
 .wrap-narrow{ max-width:980px; }
 
-/* section rhythm */
+
 .section{ padding-block:clamp(82px,12vh,150px); position:relative; z-index:2; }
 .section--tight{ padding-block:clamp(60px,9vh,110px); }
 
-/* a thin ruled separator with coordinate ticks (drafting detailing) */
+
 .ruler{ position:relative; height:18px; }
 .ruler::before{ content:""; position:absolute; left:0; right:0; top:9px; height:1px; background:var(--hair); }
 .ruler::after{
@@ -155,14 +149,14 @@ img,svg{display:block}
   background:repeating-linear-gradient(90deg, var(--hair) 0 1px, transparent 1px 30px);
 }
 
-/* coordinate ruler ticks down a section's left margin (chart detailing) */
+
 .coords{ position:absolute; left:6px; top:0; bottom:0; width:18px; z-index:3; pointer-events:none; display:none; }
 @media (min-width:1180px){
   .coords{ display:flex; flex-direction:column; justify-content:space-between; padding-block:clamp(82px,12vh,150px); }
   .coords span{ font-family:var(--font-mono); font-size:9px; letter-spacing:.1em; color:var(--blue); opacity:.5; }
 }
 
-/* shared headings */
+
 .callout{
   font-family:var(--font-mono); font-size:var(--step--1); font-weight:500; letter-spacing:.12em;
   text-transform:uppercase; color:var(--blue); display:inline-flex; align-items:center; gap:11px;
@@ -174,18 +168,17 @@ h1,h2,h3{ font-family:var(--font-display); font-weight:800; line-height:1.03; le
 .h2{ font-size:var(--step-3); margin:0 0 18px; }
 .lead{ color:var(--muted); font-size:var(--step-1); max-width:62ch; line-height:1.5; text-wrap:pretty; margin:0; font-weight:400; }
 .accent-word{ color:var(--signal); }
-/* signal underline accent (NOT gradient-clip) */
+
 .mark-underline{ position:relative; white-space:nowrap; }
 .mark-underline::after{
   content:""; position:absolute; left:-.02em; right:-.02em; bottom:.04em; height:3px;
   background:var(--signal);
 }
-/* a thin signal drafting-callout rectangle around a phrase */
-/* accent phrase: bright vermilion word (no box — a bordered box gets clipped by the
-   line-reveal mask's overflow:hidden, leaving a stray rule). Brightened for AA-large on blue. */
+
+
 .mark-box{ color:var(--signal); white-space:nowrap; }
 
-/* ---------- buttons (sharp drafting rectangles, never pills) ---------- */
+
 .btn{ display:inline-flex; align-items:center; justify-content:center; gap:9px; font-family:var(--font-body); font-weight:600; font-size:var(--step-0); line-height:1; cursor:pointer; border:1.5px solid transparent; text-align:center; border-radius:var(--r); transition:background .2s var(--ease-out), border-color .2s var(--ease-out), color .2s var(--ease-out), transform .12s var(--ease-out); white-space:nowrap; }
 .btn:active{ transform:scale(.98); }
 .btn--primary{ background:var(--signal); color:var(--on-accent); padding:14px 24px; border-color:var(--signal); }
@@ -194,10 +187,10 @@ h1,h2,h3{ font-family:var(--font-display); font-weight:800; line-height:1.03; le
 .btn--ghost:hover{ background:var(--blue-soft); }
 .btn svg{ width:17px; height:17px; }
 
-/* ---------- nav ---------- */
+
 .nav{ position:fixed; top:0; left:0; right:0; z-index:100; height:var(--nav-h); display:flex; align-items:center; transition:background .3s var(--ease-out), border-color .3s var(--ease-out); border-bottom:1px solid transparent; }
 .nav__inner{ display:flex; align-items:center; justify-content:space-between; width:100%; max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(20px,5vw,40px); position:relative; }
-/* corner tick marks on the nav inner */
+
 .nav__inner::before, .nav__inner::after{ content:""; position:absolute; top:50%; width:7px; height:7px; opacity:0; transition:opacity .3s var(--ease-out); }
 .nav.is-solid{ background:color-mix(in oklch, var(--paper) 92%, transparent); border-bottom-color:var(--hair); backdrop-filter:saturate(120%); -webkit-backdrop-filter:saturate(120%); }
 @media (prefers-reduced-transparency: reduce){ .nav.is-solid{ background:var(--paper); backdrop-filter:none; -webkit-backdrop-filter:none; } }
@@ -216,9 +209,7 @@ h1,h2,h3{ font-family:var(--font-display); font-weight:800; line-height:1.03; le
   .nav__cta .btn--ghost{ display:none; }
 }
 
-/* ============================================================
-   HERO — editorial split; wheel as dimensioned engineering drawing
-   ============================================================ */
+
 .hero{ position:relative; padding-top:calc(var(--nav-h) + clamp(36px,8vh,84px)); padding-bottom:clamp(56px,9vh,110px); min-height:100dvh; display:flex; align-items:center; overflow:clip; }
 .hero__grid{ display:grid; grid-template-columns:1.06fr .94fr; gap:clamp(28px,4vw,60px); align-items:center; width:100%; }
 .hero__left{ position:relative; z-index:3; }
@@ -230,7 +221,7 @@ h1.hero__title .ln > span{ display:block; }
 .hero__sub{ color:var(--muted); font-size:var(--step-1); line-height:1.5; max-width:52ch; margin:0 0 26px; font-weight:400; text-wrap:pretty; }
 .hero__sub strong{ color:var(--ink); font-weight:600; }
 
-/* mono "drafting note" command box */
+
 .cmd{ display:flex; align-items:center; gap:10px; max-width:560px; background:var(--paper2); border:1.5px solid var(--blue); border-radius:var(--r); padding:0; font-family:var(--font-mono); font-size:var(--step--1); color:var(--ink); margin-bottom:24px; overflow:hidden; position:relative; }
 .cmd__tag{ flex:none; align-self:stretch; display:flex; align-items:center; padding:0 11px; background:var(--signal); color:var(--on-accent); font-size:10px; letter-spacing:.12em; }
 .cmd .pr{ color:var(--signal); user-select:none; padding-left:13px; }
@@ -238,23 +229,23 @@ h1.hero__title .ln > span{ display:block; }
 .cmd code::-webkit-scrollbar{ display:none; }
 .hero__ctas{ display:flex; flex-wrap:wrap; gap:14px; margin-bottom:26px; }
 
-/* spec strip */
+
 .specstrip{ display:flex; flex-wrap:wrap; gap:0; font-family:var(--font-mono); font-size:var(--step--2); letter-spacing:.08em; color:var(--blue); text-transform:uppercase; border:1px solid var(--hair); border-radius:var(--r); background:var(--blue-tint); width:fit-content; max-width:100%; }
 .specstrip span{ padding:7px 13px; border-right:1px solid var(--hair); }
 .specstrip span:last-child{ border-right:0; }
 .specstrip b{ color:var(--signal); font-weight:700; }
 
-/* copy button — fixed min-width to avoid layout shift on "Copied" */
+
 .copy{ flex:none; align-self:center; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:78px; margin-right:8px; background:var(--paper); border:1.5px solid var(--blue); color:var(--blue); border-radius:var(--r-sm); padding:7px 12px; font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), border-color .18s var(--ease-out), transform .12s var(--ease-out); }
 .copy:hover{ background:var(--blue-soft); }
 .copy:active{ transform:scale(.96); }
 .copy.is-done{ color:var(--signal); border-color:var(--signal); background:var(--signal-soft); }
 
-/* hero wheel stage — dimensioned blueprint drawing */
+
 .hero__right{ position:relative; z-index:2; display:grid; place-items:center; }
 .wheel-stage{ position:relative; width:min(100%, 480px); aspect-ratio:1/1; }
 .wheel-stage svg{ width:100%; height:100%; overflow:visible; }
-/* corner ticks framing the drawing */
+
 .wheel-frame{ position:absolute; inset:-2%; pointer-events:none; }
 .wheel-frame span{ position:absolute; width:14px; height:14px; }
 .wheel-frame .tl{ left:0; top:0; border-left:1.5px solid var(--blue); border-top:1.5px solid var(--blue); }
@@ -271,9 +262,7 @@ h1.hero__title .ln > span{ display:block; }
   .specstrip span{ padding:6px 10px; }
 }
 
-/* ============================================================
-   THESIS beat — big drafting statement with leader-line callouts
-   ============================================================ */
+
 .thesis{ display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:clamp(28px,5vw,72px); align-items:end; }
 .thesis h2{ font-size:var(--step-4); letter-spacing:-.03em; }
 .thesis__body{ color:var(--muted); font-size:var(--step-1); line-height:1.55; max-width:50ch; text-wrap:pretty; }
@@ -282,7 +271,7 @@ h1.hero__title .ln > span{ display:block; }
 .thesis__meta span{ display:block; }
 .thesis__meta b{ color:var(--ink); font-weight:500; }
 .thesis__meta .lbl{ color:var(--muted); }
-/* leader-line callout marks on words */
+
 .annot{ position:relative; color:var(--ink); }
 .annot::after{
   content:attr(data-note); position:absolute; left:50%; top:-1.55em; transform:translateX(-50%);
@@ -294,9 +283,7 @@ h1.hero__title .ln > span{ display:block; }
 }
 @media (max-width:820px){ .thesis{ grid-template-columns:1fr; gap:28px; align-items:start; } .thesis__meta{ border-left:0; border-top:1.5px solid var(--hair); padding-left:0; padding-top:18px; } .annot::after, .annot::before{ display:none; } }
 
-/* ============================================================
-   FEATURES — annotated parts legend / drawing
-   ============================================================ */
+
 .legendgrid{ display:grid; grid-template-columns:repeat(4,1fr); grid-auto-rows:minmax(170px,auto); gap:0; grid-auto-flow:dense; margin-top:44px; border:1.5px solid var(--blue); border-radius:var(--r); background:var(--paper); }
 .part{ position:relative; padding:24px; border-right:1px solid var(--hair); border-bottom:1px solid var(--hair); display:flex; flex-direction:column; transition:background .3s var(--ease-out); }
 .legendgrid > .part:nth-child(4n){ border-right:0; }
@@ -329,9 +316,7 @@ h1.hero__title .ln > span{ display:block; }
   .part.span2{ grid-column:span 1; }
 }
 
-/* ============================================================
-   HOW — dimensioned sequence with leader lines + arrowheads
-   ============================================================ */
+
 .flow{ position:relative; margin-top:48px; display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(20px,3vw,46px); }
 .flow__line{ position:absolute; top:27px; left:9%; right:9%; height:1.5px; z-index:0; background:repeating-linear-gradient(90deg, var(--blue) 0 8px, transparent 8px 15px); opacity:.7; }
 .flow__line::after{ content:""; position:absolute; right:-2px; top:50%; transform:translateY(-50%); width:0; height:0; border-left:7px solid var(--blue); border-top:4px solid transparent; border-bottom:4px solid transparent; }
@@ -351,9 +336,7 @@ h1.hero__title .ln > span{ display:block; }
   .fstep p{ max-width:none; }
 }
 
-/* ============================================================
-   TERMINAL window — drafting console note
-   ============================================================ */
+
 .win{ border:1.5px solid var(--blue); border-radius:var(--r); overflow:hidden; background:var(--paper); }
 .win__bar{ display:flex; align-items:center; gap:13px; padding:10px 15px; background:var(--blue-tint); border-bottom:1.5px solid var(--blue); flex-wrap:wrap; }
 .win__corner{ display:flex; gap:7px; }
@@ -383,9 +366,7 @@ h1.hero__title .ln > span{ display:block; }
 .tipline b{ color:var(--ink); }
 code.k{ font-family:var(--font-mono); background:var(--blue-tint); border:1px solid var(--hair); border-radius:var(--r-sm); padding:1px 6px; font-size:.9em; color:var(--blue-deep); }
 
-/* ============================================================
-   COMPARE — SPECIFICATION SHEET
-   ============================================================ */
+
 .cmp-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; }
 .cmpkey{ display:flex; flex-wrap:wrap; gap:8px; margin:26px 0 8px; }
 .cmpkey .chip{ display:inline-flex; align-items:center; gap:8px; background:var(--paper); border:1px solid var(--hair); color:var(--blue-deep); font-family:var(--font-mono); font-size:12px; padding:6px 12px; border-radius:var(--r); }
@@ -408,7 +389,7 @@ table.cmp thead th.helm, table.cmp td.helm{ box-shadow:inset 1.5px 0 0 var(--sig
 table.cmp tbody tr:hover td.helm{ background:var(--signal-col-hover); }
 .mk{ font-weight:500; font-size:14px; }
 .mk.yes,.tyes{ color:var(--signal) } .mk.part,.tpart{ color:var(--part) } .mk.no,.tno{ color:var(--no) }
-/* Helm marks: the most prominent — bold signal-red */
+
 td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
 .scrollhint{ font-family:var(--font-mono); color:var(--blue); font-size:11px; margin:12px 0 0; display:flex; align-items:center; gap:8px; }
 .scrollhint .swipe{ display:inline-block; color:var(--signal); }
@@ -421,9 +402,7 @@ td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
   table.cmp th:nth-child(2), table.cmp td:nth-child(2){ left:170px; }
 }
 
-/* ============================================================
-   DESKTOP — exploded-view callout / app window line-work
-   ============================================================ */
+
 .desk{ display:grid; grid-template-columns:.92fr 1.08fr; gap:clamp(30px,5vw,72px); align-items:center; }
 @media (max-width:920px){ .desk{ grid-template-columns:1fr; gap:36px; } }
 .desk__copy h2{ font-size:var(--step-3); margin-bottom:18px; }
@@ -431,7 +410,7 @@ td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
 .desk__note{ color:var(--muted); font-size:var(--step--1); line-height:1.65; max-width:54ch; }
 .desk__note a{ color:var(--blue); text-decoration:underline; text-decoration-color:var(--hair); text-underline-offset:2px; }
 .desk__note b{ color:var(--ink); }
-/* app window as thin line-work on paper */
+
 .app{ border:1.5px solid var(--blue); border-radius:var(--r); overflow:hidden; background:var(--paper); position:relative; }
 .app__bar{ display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--blue-tint); border-bottom:1.5px solid var(--blue); }
 .app__bar .title{ font-family:var(--font-mono); font-size:11px; color:var(--blue-deep); letter-spacing:.04em; }
@@ -458,7 +437,7 @@ td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
 @keyframes think{ 0%,100%{ opacity:.3; transform:translateY(0) } 50%{ opacity:1; transform:translateY(-2px) } }
 .app__input{ margin-top:auto; display:flex; align-items:center; gap:10px; border:1.5px solid var(--hair); border-radius:var(--r); padding:9px 12px; background:var(--paper2); color:var(--muted); font-size:13px; }
 .app__input .send{ margin-left:auto; color:var(--signal); }
-/* leader-line label on the app drawing */
+
 .app__leader{ position:absolute; right:14px; bottom:-1px; transform:translateY(100%); font-family:var(--font-mono); font-size:9px; letter-spacing:.1em; color:var(--blue); text-transform:uppercase; padding-top:6px; display:none; }
 @media (min-width:921px){ .app__leader{ display:block; } }
 @media (max-width:520px){
@@ -466,9 +445,7 @@ td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
   .app__side{ display:none; }
 }
 
-/* ============================================================
-   INSTALL — assembly instructions
-   ============================================================ */
+
 .tabbar{ display:flex; gap:7px; flex-wrap:wrap; }
 .tab{ background:var(--paper); border:1.5px solid var(--hair); color:var(--blue-deep); border-radius:var(--r); padding:7px 13px; font-family:var(--font-mono); font-size:12px; cursor:pointer; transition:color .18s var(--ease-out), border-color .18s var(--ease-out), background .18s var(--ease-out); }
 .tab:hover{ border-color:var(--blue); background:var(--blue-soft); }
@@ -476,7 +453,7 @@ td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
 .install-note{ color:var(--muted); font-size:var(--step--1); line-height:1.65; margin-top:16px; max-width:78ch; }
 .install-note b{ color:var(--ink); }
 
-/* numbered drafting rows for setup with leader lines */
+
 .steps{ margin-top:14px; border-top:1.5px solid var(--blue); }
 .srow{ display:grid; grid-template-columns:68px 1fr; gap:22px; padding:22px 4px; border-bottom:1px solid var(--hair); align-items:baseline; position:relative; }
 .srow__n{ font-family:var(--font-mono); font-size:var(--step-2); font-weight:700; color:var(--signal); line-height:1; letter-spacing:-.02em; position:relative; }
@@ -492,7 +469,7 @@ td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
 .subhead-kick{ font-family:var(--font-mono); font-size:var(--step--1); color:var(--blue); letter-spacing:.10em; text-transform:uppercase; margin:0 0 12px; display:inline-flex; align-items:center; gap:9px; }
 .subhead-kick::before{ content:""; width:16px; height:1px; background:var(--signal); }
 
-/* option group: varied, not 3 identical cards */
+
 .optgrid{ display:grid; grid-template-columns:1.25fr 1fr 1fr; gap:0; margin-top:22px; border:1.5px solid var(--blue); border-radius:var(--r); }
 .opt{ padding:22px; border-right:1px solid var(--hair); }
 .opt:last-child{ border-right:0; }
@@ -509,9 +486,7 @@ td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
 .uninstall-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
 @media (max-width:680px){ .uninstall-grid{ grid-template-columns:1fr; } }
 
-/* ============================================================
-   FINAL CTA + footer — drawing title block
-   ============================================================ */
+
 .final{ text-align:center; }
 .final__block{ border:1.5px solid var(--blue); border-radius:var(--r); padding:clamp(40px,7vw,80px) clamp(24px,5vw,60px); position:relative; background:var(--paper); }
 .final__block::before{ content:"SHEET 5 / 5"; position:absolute; top:14px; right:16px; font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.12em; color:var(--signal); }
@@ -540,12 +515,12 @@ footer{ border-top:1.5px solid var(--blue); padding-block:48px; position:relativ
 .foot__bottom{ margin-top:34px; padding-top:22px; border-top:1px solid var(--hair); display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; font-family:var(--font-mono); font-size:11px; color:var(--blue); letter-spacing:.06em; }
 @media (max-width:640px){ .foot{ grid-template-columns:1fr; gap:24px; } .foot__links{ justify-self:start; } }
 
-/* reveal init state — only applied when JS+motion on */
+
 .reveal{ opacity:1; }
 html.has-motion .reveal{ opacity:0; transform:translateY(14px); }
 html.has-motion .reveal.is-in{ opacity:1; transform:none; transition:opacity .6s var(--ease-out), transform .6s var(--ease-out); }
 
-/* SVG draw-on: lines start hidden when motion on; drawn instantly otherwise */
+
 .draw{ stroke-dasharray:var(--len,1000); stroke-dashoffset:0; }
 html.has-motion .draw{ stroke-dashoffset:var(--len,1000); }
 html.has-motion .draw.is-drawn{ stroke-dashoffset:0; transition:stroke-dashoffset 1.4s var(--ease-out); }
@@ -553,7 +528,7 @@ html.has-motion .draw.is-drawn{ stroke-dashoffset:0; transition:stroke-dashoffse
 html.has-motion .draw-fade{ opacity:0; }
 html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--ease-out); }
 
-/* reduced motion: kill movement, keep opacity, halve durations, show drawings fully */
+
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.3s !important; scroll-behavior:auto !important; }
   .caret{ animation:none !important; }
@@ -568,7 +543,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 <div class="gridpaper" aria-hidden="true"></div>
 <div class="grain" aria-hidden="true"></div>
 
-<!-- ============================ NAV ============================ -->
+
 <header class="nav" id="nav">
   <div class="nav__inner">
     <a class="brand" href="#top" aria-label="Helm — home">
@@ -599,7 +574,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 <main id="main">
 <span id="top"></span>
 
-<!-- ============================ HERO ============================ -->
+
 <section class="hero wrap" aria-labelledby="hero-title">
   <div class="hero__grid">
     <div class="hero__left">
@@ -631,21 +606,21 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       <div class="wheel-stage" id="wheelStage">
         <div class="wheel-frame"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
         <svg viewBox="0 0 520 520" id="wheelSvg" focusable="false">
-          <!-- ===== construction / dimension layer (drawn first, faint) ===== -->
+
           <g fill="none" stroke="var(--blue)" stroke-width="1" opacity="0.55">
-            <!-- pitch / bounding circle (dashed) -->
+
             <circle class="draw" cx="260" cy="260" r="232" stroke-dasharray="6 7" data-fixeddash="1"/>
-            <!-- center crosshair -->
+
             <line class="draw" x1="260" y1="60" x2="260" y2="142"/>
             <line class="draw" x1="260" y1="378" x2="260" y2="460"/>
             <line class="draw" x1="60" y1="260" x2="142" y2="260"/>
             <line class="draw" x1="378" y1="260" x2="460" y2="260"/>
           </g>
 
-          <!-- ===== radius dimension line with arrowheads + label ===== -->
+
           <g fill="none" stroke="var(--blue)" stroke-width="1.25" opacity="0.8">
             <line class="draw" x1="260" y1="260" x2="438" y2="138"/>
-            <!-- arrowhead at outer end -->
+
             <path class="draw" d="M438 138 l-13 1 l6 11" stroke-width="1.25"/>
           </g>
           <g class="draw-fade">
@@ -653,13 +628,13 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
             <text x="387" y="164" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--blue-deep)">R 126</text>
           </g>
 
-          <!-- ===== outer diameter callout ===== -->
+
           <g class="draw-fade">
             <rect x="206" y="14" width="108" height="22" fill="var(--paper)" stroke="var(--blue)" stroke-width="1"/>
             <text x="260" y="29" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--blue-deep)">&#216; 252</text>
           </g>
 
-          <!-- ===== spoke angle mark ===== -->
+
           <g fill="none" stroke="var(--blue)" stroke-width="1" opacity="0.7">
             <path class="draw" d="M260 200 A 60 60 0 0 1 302 218" stroke-dasharray="0"/>
           </g>
@@ -667,7 +642,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
             <text x="296" y="206" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--blue)">45&#176;</text>
           </g>
 
-          <!-- ===== THE WHEEL — thin technical strokes ===== -->
+
           <g transform="translate(260,260)" fill="none" stroke="var(--blue)" stroke-linecap="round" stroke-linejoin="round">
             <g stroke-width="6">
               <line class="draw" y2="-200"/>
@@ -679,7 +654,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
               <line class="draw" y2="-200" transform="rotate(270)"/>
               <line class="draw" y2="-200" transform="rotate(315)"/>
             </g>
-            <!-- handle knobs at spoke ends -->
+
             <g stroke-width="3.5">
               <circle class="draw" cy="-200" r="9"/>
               <circle class="draw" cy="-200" r="9" transform="rotate(45)"/>
@@ -694,22 +669,22 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
             <circle class="draw" r="96" stroke-width="2.5" opacity="0.55"/>
             <circle class="draw" r="52" stroke-width="6"/>
           </g>
-          <!-- hub center -->
+
           <circle cx="260" cy="260" r="14" fill="var(--signal)"/>
 
-          <!-- ===== compass rose (top-left), needle in signal ===== -->
+
           <g transform="translate(78,78)">
             <circle class="draw" cx="0" cy="0" r="34" fill="var(--paper)" stroke="var(--blue)" stroke-width="1.25"/>
             <g class="draw-fade" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--blue)" text-anchor="middle">
               <text x="0" y="-22">N</text><text x="26" y="4">E</text><text x="0" y="30">S</text><text x="-26" y="4">W</text>
             </g>
-            <!-- needle: signal pointing N, blue tail -->
+
             <path class="draw-fade" d="M0 -16 L5 0 L0 4 L-5 0 Z" fill="var(--signal)" stroke="none"/>
             <path class="draw-fade" d="M0 16 L4 0 L0 -2 L-4 0 Z" fill="var(--blue)" stroke="none"/>
             <circle cx="0" cy="0" r="2" fill="var(--ink)"/>
           </g>
 
-          <!-- ===== drawing labels ===== -->
+
           <g class="draw-fade" font-family="JetBrains Mono, monospace" fill="var(--blue-deep)">
             <text x="14" y="500" font-size="13" font-weight="700" letter-spacing="1">FIG. 01 — THE HELM</text>
             <text x="430" y="500" font-size="11" fill="var(--blue)">SCALE 1:1</text>
@@ -722,7 +697,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 
 <div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
 
-<!-- ============================ THESIS ============================ -->
+
 <section class="section wrap" aria-labelledby="thesis-title">
   <span class="coords" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span></span>
   <p class="callout reveal">Sheet 1 / 5 — Thesis</p>
@@ -739,7 +714,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
   </div>
 </section>
 
-<!-- ============================ FEATURES (PARTS LEGEND) ============================ -->
+
 <section class="section wrap" id="features" aria-labelledby="features-title">
   <span class="coords" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span></span>
   <p class="callout reveal">Section A — Capabilities</p>
@@ -747,7 +722,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
   <p class="lead reveal">Eight things Helm does that a chat window can't. No cloud sandbox, no SaaS account, no data leaving hardware you own.</p>
 
   <div class="legendgrid">
-    <!-- large feature 1: any model -->
+
     <div class="part span2 tall part--feature reveal">
       <span class="part__tag">A1 · core</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5L12 3Z"/><path d="m9 11 2 2 4-4"/></svg></div>
@@ -758,7 +733,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       </div>
     </div>
 
-    <!-- machine -->
+
     <div class="part reveal">
       <span class="part__tag">A2</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M7 9l2.5 2.5L7 14"/><path d="M13 14h3"/><path d="M9 20h6"/></svg></div>
@@ -766,7 +741,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       <p>Full shell, file system and web access — not a locked cloud sandbox. It builds, runs and fixes things for real.</p>
     </div>
 
-    <!-- message anywhere -->
+
     <div class="part reveal">
       <span class="part__tag">A3</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></div>
@@ -774,7 +749,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       <p>DM it on Discord, or iMessage on a Mac, or call it from your shell. No dashboard to babysit.</p>
     </div>
 
-    <!-- large feature 2: thinks 24/7 -->
+
     <div class="part span2 tall reveal">
       <span class="part__tag">A4 · always-on</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><path d="M20 20v-4h-4"/></svg></div>
@@ -787,7 +762,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       </div>
     </div>
 
-    <!-- owner locked -->
+
     <div class="part reveal">
       <span class="part__tag">A5</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="9.5" rx="1"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></div>
@@ -795,7 +770,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       <p>Only your ID can command it. Your data, keys and conversations never leave hardware you own.</p>
     </div>
 
-    <!-- memory -->
+
     <div class="part reveal">
       <span class="part__tag">A6</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/><path d="M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6"/></svg></div>
@@ -803,7 +778,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       <p>A structured memory store plus a self-rewriting Markdown brain that learns your preferences and stays consistent.</p>
     </div>
 
-    <!-- swarm -->
+
     <div class="part reveal">
       <span class="part__tag">A7</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7"/><path d="M18 10.5c0 3-2 4-5 4.6"/></svg></div>
@@ -811,7 +786,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       <p>Spins up agents in isolated git branches to build and review features at once — smoke-gated, so a broken change never reaches main.</p>
     </div>
 
-    <!-- screen -->
+
     <div class="part reveal">
       <span class="part__tag">A8</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></div>
@@ -819,7 +794,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       <p>Screenshots, clicks and types on whichever machine it runs on. It operates apps that have no API when it has to.</p>
     </div>
 
-    <!-- vault -->
+
     <div class="part reveal">
       <span class="part__tag">A9</span>
       <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5L12 3Z"/><circle cx="12" cy="10.5" r="1.5"/><path d="M12 12v2.5"/></svg></div>
@@ -831,7 +806,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 
 <div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
 
-<!-- ============================ HOW ============================ -->
+
 <section class="section wrap" id="how" aria-labelledby="how-title">
   <p class="callout reveal">Fig. 02 — Operating sequence</p>
   <h2 class="h2 reveal" id="how-title" style="font-size:var(--step-3)">Three moving parts. That's the whole loop.</h2>
@@ -860,7 +835,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
   </div>
 </section>
 
-<!-- ============================ TERMINAL ============================ -->
+
 <section class="section wrap" id="terminal" aria-labelledby="term-title">
   <p class="callout reveal">Sheet 2 / 5 — Console</p>
   <h2 class="h2 reveal" id="term-title" style="font-size:var(--step-3)">One command: <span class="accent-word">helm</span>.</h2>
@@ -895,7 +870,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 
 <div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
 
-<!-- ============================ COMPARE ============================ -->
+
 <section class="section wrap" id="compare" aria-labelledby="cmp-title">
   <div class="cmp-head">
     <div>
@@ -970,7 +945,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 
 <div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
 
-<!-- ============================ DESKTOP ============================ -->
+
 <section class="section wrap" id="desktop" aria-labelledby="desk-title">
   <div class="desk">
     <div class="desk__copy">
@@ -1013,7 +988,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 
 <div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
 
-<!-- ============================ INSTALL ============================ -->
+
 <section class="section wrap" id="install" aria-labelledby="inst-title">
   <span class="coords" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></span>
   <p class="callout reveal">Sheet 4 / 5 — Assembly instructions</p>
@@ -1041,7 +1016,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
   <p class="install-note reveal">Brings everything it needs: Node, Claude Code (the engine) and dependencies are installed for you. Then pick any model in the wizard; the free/local path (Ollama) needs no Anthropic account at all.</p>
   <p class="install-note reveal"><b>Windows tip:</b> the PowerShell line works even when scripts are "Restricted". If a bare <code class="k">npx</code> says <em>"running scripts is disabled"</em>, use the PowerShell line above, or run <code class="k">npx.cmd github:GOODMAN-PRO/helm</code>.</p>
 
-  <!-- setup as numbered drafting rows -->
+
   <div class="subhead-wrap">
     <p class="subhead-kick reveal">Setup, step by step</p>
     <h3 class="subhead reveal">The command handles 1–2. The wizard walks you through 3–5.</h3>
@@ -1054,7 +1029,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     </div>
   </div>
 
-  <!-- option group: varied, not 3 identical cards -->
+
   <div class="optgrid">
     <div class="opt reveal">
       <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5z"/><path d="m9 11 2 2 4-4"/></svg>Any model, including free</h4>
@@ -1070,7 +1045,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     </div>
   </div>
 
-  <!-- Discord bot steps -->
+
   <div class="subhead-wrap">
     <p class="subhead-kick reveal">Create your Discord bot · ~2 min</p>
     <h3 class="subhead reveal">The one part that's yours to do.</h3>
@@ -1082,7 +1057,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     </div>
   </div>
 
-  <!-- safety -->
+
   <div class="subhead-wrap">
     <p class="subhead-kick reveal">Safety &amp; permissions</p>
     <div class="safety reveal">
@@ -1090,7 +1065,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     </div>
   </div>
 
-  <!-- uninstall -->
+
   <div class="subhead-wrap">
     <p class="subhead-kick reveal">Decommission</p>
     <h3 class="subhead reveal">One line. It leaves your vault and backups alone.</h3>
@@ -1116,7 +1091,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 
 <div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
 
-<!-- ============================ FINAL CTA ============================ -->
+
 <section class="section wrap final" aria-labelledby="final-title">
   <div class="final__block reveal">
     <h2 class="reveal" id="final-title">Put an agent on your own machine.</h2>
@@ -1137,7 +1112,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
 </section>
 </main>
 
-<!-- ============================ FOOTER ============================ -->
+
 <footer>
   <div class="wrap">
     <div class="foot">
@@ -1168,7 +1143,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
   </div>
 </footer>
 
-<!-- ============================ SCRIPTS ============================ -->
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
@@ -1179,7 +1154,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
   var hasGSAP = !!(window.gsap && window.ScrollTrigger);
   var hasLenis = !!window.Lenis;
 
-  /* ---------- copy buttons (real, with no-shift "Copied") ---------- */
+
   function flash(btn){
     if(!btn) return;
     var prev = btn.getAttribute("data-label") || btn.textContent;
@@ -1213,7 +1188,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     copyText(txt, btn);
   });
 
-  /* ---------- install tabs (keyboard-operable) ---------- */
+
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[role="tab"]'));
   var installCmd = document.getElementById("installCmdText");
   var installCopy = document.getElementById("installCopy");
@@ -1236,13 +1211,13 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     });
   });
 
-  /* ---------- nav: solid on scroll ---------- */
+
   var nav = document.getElementById("nav");
   function onScrollNav(){ if(nav){ nav.classList.toggle("is-solid", window.scrollY > 24); } }
   onScrollNav();
   window.addEventListener("scroll", onScrollNav, { passive:true });
 
-  /* ---------- Lenis smooth scroll + GSAP ---------- */
+
   var lenis = null;
   if(hasLenis && !REDUCE){
     lenis = new Lenis({ duration:1.1, smoothWheel:true });
@@ -1256,7 +1231,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     }
   }
 
-  /* ---------- smooth-scroll for in-page links (nav-height offset) ---------- */
+
   var navH = 60;
   function scrollToTarget(target){
     if(!target) return;
@@ -1283,17 +1258,17 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     window.ScrollTrigger = ScrollTrigger;
   }
 
-  /* ---------- SVG draw-on: measure each path length, set dash ---------- */
+
   function setupDraw(){
     var draws = Array.prototype.slice.call(document.querySelectorAll(".draw"));
     draws.forEach(function(el){
       var len;
       try{ len = el.getTotalLength ? el.getTotalLength() : 0; }catch(e){ len = 0; }
       if(!len || !isFinite(len)) len = 1000;
-      // for fixed-dash construction circles, keep their dash pattern but still allow draw via offset
+
       el.style.setProperty("--len", Math.ceil(len));
       if(el.getAttribute("data-fixeddash")){
-        // keep visual dash but animate from fully hidden: use a large offset
+
         el.style.strokeDasharray = Math.ceil(len);
       }
     });
@@ -1302,31 +1277,31 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
   function drawIn(scope){
     var draws = Array.prototype.slice.call((scope||document).querySelectorAll(".draw, .draw-fade"));
     draws.forEach(function(el, i){
-      // small stagger so it reads like a hand drawing
+
       setTimeout(function(){ el.classList.add("is-drawn"); }, i*22);
     });
   }
 
-  /* ---------- reveals + hero ---------- */
+
   if(hasGSAP && !REDUCE){
     document.documentElement.classList.add("has-motion");
     setupDraw();
 
-    // hero headline mask reveal
+
     var heroLines = document.querySelectorAll(".hero__title .ln > span");
     if(heroLines.length){
       gsap.set(heroLines, { yPercent:115 });
       gsap.to(heroLines, { yPercent:0, duration:1.0, ease:"power3.out", stagger:0.1, delay:0.15 });
     }
-    // hero left supporting elements
+
     gsap.from(".hero__draft, .hero__sub, .cmd, .hero__ctas, .specstrip", {
       opacity:0, y:16, duration:0.7, ease:"power3.out", stagger:0.08, delay:0.5
     });
 
-    // hero wheel draws itself in on load
+
     setTimeout(function(){ drawIn(document.getElementById("wheelSvg")); }, 350);
 
-    // generic reveals
+
     var reveals = gsap.utils.toArray(".reveal");
     reveals.forEach(function(el){
       ScrollTrigger.create({
@@ -1335,14 +1310,14 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
       });
     });
   } else {
-    // reduced motion / no GSAP: everything visible
+
     document.documentElement.classList.add("has-motion");
     setupDraw();
     document.querySelectorAll(".reveal").forEach(function(el){ el.classList.add("is-in"); });
     document.querySelectorAll(".draw, .draw-fade").forEach(function(el){ el.classList.add("is-drawn"); });
   }
 
-  /* ---------- terminal type-on-view ---------- */
+
   (function(){
     var body = document.getElementById("termBody");
     var caret = document.getElementById("termCaret");
@@ -1377,7 +1352,7 @@ html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--eas
     ScrollTrigger.create({ trigger: body, start: "top 80%", once:true, onEnter: typeAll });
   })();
 
-  /* refresh ScrollTrigger after fonts load (layout shift safety) */
+
   if(hasGSAP && document.fonts && document.fonts.ready){
     document.fonts.ready.then(function(){ ScrollTrigger.refresh(); });
   }
