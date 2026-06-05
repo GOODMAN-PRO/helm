@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helm — your own AI agent, on your own machine</title>
 <meta name="description" content="Helm is a personal AI agent that runs on your hardware with full shell, files, web and screen. Message it from Discord, iMessage or your terminal. Owner-locked, private, runs on any model — your Claude subscription, an API key, or a free local model. Free, self-hosted.">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#234a86">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f1ead9">
 <meta property="og:title" content="Helm — your own AI agent, on your own machine">
 <meta property="og:description" content="A personal AI agent that runs on your hardware. Full shell, files, web and screen. Owner-locked. Runs on any model. Free, self-hosted.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='40' fill='%23234a86'/%3E%3Cg transform='translate(256,256)' fill='none' stroke='%23cfdef3' stroke-linecap='round'%3E%3Cg stroke-width='14'%3E%3Cline y2='-184'/%3E%3Cline y2='-184' transform='rotate(45)'/%3E%3Cline y2='-184' transform='rotate(90)'/%3E%3Cline y2='-184' transform='rotate(135)'/%3E%3Cline y2='-184' transform='rotate(180)'/%3E%3Cline y2='-184' transform='rotate(225)'/%3E%3Cline y2='-184' transform='rotate(270)'/%3E%3Cline y2='-184' transform='rotate(315)'/%3E%3C/g%3E%3Ccircle r='126' stroke-width='16'/%3E%3Ccircle r='52' stroke-width='10'/%3E%3C/g%3E%3Ccircle cx='256' cy='256' r='15' fill='%23e8572f'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='40' fill='%23f0e9d8'/%3E%3Cg transform='translate(256,256)' fill='none' stroke='%232b4a86' stroke-linecap='round'%3E%3Cg stroke-width='14'%3E%3Cline y2='-184'/%3E%3Cline y2='-184' transform='rotate(45)'/%3E%3Cline y2='-184' transform='rotate(90)'/%3E%3Cline y2='-184' transform='rotate(135)'/%3E%3Cline y2='-184' transform='rotate(180)'/%3E%3Cline y2='-184' transform='rotate(225)'/%3E%3Cline y2='-184' transform='rotate(270)'/%3E%3Cline y2='-184' transform='rotate(315)'/%3E%3C/g%3E%3Ccircle r='126' stroke-width='16'/%3E%3Ccircle r='52' stroke-width='10'/%3E%3C/g%3E%3Ccircle cx='256' cy='256' r='15' fill='%23c8472a'/%3E%3C/svg%3E">
 
 <!-- Fonts: Switzer (display + body) + JetBrains Mono (drafting annotations) via Fontshare -->
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
@@ -25,32 +25,32 @@
    ============================================================ */
 :root{
   /* --- color: OKLCH chart paper + drafting blue + one vermilion signal --- */
-  --paper:     oklch(0.38 0.10 256);    /* classic cyanotype blueprint blue ground */
-  --paper2:    oklch(0.42 0.094 256);   /* raised panel / compartment */
-  --paper3:    oklch(0.325 0.088 257);  /* recessed field (terminal/app) */
-  --ink:       oklch(0.94 0.018 248);   /* paper-white — body type */
-  --blue:      oklch(0.82 0.055 245);   /* pale blueprint line-work */
-  --blue-deep: oklch(0.905 0.035 245);  /* brighter lines / mono headings */
-  --grid:      oklch(0.86 0.05 245 / 0.13);  /* faint white ruled grid */
-  --grid-5:    oklch(0.86 0.05 245 / 0.22);  /* every 5th line, stronger */
-  --signal:    oklch(0.66 0.205 35);    /* VERMILION — the one accent */
-  --signal-deep: oklch(0.58 0.19 35);
-  --muted:     oklch(0.82 0.032 245);   /* secondary light text */
-  --hair:      oklch(0.82 0.055 245 / 0.34); /* hairlines */
-  --hair-soft: oklch(0.82 0.055 245 / 0.18);
-  --signal-soft: oklch(0.66 0.205 35 / 0.16);
-  --blue-soft: oklch(0.86 0.05 245 / 0.08);
-  --blue-tint: oklch(0.86 0.05 245 / 0.05);
-  /* opaque raised blue column for the Helm spec row (no bleed-through) */
-  --signal-col: oklch(0.44 0.088 252);
-  --signal-col-hover: oklch(0.485 0.095 252);
-  --blue-tint-solid: oklch(0.45 0.075 252);
+  --paper:     oklch(0.955 0.014 85);   /* warm bone / chart paper */
+  --paper2:    oklch(0.93 0.018 82);    /* insets / panels */
+  --paper3:    oklch(0.90 0.020 80);    /* deeper inset (terminal/app field) */
+  --ink:       oklch(0.23 0.02 255);    /* deep cool near-black — body */
+  --blue:      oklch(0.46 0.11 252);    /* Prussian/drafting blue — all line-work */
+  --blue-deep: oklch(0.34 0.10 255);    /* heavier construction lines, mono headings */
+  --grid:      oklch(0.46 0.07 252 / 0.10); /* faint ruled grid */
+  --grid-5:    oklch(0.46 0.08 252 / 0.17); /* every 5th line, stronger */
+  --signal:    oklch(0.60 0.20 33);     /* VERMILION — the one accent */
+  --signal-deep: oklch(0.52 0.19 33);
+  --muted:     oklch(0.46 0.03 255);    /* secondary ink */
+  --hair:      oklch(0.46 0.10 252 / 0.32); /* hairlines */
+  --hair-soft: oklch(0.46 0.10 252 / 0.18);
+  --signal-soft: oklch(0.60 0.20 33 / 0.10);
+  --blue-soft: oklch(0.46 0.11 252 / 0.07);
+  --blue-tint: oklch(0.46 0.11 252 / 0.045);
+  /* opaque signal-tinted column for the Helm spec row (no bleed-through) */
+  --signal-col: oklch(0.935 0.035 55);
+  --signal-col-hover: oklch(0.905 0.055 50);
+  --blue-tint-solid: oklch(0.94 0.018 180);
   --on-accent: oklch(0.975 0.012 250);  /* text on signal / colored fills */
 
   /* legend marks */
   --yes: var(--signal);
-  --part: oklch(0.80 0.10 75);   /* warm amber */
-  --no: oklch(0.66 0.03 250);
+  --part: oklch(0.55 0.10 65);   /* muted ochre */
+  --no: oklch(0.55 0.02 255);
 
   /* --- type --- */
   --font-display: "Switzer", ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -96,13 +96,13 @@ body{
 }
 @supports not (color: oklch(0 0 0)){
   :root{
-    --paper:#234a86; --paper2:#2c5495; --paper3:#1d4070; --ink:#e6ecf7;
-    --blue:#aac5e9; --blue-deep:#cfdef3; --grid:rgba(170,197,233,.13); --grid-5:rgba(170,197,233,.22);
-    --signal:#e8572f; --signal-deep:#cf4824; --muted:#b3c5e0; --hair:rgba(170,197,233,.34);
-    --hair-soft:rgba(170,197,233,.18); --signal-soft:rgba(232,87,47,.16);
-    --blue-soft:rgba(170,197,233,.08); --blue-tint:rgba(170,197,233,.05);
-    --signal-col:#2f5694; --signal-col-hover:#36619f; --blue-tint-solid:#315796;
-    --on-accent:#f4f7fd; --yes:#e8572f; --part:#d8b25a; --no:#9fb3d4;
+    --paper:#f1ead9; --paper2:#e9e0cb; --paper3:#e2d8c0; --ink:#222933;
+    --blue:#2b4a86; --blue-deep:#22386a; --grid:rgba(43,74,134,.10); --grid-5:rgba(43,74,134,.17);
+    --signal:#c8472a; --signal-deep:#a83b22; --muted:#5d6470; --hair:rgba(43,74,134,.32);
+    --hair-soft:rgba(43,74,134,.18); --signal-soft:rgba(200,71,42,.10);
+    --blue-soft:rgba(43,74,134,.07); --blue-tint:rgba(43,74,134,.045);
+    --signal-col:#f3dfca; --signal-col-hover:#eecbb0; --blue-tint-solid:#e2ebe6;
+    --on-accent:#f4f7fd; --yes:#c8472a; --part:#9a7a2e; --no:#7d8590;
   }
 }
 
@@ -136,7 +136,7 @@ img,svg{display:block}
   background-size:150px 150px;
 }
 /* subtle paper grain */
-.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.045;mix-blend-mode:multiply;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
 
 /* container */
@@ -183,8 +183,7 @@ h1,h2,h3{ font-family:var(--font-display); font-weight:800; line-height:1.03; le
 /* a thin signal drafting-callout rectangle around a phrase */
 /* accent phrase: bright vermilion word (no box — a bordered box gets clipped by the
    line-reveal mask's overflow:hidden, leaving a stray rule). Brightened for AA-large on blue. */
-.mark-box{ color:oklch(0.72 0.20 38); white-space:nowrap; }
-@supports not (color:oklch(0 0 0)){ .mark-box{ color:#ff7a4d; } }
+.mark-box{ color:var(--signal); white-space:nowrap; }
 
 /* ---------- buttons (sharp drafting rectangles, never pills) ---------- */
 .btn{ display:inline-flex; align-items:center; justify-content:center; gap:9px; font-family:var(--font-body); font-weight:600; font-size:var(--step-0); line-height:1; cursor:pointer; border:1.5px solid transparent; text-align:center; border-radius:var(--r); transition:background .2s var(--ease-out), border-color .2s var(--ease-out), color .2s var(--ease-out), transform .12s var(--ease-out); white-space:nowrap; }
