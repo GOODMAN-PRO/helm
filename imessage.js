@@ -56,8 +56,8 @@ try {
 } catch {}
 
 // Pick --model for this turn: fixed pref overrides the complexity classifier.
-function pickModel(prompt) {
-  return getModelPref() ?? classifyComplexity(prompt);
+async function pickModel(prompt) {
+  return getModelPref() ?? (await classifyComplexity(prompt));
 }
 
 // Returns an inline MCP config JSON string built from workspace/mcp/servers.json.
@@ -130,7 +130,7 @@ function runClaude(args, prompt) {
 }
 
 async function ask(handle, prompt) {
-  const model = pickModel(prompt);
+  const model = await pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [
     '-p', '--output-format', 'json',

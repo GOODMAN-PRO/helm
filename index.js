@@ -270,7 +270,7 @@ function vertexModel() {
   return process.env.VERTEX_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5@20250929';
 }
 // Pick --model for this turn: fixed pref overrides the complexity classifier.
-function pickModel(prompt) {
+async function pickModel(prompt) {
   // Claude on Vertex: pass the Vertex model id straight through.
   if (AUTH_MODE === 'vertex') return vertexModel();
   // free online model behind the proxy: the proxy forces OPENAI_MODEL upstream, so --model is
@@ -278,7 +278,7 @@ function pickModel(prompt) {
   if (proxyConfigured()) return process.env.OPENAI_MODEL;
   // custom/local endpoints expect their own model id (e.g. an Ollama model name)
   if (AUTH_MODE === 'custom' && process.env.ANTHROPIC_MODEL) return process.env.ANTHROPIC_MODEL;
-  return getModelPref() ?? classifyComplexity(prompt);
+  return getModelPref() ?? (await classifyComplexity(prompt));
 }
 // Returns an inline MCP config JSON string built from workspace/mcp/servers.json.
 // Only includes servers with enabled !== false. Strips Helm-only schema fields
@@ -598,7 +598,7 @@ async function ask(prompt, onProgress, mode = 'copilot', opts = {}) {
   if (AUTH_MODE === 'vertex' && !(process.env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.GCP_PROJECT_ID || process.env.VERTEX_PROJECT_ID)) {
     return '⚠️ Vertex mode is on but no GCP project is set. Add `GCP_PROJECT_ID=your-project-id` to .env, run `gcloud auth application-default login`, then say `restart`.';
   }
-  const model = pickModel(prompt);
+  const model = await pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [
     '-p', '--output-format', 'stream-json', '--verbose',   // stream events so we can show live progress

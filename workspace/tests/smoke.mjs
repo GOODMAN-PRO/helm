@@ -1099,7 +1099,7 @@ function fail(label, reason) {
     ];
 
     for (const [input, expected] of cases) {
-      const tier = classifyComplexity(input);
+      const tier = await classifyComplexity(input);
       if (!VALID.has(tier)) throw new Error(`classifyComplexity(${JSON.stringify(input.slice(0, 30))}) returned invalid tier ${JSON.stringify(tier)}`);
       if (tier !== expected) throw new Error(`classifyComplexity(${JSON.stringify(input.slice(0, 30))}) = ${tier}, expected ${expected}`);
     }
@@ -1108,7 +1108,7 @@ function fail(label, reason) {
     const extras = ['hello', 'what time is it', 'translate this', 'refactor the module',
                     'deploy to staging', 'write a function', 'yes', 'where is the file'];
     for (const input of extras) {
-      const tier = classifyComplexity(input);
+      const tier = await classifyComplexity(input);
       if (!VALID.has(tier)) throw new Error(`classifyComplexity(${JSON.stringify(input)}) returned invalid tier: ${JSON.stringify(tier)}`);
     }
 

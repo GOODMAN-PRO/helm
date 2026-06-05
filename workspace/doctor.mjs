@@ -223,6 +223,23 @@ async function main() {
     ok('auth', 'subscription mode (Claude Pro/Max). If you hit auth errors, run `claude` once to log in.');
   }
 
+  // ---- MCP health checks ----
+  try {
+    const { runHealthChecks } = await import('./mcp/check.mjs');
+    const mcpResults = await runHealthChecks({ silent: true });
+    for (const r of mcpResults) {
+      if (r.status === 'UP') {
+        ok(`mcp:${r.name}`, `MCP server "${r.name}" is UP`);
+      } else if (r.status === 'DOWN') {
+        warn(`mcp:${r.name}`, `MCP server "${r.name}" is DOWN: ${r.error}`, `Run \`node workspace/mcp/check.mjs\` to troubleshoot, or check its config in servers.json.`);
+      } else {
+        ok(`mcp:${r.name}`, `MCP server "${r.name}" is disabled/skipped`);
+      }
+    }
+  } catch (e) {
+    warn('mcp-check', `could not run MCP health checks: ${e.message}`);
+  }
+
   // ---- npm available (needed for self-upgrade + installing the engine) ----
   const nr = spawnSync(IS_WIN ? 'npm.cmd' : 'npm', ['-v'], { encoding: 'utf8', shell: IS_WIN, timeout: 15000 });
   if (nr.status === 0) ok('npm', `npm ${(nr.stdout || '').trim()}`);

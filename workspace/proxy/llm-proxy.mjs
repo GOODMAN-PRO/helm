@@ -28,22 +28,38 @@ function toOpenAI(a) {
   if (a.system) { const s = blocksText(a.system); if (s) messages.push({ role: 'system', content: s }); }
   for (const m of a.messages || []) {
     if (typeof m.content === 'string') { messages.push({ role: m.role, content: m.content }); continue; }
-    const text = []; const toolCalls = []; const toolResults = [];
+    const content = []; const toolCalls = []; const toolResults = [];
     for (const b of m.content || []) {
-      if (b.type === 'text') text.push(b.text);
-      else if (b.type === 'tool_use') toolCalls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input || {}) } });
-      else if (b.type === 'tool_result') toolResults.push({ tool_call_id: b.tool_use_id, content: blocksText(b.content) || '' });
+      if (b.type === 'text') {
+        content.push({ type: 'text', text: b.text });
+      } else if (b.type === 'image') {
+        content.push({
+          type: 'image_url',
+          image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` }
+        });
+      } else if (b.type === 'tool_use') {
+        toolCalls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input || {}) } });
+      } else if (b.type === 'tool_result') {
+        toolResults.push({ tool_call_id: b.tool_use_id, content: blocksText(b.content) || '' });
+      }
     }
+    const hasImage = content.some(b => b.type === 'image_url');
+    const textVal = content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const finalContent = hasImage ? content : (textVal || null);
+
     if (m.role === 'assistant') {
-      const msg = { role: 'assistant', content: text.join('\n') || null };
+      const msg = { role: 'assistant', content: finalContent };
       if (toolCalls.length) msg.tool_calls = toolCalls;
       messages.push(msg);
     } else {
-      if (text.length) messages.push({ role: 'user', content: text.join('\n') });
+      if (finalContent) messages.push({ role: m.role, content: finalContent });
       for (const tr of toolResults) messages.push({ role: 'tool', tool_call_id: tr.tool_call_id, content: tr.content });
     }
   }
-  const req = { model: MODEL, messages, stream: false, max_tokens: a.max_tokens || 8192 };
+  const req = { model: MODEL, messages, stream: a.stream ?? false, max_tokens: a.max_tokens || 8192 };
+  if (req.stream) {
+    req.stream_options = { include_usage: true };
+  }
   if (typeof a.temperature === 'number') req.temperature = a.temperature;
   // Claude Code sends its full tool suite (dozens). Forwarding ALL overwhelms weak free models;
   // forwarding NONE makes Helm a chatbot that only *claims* to act. Default = a curated CORE set so the
@@ -110,33 +126,189 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ type: 'error', error: { type: etype, message: hint } }));
       return;
     }
-    const oai = await up.json();
-    const { blocks, stop, usage } = toBlocks(oai);
     const id = 'msg_' + Math.random().toString(36).slice(2);
-    const inTok = usage.prompt_tokens || 0, outTok = usage.completion_tokens || 0;
-
     if (body.stream === false) {
+      const oai = await up.json();
+      const { blocks, stop, usage } = toBlocks(oai);
+      const inTok = usage.prompt_tokens || 0, outTok = usage.completion_tokens || 0;
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ id, type: 'message', role: 'assistant', model: MODEL, content: blocks, stop_reason: stop, stop_sequence: null, usage: { input_tokens: inTok, output_tokens: outTok } }));
       return;
     }
-    // streaming: synthesize the Anthropic SSE event sequence from the full reply
-    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-    sse(res, 'message_start', { type: 'message_start', message: { id, type: 'message', role: 'assistant', model: MODEL, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: inTok, output_tokens: 0 } } });
-    blocks.forEach((blk, i) => {
-      if (blk.type === 'text') {
-        sse(res, 'content_block_start', { type: 'content_block_start', index: i, content_block: { type: 'text', text: '' } });
-        sse(res, 'content_block_delta', { type: 'content_block_delta', index: i, delta: { type: 'text_delta', text: blk.text } });
-      } else {
-        sse(res, 'content_block_start', { type: 'content_block_start', index: i, content_block: { type: 'tool_use', id: blk.id, name: blk.name, input: {} } });
-        sse(res, 'content_block_delta', { type: 'content_block_delta', index: i, delta: { type: 'input_json_delta', partial_json: JSON.stringify(blk.input || {}) } });
-      }
-      sse(res, 'content_block_stop', { type: 'content_block_stop', index: i });
+
+    // End-to-end streaming
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      'connection': 'keep-alive'
     });
-    sse(res, 'message_delta', { type: 'message_delta', delta: { stop_reason: stop, stop_sequence: null }, usage: { output_tokens: outTok } });
+
+    const estInTok = Math.ceil((raw || '').length / 4);
+    sse(res, 'message_start', {
+      type: 'message_start',
+      message: {
+        id,
+        type: 'message',
+        role: 'assistant',
+        model: MODEL,
+        content: [],
+        stop_reason: null,
+        stop_sequence: null,
+        usage: { input_tokens: estInTok, output_tokens: 0 }
+      }
+    });
+
+    let textActive = false;
+    let textStopped = false;
+    const textBlockIdx = 0;
+    let nextBlockIdx = 1;
+    const toolCalls = {}; // index -> { id, name, argsBuffer, started, blockIdx }
+    let finishReason = null;
+    let finalUsage = null;
+
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    for await (const chunk of up.body) {
+      buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
+      let lines = buffer.split('\n');
+      buffer = lines.pop(); // keep partial line
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed === 'data: [DONE]') continue;
+        if (trimmed.startsWith('data: ')) {
+          const dataStr = trimmed.slice(6);
+          try {
+            const dataObj = JSON.parse(dataStr);
+            if (dataObj.usage) {
+              finalUsage = dataObj.usage;
+            }
+            const choice = dataObj.choices && dataObj.choices[0];
+            if (choice) {
+              if (choice.finish_reason) {
+                finishReason = choice.finish_reason;
+              }
+              const delta = choice.delta;
+              if (delta) {
+                if (delta.content) {
+                  if (!textActive) {
+                    textActive = true;
+                    sse(res, 'content_block_start', {
+                      type: 'content_block_start',
+                      index: textBlockIdx,
+                      content_block: { type: 'text', text: '' }
+                    });
+                  }
+                  sse(res, 'content_block_delta', {
+                    type: 'content_block_delta',
+                    index: textBlockIdx,
+                    delta: { type: 'text_delta', text: delta.content }
+                  });
+                }
+                if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+                  for (const tc of delta.tool_calls) {
+                    const idx = tc.index;
+                    if (idx === undefined) continue;
+                    if (!toolCalls[idx]) {
+                      toolCalls[idx] = {
+                        id: tc.id || '',
+                        name: tc.function?.name || '',
+                        argsBuffer: tc.function?.arguments || '',
+                        started: false,
+                        blockIdx: nextBlockIdx++
+                      };
+                    } else {
+                      if (tc.id) toolCalls[idx].id = tc.id;
+                      if (tc.function?.name) toolCalls[idx].name = tc.function.name;
+                      if (tc.function?.arguments) toolCalls[idx].argsBuffer += tc.function.arguments;
+                    }
+
+                    if (toolCalls[idx].name && !toolCalls[idx].started) {
+                      if (textActive && !textStopped) {
+                        sse(res, 'content_block_stop', { type: 'content_block_stop', index: textBlockIdx });
+                        textStopped = true;
+                      }
+                      if (!toolCalls[idx].id) {
+                        toolCalls[idx].id = 'toolu_' + Math.random().toString(36).slice(2);
+                      }
+                      sse(res, 'content_block_start', {
+                        type: 'content_block_start',
+                        index: toolCalls[idx].blockIdx,
+                        content_block: {
+                          type: 'tool_use',
+                          id: toolCalls[idx].id,
+                          name: toolCalls[idx].name,
+                          input: {}
+                        }
+                      });
+                      toolCalls[idx].started = true;
+                      if (toolCalls[idx].argsBuffer) {
+                        sse(res, 'content_block_delta', {
+                          type: 'content_block_delta',
+                          index: toolCalls[idx].blockIdx,
+                          delta: {
+                            type: 'input_json_delta',
+                            partial_json: toolCalls[idx].argsBuffer
+                          }
+                        });
+                        toolCalls[idx].argsBuffer = '';
+                      }
+                    } else if (toolCalls[idx].started && tc.function?.arguments) {
+                      sse(res, 'content_block_delta', {
+                        type: 'content_block_delta',
+                        index: toolCalls[idx].blockIdx,
+                        delta: {
+                          type: 'input_json_delta',
+                          partial_json: tc.function.arguments
+                        }
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore bad JSON
+          }
+        }
+      }
+    }
+
+    if (buffer) {
+      const trimmed = buffer.trim();
+      if (trimmed && trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+        try {
+          const dataObj = JSON.parse(trimmed.slice(6));
+          if (dataObj.usage) finalUsage = dataObj.usage;
+        } catch {}
+      }
+    }
+
+    if (textActive && !textStopped) {
+      sse(res, 'content_block_stop', { type: 'content_block_stop', index: textBlockIdx });
+      textStopped = true;
+    }
+    for (const idx of Object.keys(toolCalls)) {
+      const tc = toolCalls[idx];
+      if (tc.started) {
+        sse(res, 'content_block_stop', { type: 'content_block_stop', index: tc.blockIdx });
+      }
+    }
+
+    const stop = (Object.keys(toolCalls).length > 0) ? 'tool_use' : finishReason === 'length' ? 'max_tokens' : 'end_turn';
+    const inTok = (finalUsage && finalUsage.prompt_tokens) || estInTok;
+    const outTok = (finalUsage && finalUsage.completion_tokens) || 0;
+
+    sse(res, 'message_delta', {
+      type: 'message_delta',
+      delta: { stop_reason: stop, stop_sequence: null },
+      usage: { output_tokens: outTok }
+    });
     sse(res, 'message_stop', { type: 'message_stop' });
     res.end();
-    console.error(`[helm-proxy][res] streamed ${blocks.length} block(s), stop=${stop}`);
+    console.error(`[helm-proxy][res] streamed end-to-end, stop=${stop}`);
   } catch (e) {
     res.writeHead(500, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ type: 'error', error: { type: 'proxy_error', message: String(e.message || e) } }));

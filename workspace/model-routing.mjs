@@ -17,8 +17,34 @@ const OPUS_RX = /\b(build|implement|debug|refactor|deploy|architect|rewrite|scaf
 // Trivial acknowledgements and one-word queries -> haiku is fine
 const HAIKU_RX = /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|sure|ping|stop|cancel)\b|^(what time|what day|who is|when is|where is)\b/i;
 
+let anchorEmbeddings = null;
+const HAIKU_ANCHORS = [
+  "hello", "hi", "how are you", "thanks", "what time is it", "status of the bot", "cancel the current task"
+];
+const SONNET_ANCHORS = [
+  "explain quantum computing in simple terms", "write an essay about climate change",
+  "what are the main differences between Python and Javascript", "give me a recipe for chocolate chip cookies",
+  "how do I organize a project plan"
+];
+const OPUS_ANCHORS = [
+  "write a python script to parse logs and handle exceptions",
+  "there is a bug in my typescript code: it throws a null pointer exception, let's fix it",
+  "implement a new REST api route using express that queries the sqlite database",
+  "refactor this React component to use hooks and optimize performance",
+  "write unit tests for this class and configure the github action pipeline",
+  "help me build a command line interface to manage tasks"
+];
+
+let embedPromise = null;
+function getEmbedModule() {
+  if (!embedPromise) {
+    embedPromise = import('./memory/embed.mjs').catch(() => null);
+  }
+  return embedPromise;
+}
+
 // Returns 'haiku' | 'sonnet' | 'opus'.
-export function classifyComplexity(text) {
+export async function classifyComplexity(text) {
   const t = (text || '').trim();
   const len = t.length;
 
@@ -33,6 +59,42 @@ export function classifyComplexity(text) {
 
   // Medium-length trivial patterns -> haiku
   if (HAIKU_RX.test(t)) return 'haiku';
+
+  try {
+    const embedMod = await getEmbedModule();
+    if (embedMod && await embedMod.ensurePipelineLoaded()) {
+      if (!anchorEmbeddings) {
+        const haikuVecs = await Promise.all(HAIKU_ANCHORS.map(a => embedMod.embedText(a)));
+        const sonnetVecs = await Promise.all(SONNET_ANCHORS.map(a => embedMod.embedText(a)));
+        const opusVecs = await Promise.all(OPUS_ANCHORS.map(a => embedMod.embedText(a)));
+        anchorEmbeddings = { haiku: haikuVecs, sonnet: sonnetVecs, opus: opusVecs };
+      }
+
+      const inputVec = await embedMod.embedText(t);
+      const maxSim = vecs => {
+        let max = -1;
+        for (const v of vecs) {
+          const sim = embedMod.cosineSimilarity(inputVec, v);
+          if (sim > max) max = sim;
+        }
+        return max;
+      };
+
+      const haikuScore = maxSim(anchorEmbeddings.haiku);
+      const sonnetScore = maxSim(anchorEmbeddings.sonnet);
+      const opusScore = maxSim(anchorEmbeddings.opus);
+
+      if (opusScore > sonnetScore && opusScore > haikuScore) {
+        return 'opus';
+      } else if (sonnetScore > haikuScore) {
+        return 'sonnet';
+      } else {
+        return 'haiku';
+      }
+    }
+  } catch (e) {
+    // Fall through to regex-based default
+  }
 
   // Default: sonnet handles everything else (general questions, explanations, planning)
   return 'sonnet';
