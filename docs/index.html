@@ -3,441 +3,1390 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Helm: your own AI agent, on your own machine</title>
-<meta name="description" content="Helm is a personal AI agent that lives on your hardware. Message it from Discord, give it full shell, files and screen. Runs on any model: your Claude subscription, an API key, or a free local model (no Anthropic account needed).">
+<title>Helm — your own AI agent, on your own machine</title>
+<meta name="description" content="Helm is a personal AI agent that runs on your hardware with full shell, files, web and screen. Message it from Discord, iMessage or your terminal. Owner-locked, private, runs on any model — your Claude subscription, an API key, or a free local model. Free, self-hosted.">
+<meta name="color-scheme" content="light">
+<meta property="og:title" content="Helm — your own AI agent, on your own machine">
+<meta property="og:description" content="A personal AI agent that runs on your hardware. Full shell, files, web and screen. Owner-locked. Runs on any model. Free, self-hosted.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='40' fill='%23f0e9d8'/%3E%3Cg transform='translate(256,256)' fill='none' stroke='%232b4a86' stroke-linecap='round'%3E%3Cg stroke-width='14'%3E%3Cline y2='-184'/%3E%3Cline y2='-184' transform='rotate(45)'/%3E%3Cline y2='-184' transform='rotate(90)'/%3E%3Cline y2='-184' transform='rotate(135)'/%3E%3Cline y2='-184' transform='rotate(180)'/%3E%3Cline y2='-184' transform='rotate(225)'/%3E%3Cline y2='-184' transform='rotate(270)'/%3E%3Cline y2='-184' transform='rotate(315)'/%3E%3C/g%3E%3Ccircle r='126' stroke-width='16'/%3E%3Ccircle r='52' stroke-width='10'/%3E%3C/g%3E%3Ccircle cx='256' cy='256' r='15' fill='%23c8472a'/%3E%3C/svg%3E">
+
+<!-- Fonts: Switzer (display + body) + JetBrains Mono (drafting annotations) via Fontshare -->
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700,800&f[]=jetbrains-mono@400,500,700&display=swap" rel="stylesheet">
+
 <style>
+/* ============================================================
+   HELM — Nautical Engineering Blueprint / Admiralty Chart.
+   Light chart paper · Prussian-blue line-work · vermilion signal.
+   Flat, precise, hand-drafted, technical. No dark, no cyan, no glow.
+   ============================================================ */
+:root{
+  /* --- color: OKLCH chart paper + drafting blue + one vermilion signal --- */
+  --paper:     oklch(0.955 0.014 85);   /* warm bone / chart paper */
+  --paper2:    oklch(0.93 0.018 82);    /* insets / panels */
+  --paper3:    oklch(0.90 0.020 80);    /* deeper inset (terminal/app field) */
+  --ink:       oklch(0.23 0.02 255);    /* deep cool near-black — body */
+  --blue:      oklch(0.46 0.11 252);    /* Prussian/drafting blue — all line-work */
+  --blue-deep: oklch(0.34 0.10 255);    /* heavier construction lines, mono headings */
+  --grid:      oklch(0.46 0.07 252 / 0.10); /* faint ruled grid */
+  --grid-5:    oklch(0.46 0.08 252 / 0.17); /* every 5th line, stronger */
+  --signal:    oklch(0.60 0.20 33);     /* VERMILION — the one accent */
+  --signal-deep: oklch(0.52 0.19 33);
+  --muted:     oklch(0.46 0.03 255);    /* secondary ink */
+  --hair:      oklch(0.46 0.10 252 / 0.32); /* hairlines */
+  --hair-soft: oklch(0.46 0.10 252 / 0.18);
+  --signal-soft: oklch(0.60 0.20 33 / 0.10);
+  --blue-soft: oklch(0.46 0.11 252 / 0.07);
+  --blue-tint: oklch(0.46 0.11 252 / 0.045);
+  /* opaque signal-tinted column (sticky cells must not let content bleed through) */
+  --signal-col: oklch(0.935 0.035 55);
+  --signal-col-hover: oklch(0.905 0.055 50);
+  --blue-tint-solid: oklch(0.94 0.018 180);
+
+  /* legend marks */
+  --yes: var(--signal);
+  --part: oklch(0.55 0.10 65);   /* muted ochre */
+  --no: oklch(0.55 0.02 255);
+
+  /* --- type --- */
+  --font-display: "Switzer", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-body: "Switzer", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* fluid type scale (Utopia-style) */
+  --step--2: clamp(0.70rem, 0.68rem + 0.08vw, 0.76rem);
+  --step--1: clamp(0.81rem, 0.78rem + 0.13vw, 0.90rem);
+  --step-0:  clamp(1.00rem, 0.96rem + 0.18vw, 1.13rem);
+  --step-1:  clamp(1.20rem, 1.10rem + 0.45vw, 1.45rem);
+  --step-2:  clamp(1.50rem, 1.32rem + 0.85vw, 2.05rem);
+  --step-3:  clamp(1.95rem, 1.62rem + 1.55vw, 2.95rem);
+  --step-4:  clamp(2.55rem, 1.95rem + 2.85vw, 4.30rem);
+  --step-5:  clamp(3.10rem, 2.10rem + 4.60vw, 5.40rem);
+
+  /* drafting = sharp, near-zero radius */
+  --r: 2px;
+  --r-sm: 1px;
+
+  /* --- easing --- */
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --ease-std: cubic-bezier(.2,0,0,1);
+
+  --nav-h: 60px;
+  --maxw: 1240px;
+}
+
+*{box-sizing:border-box}
+html{ -webkit-text-size-adjust:100%; }
+html, body{ overflow-x:clip; }
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:var(--step-0);
+  line-height:1.6;
+  font-weight:400;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-wrap:break-word;
+}
+@supports not (color: oklch(0 0 0)){
   :root{
-    --bg:#080b11; --bg2:#0b111b; --panel:#0f1828; --panel2:#121d2e;
-    --line:#1d2a3d; --ink:#eaf6f8; --muted:#9fb3c8; --faint:#8a9db2;
-    --cyan:#22d3ee; --teal:#5eead4; --sky:#38bdf8;
-    --grad:linear-gradient(120deg,#7df0dc 0%,#22d3ee 50%,#38bdf8 100%);
-    --yes:#5eead4; --no:#8497ac; --part:#e0b65a;
-    --radius:16px;
+    --paper:#f1ead9; --paper2:#e9e0cb; --paper3:#e2d8c0; --ink:#222933;
+    --blue:#2b4a86; --blue-deep:#22386a; --grid:rgba(43,74,134,.10); --grid-5:rgba(43,74,134,.17);
+    --signal:#c8472a; --signal-deep:#a83b22; --muted:#5d6470; --hair:rgba(43,74,134,.32);
+    --hair-soft:rgba(43,74,134,.18); --signal-soft:rgba(200,71,42,.10);
+    --blue-soft:rgba(43,74,134,.07); --blue-tint:rgba(43,74,134,.045);
+    --signal-col:#f3dfca; --signal-col-hover:#eecbb0; --blue-tint-solid:#e2ebe6;
+    --yes:#c8472a; --part:#9a7a2e; --no:#7d8590;
   }
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  a:focus-visible,button:focus-visible,.tab:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:8px}
-  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
-  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  body{
-    margin:0; background:
-      radial-gradient(1200px 700px at 50% -10%, #14202f 0%, transparent 60%),
-      var(--bg);
-    color:var(--ink);
-    font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-  a{color:var(--cyan);text-decoration:none}
-  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
-  .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+}
 
-  /* nav */
-  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
-  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.5px}
-  .brand svg{width:34px;height:34px;border-radius:50%}
-  .nav-links{display:flex;gap:26px;font-size:14px;color:var(--muted)}
-  .nav-links a:hover{color:var(--ink)}
-  @media(max-width:640px){.nav-links{gap:16px;font-size:13px;flex-wrap:wrap;justify-content:flex-end}.nav-links a:not([href="#install"]){display:none}}
+a{color:var(--blue);text-decoration:none}
+img,svg{display:block}
+::selection{ background:var(--signal-soft); color:var(--ink); }
 
-  /* hero */
-  header.hero{text-align:center;padding:64px 0 40px}
-  .logo-glow{display:inline-block;border-radius:28px;
-    box-shadow:0 0 0 1px #1c2c40, 0 0 60px -8px #22d3ee66, 0 0 140px -30px #38bdf855;
-    animation:pulse 5s ease-in-out infinite}
-  @keyframes pulse{0%,100%{box-shadow:0 0 0 1px #1c2c40,0 0 50px -10px #22d3ee44,0 0 120px -30px #38bdf844}
-    50%{box-shadow:0 0 0 1px #20405a,0 0 80px -6px #22d3ee88,0 0 170px -24px #38bdf877}}
-  .logo-glow svg{display:block;width:128px;height:128px;border-radius:28px}
-  h1{font-size:clamp(34px,6vw,60px);line-height:1.05;margin:26px 0 14px;letter-spacing:-1px}
-  .sub{font-size:clamp(16px,2.4vw,20px);color:var(--muted);max-width:680px;margin:0 auto 28px}
-  .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-  .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:12px;font-weight:600;font-size:15px;border:1px solid transparent;cursor:pointer}
-  .btn.primary{background:var(--grad);color:#05202a}
-  .btn.primary:hover{filter:brightness(1.08)}
-  .btn.ghost{border-color:var(--line);color:var(--ink);background:#0c1421}
-  .btn.ghost:hover{border-color:var(--cyan)}
-  .tagrow{margin-top:22px;color:var(--faint);font-size:13px}
+/* accessible focus — a signal/blue ring */
+:focus-visible{ outline:2px solid var(--signal); outline-offset:3px; border-radius:var(--r-sm); }
+*:focus:not(:focus-visible){ outline:none; }
 
-  /* sections */
-  section{padding:88px 0}
-  @media(max-width:640px){section{padding:54px 0}}
-  .eyebrow{color:var(--cyan);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 0 10px}
-  h2{font-size:clamp(26px,4vw,38px);margin:0 0 10px;letter-spacing:-.5px}
-  .lead{color:var(--muted);max-width:680px;margin:0 0 34px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{position:fixed;left:12px;top:-60px;z-index:200;background:var(--paper);border:1px solid var(--blue);color:var(--ink);padding:10px 14px;border-radius:var(--r-sm);transition:top .2s var(--ease-out)}
+.skip-link:focus{top:12px}
 
-  /* feature grid */
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-  @media(max-width:860px){.grid{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:560px){.grid{grid-template-columns:1fr}}
-  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
-    border-radius:var(--radius);padding:22px;transition:.2s}
-  .card:hover{transform:translateY(-2px);border-color:#2c4561}
-  .card .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:14px;
-    background:#0c1827;border:1px solid #20364e;color:var(--teal)}
-  .card .ic svg{width:20px;height:20px;display:block}
-  .card h3{margin:0 0 6px;font-size:17px}
-  .card p{margin:0;color:var(--muted);font-size:14px}
+/* ============================================================
+   THE BLUEPRINT TEXTURE — fixed ruled grid + paper grain
+   ============================================================ */
+.gridpaper{
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:30px 30px;
+}
+.gridpaper::after{
+  content:""; position:absolute; inset:0;
+  background-image:
+    linear-gradient(var(--grid-5) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-5) 1px, transparent 1px);
+  background-size:150px 150px;
+}
+/* subtle paper grain */
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.045;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
 
-  /* how it works */
-  .flow{display:flex;align-items:stretch;gap:14px;flex-wrap:wrap}
-  .step{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
-  .step .n{font-size:13px;color:var(--cyan);font-weight:700;margin-bottom:8px}
-  .step h3{margin:0 0 6px;font-size:16px}
-  .step p{margin:0;color:var(--muted);font-size:14px}
+/* container */
+.wrap{ width:100%; max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(20px,5vw,40px); position:relative; }
+.wrap-narrow{ max-width:980px; }
 
-  /* comparison */
-  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
-  table{border-collapse:collapse;width:100%;min-width:1280px;font-size:13px}
-  th,td{padding:11px 8px;text-align:center;border-bottom:1px solid var(--line)}
-  th:first-child,td:first-child{text-align:left;color:var(--ink);font-weight:500;width:210px;min-width:210px;max-width:210px;position:sticky;left:0}
-  th:nth-child(2),td:nth-child(2){position:sticky;left:210px}
-  thead th:first-child,thead th:nth-child(2){z-index:5}
-  tbody td:first-child{z-index:1;background:var(--panel)}
-  tbody td:nth-child(2){z-index:1}
-  thead th{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.2px;background:#0c1421;vertical-align:bottom;line-height:1.25;white-space:normal}
-  thead th.helm{color:#06222b;background:var(--grad)}
-  thead tr.grp th.g{color:var(--cyan);font-size:11px;letter-spacing:1.3px;text-transform:uppercase;background:#0a131f;border-left:1px solid #25384f;padding:8px}
-  tbody tr:hover{background:#0c1726}
-  td.helm{background:#0b1a22}
-  td.helm span.mk{font-size:15px}
-  .helmkey{display:flex;flex-wrap:wrap;gap:10px;margin:2px 0 28px}
-  .helmkey .chip{display:inline-flex;align-items:center;gap:7px;background:#0b1a22;border:1px solid #1d3a44;color:var(--ink);font-size:13px;font-weight:500;padding:8px 13px;border-radius:999px}
-  .helmkey .chip b{color:var(--teal);font-weight:800}
-  .mk{font-weight:800}
-  .yes{color:var(--yes)} .no{color:var(--no)} .part{color:var(--part)}
-  .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:14px}
-  .legend span b{font-weight:800;margin-right:6px}
-  .note{color:var(--faint);font-size:13px;margin-top:12px;max-width:760px}
-  .scrollhint{color:var(--faint);font-size:12px;margin:10px 0 0;text-align:right}
-  @media(max-width:560px){th:first-child,td:first-child{width:150px;min-width:150px;max-width:150px}th:nth-child(2),td:nth-child(2){left:150px}}
+/* section rhythm */
+.section{ padding-block:clamp(82px,12vh,150px); position:relative; z-index:2; }
+.section--tight{ padding-block:clamp(60px,9vh,110px); }
 
-  /* hero install command */
-  .herocode{display:flex;align-items:center;gap:10px;max-width:600px;margin:4px auto 20px;
-    background:#06090f;border:1px solid #1b2740;border-radius:12px;padding:12px 14px;
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:#cfeaf2;overflow-x:auto}
-  .herocode code{white-space:nowrap}
-  .herocode button{flex:none;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer}
-  .herocode button:hover{border-color:var(--cyan)}
+/* a thin ruled separator with coordinate ticks (drafting detailing) */
+.ruler{ position:relative; height:18px; }
+.ruler::before{ content:""; position:absolute; left:0; right:0; top:9px; height:1px; background:var(--hair); }
+.ruler::after{
+  content:""; position:absolute; left:0; right:0; top:5px; height:9px;
+  background:repeating-linear-gradient(90deg, var(--hair) 0 1px, transparent 1px 30px);
+}
 
-  /* install */
-  .install{background:linear-gradient(180deg,var(--panel2),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:34px}
-  /* terminal-style install card */
-  .term{border:1px solid #1b2740;border-radius:14px;overflow:hidden;background:#06090f;box-shadow:0 20px 60px -30px #000}
-  .term-bar{display:flex;align-items:center;gap:14px;padding:11px 14px;background:#0b1320;border-bottom:1px solid #16223a;flex-wrap:wrap}
-  .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
-  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
-  .dots{display:flex;gap:8px;margin-right:4px}
-  .tabs{display:flex;gap:6px;flex-wrap:wrap}
-  .tab{background:#0e1c2b;border:1px solid #1d3149;color:var(--muted);border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer;font-family:inherit}
-  .tab:hover{color:var(--ink)}
-  .tab.active{background:var(--grad);border-color:transparent;color:#05202a;font-weight:700}
-  .beta{margin-left:auto;color:var(--faint);font-size:11px;letter-spacing:1px;border:1px solid #1d3149;border-radius:6px;padding:3px 8px}
-  .term-body{padding:20px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;position:relative}
-  .term-body .comment{color:#8a9db2;font-style:italic;margin-bottom:12px}
-  .cmdline{display:flex;align-items:flex-start;gap:10px}
-  .cmdline .prompt{color:#5eead4;user-select:none}
-  .cmdline code{color:#cfeaf2;white-space:pre-wrap;word-break:break-all;flex:1}
-  .tcopy{position:absolute;top:14px;right:14px;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer}
-  .tcopy:hover{border-color:var(--cyan)}
-  .term-note{color:var(--faint);font-size:13px;margin-top:12px}
-  .oslab{color:var(--muted);font-size:12px;letter-spacing:.4px;margin:16px 0 6px}
-  .oslab:first-of-type{margin-top:0}
-  .code+.code{margin-top:0}
-  .code{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#06090f;border:1px solid #1b2740;border-radius:12px;padding:14px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:#cfeaf2;overflow-x:auto}
-  .code button{flex:none;background:#0e1c2b;border:1px solid #24405a;color:var(--cyan);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
-  .code button:hover{border-color:var(--cyan)}
-  .setup-h{margin:30px 0 10px;font-size:18px}
-  .opts{display:flex;gap:14px;flex-wrap:wrap;margin-top:18px}
-  .opt{flex:1;min-width:200px;background:#0c1726;border:1px solid var(--line);border-radius:12px;padding:16px}
-  .opt h3{margin:0 0 4px;font-size:15px}
-  .opt p{margin:0;color:var(--muted);font-size:14px}
+/* coordinate ruler ticks down a section's left margin (chart detailing) */
+.coords{ position:absolute; left:6px; top:0; bottom:0; width:18px; z-index:3; pointer-events:none; display:none; }
+@media (min-width:1180px){
+  .coords{ display:flex; flex-direction:column; justify-content:space-between; padding-block:clamp(82px,12vh,150px); }
+  .coords span{ font-family:var(--font-mono); font-size:9px; letter-spacing:.1em; color:var(--blue); opacity:.5; }
+}
 
-  footer{border-top:1px solid var(--line);padding:34px 0;color:var(--faint);font-size:13px;text-align:center}
+/* shared headings */
+.callout{
+  font-family:var(--font-mono); font-size:var(--step--1); font-weight:500; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--blue); display:inline-flex; align-items:center; gap:11px;
+  margin:0 0 20px; padding:5px 12px; border:1px solid var(--hair); border-radius:var(--r);
+  background:var(--blue-tint);
+}
+.callout::before{ content:""; width:18px; height:1px; background:var(--blue); }
+h1,h2,h3{ font-family:var(--font-display); font-weight:800; line-height:1.03; letter-spacing:-.025em; text-wrap:balance; margin:0; }
+.h2{ font-size:var(--step-3); margin:0 0 18px; }
+.lead{ color:var(--muted); font-size:var(--step-1); max-width:62ch; line-height:1.5; text-wrap:pretty; margin:0; font-weight:400; }
+.accent-word{ color:var(--signal); }
+/* signal underline accent (NOT gradient-clip) */
+.mark-underline{ position:relative; white-space:nowrap; }
+.mark-underline::after{
+  content:""; position:absolute; left:-.02em; right:-.02em; bottom:.04em; height:3px;
+  background:var(--signal);
+}
+/* a thin signal drafting-callout rectangle around a phrase */
+.mark-box{ position:relative; white-space:nowrap; padding:0 .14em; }
+.mark-box::before{
+  content:""; position:absolute; inset:-.06em -.02em; border:1.5px solid var(--signal); border-radius:var(--r-sm);
+  pointer-events:none;
+}
+/* tiny corner ticks for the box */
+.mark-box::after{
+  content:""; position:absolute; left:-.02em; top:-.06em; width:5px; height:5px;
+  border-left:1.5px solid var(--signal); border-top:1.5px solid var(--signal); display:none;
+}
+
+/* ---------- buttons (sharp drafting rectangles, never pills) ---------- */
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:9px; font-family:var(--font-body); font-weight:600; font-size:var(--step-0); line-height:1; cursor:pointer; border:1.5px solid transparent; text-align:center; border-radius:var(--r); transition:background .2s var(--ease-out), border-color .2s var(--ease-out), color .2s var(--ease-out), transform .12s var(--ease-out); white-space:nowrap; }
+.btn:active{ transform:scale(.98); }
+.btn--primary{ background:var(--signal); color:var(--paper); padding:14px 24px; border-color:var(--signal); }
+.btn--primary:hover{ background:var(--signal-deep); border-color:var(--signal-deep); }
+.btn--ghost{ background:transparent; color:var(--blue-deep); border-color:var(--blue); padding:13px 22px; }
+.btn--ghost:hover{ background:var(--blue-soft); }
+.btn svg{ width:17px; height:17px; }
+
+/* ---------- nav ---------- */
+.nav{ position:fixed; top:0; left:0; right:0; z-index:100; height:var(--nav-h); display:flex; align-items:center; transition:background .3s var(--ease-out), border-color .3s var(--ease-out); border-bottom:1px solid transparent; }
+.nav__inner{ display:flex; align-items:center; justify-content:space-between; width:100%; max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(20px,5vw,40px); position:relative; }
+/* corner tick marks on the nav inner */
+.nav__inner::before, .nav__inner::after{ content:""; position:absolute; top:50%; width:7px; height:7px; opacity:0; transition:opacity .3s var(--ease-out); }
+.nav.is-solid{ background:color-mix(in oklch, var(--paper) 92%, transparent); border-bottom-color:var(--hair); backdrop-filter:saturate(120%); -webkit-backdrop-filter:saturate(120%); }
+@media (prefers-reduced-transparency: reduce){ .nav.is-solid{ background:var(--paper); backdrop-filter:none; -webkit-backdrop-filter:none; } }
+.brand{ display:flex; align-items:center; gap:11px; }
+.brand svg{ width:30px; height:30px; }
+.brand b{ font-family:var(--font-mono); font-weight:700; letter-spacing:.30em; font-size:15px; color:var(--ink); padding-left:.30em; }
+.nav__links{ display:flex; align-items:center; gap:28px; }
+.nav__links a{ font-family:var(--font-mono); font-size:var(--step--1); letter-spacing:.04em; color:var(--muted); transition:color .18s var(--ease-out); position:relative; }
+.nav__links a:hover{ color:var(--blue-deep); }
+.nav__links a::after{ content:""; position:absolute; left:0; right:0; bottom:-6px; height:1.5px; background:var(--signal); transform:scaleX(0); transform-origin:left; transition:transform .25s var(--ease-out); }
+.nav__links a:hover::after{ transform:scaleX(1); }
+.nav__cta{ display:flex; align-items:center; gap:14px; }
+@media (max-width:880px){ .nav__links{ display:none; } }
+@media (max-width:420px){
+  .brand b{ letter-spacing:.22em; }
+  .nav__cta .btn--ghost{ display:none; }
+}
+
+/* ============================================================
+   HERO — editorial split; wheel as dimensioned engineering drawing
+   ============================================================ */
+.hero{ position:relative; padding-top:calc(var(--nav-h) + clamp(36px,8vh,84px)); padding-bottom:clamp(56px,9vh,110px); min-height:100dvh; display:flex; align-items:center; overflow:clip; }
+.hero__grid{ display:grid; grid-template-columns:1.06fr .94fr; gap:clamp(28px,4vw,60px); align-items:center; width:100%; }
+.hero__left{ position:relative; z-index:3; }
+.hero__draft{ font-family:var(--font-mono); font-size:var(--step--1); color:var(--blue); letter-spacing:.12em; text-transform:uppercase; margin:0 0 20px; display:inline-flex; align-items:center; gap:10px; }
+.hero__draft .tk{ color:var(--signal); }
+h1.hero__title{ font-size:clamp(2.5rem, 1.6rem + 4.0vw, 4.55rem); line-height:1.0; letter-spacing:-.03em; margin:0 0 24px; }
+h1.hero__title .ln{ display:block; overflow:hidden; }
+h1.hero__title .ln > span{ display:block; }
+.hero__sub{ color:var(--muted); font-size:var(--step-1); line-height:1.5; max-width:52ch; margin:0 0 26px; font-weight:400; text-wrap:pretty; }
+.hero__sub strong{ color:var(--ink); font-weight:600; }
+
+/* mono "drafting note" command box */
+.cmd{ display:flex; align-items:center; gap:10px; max-width:560px; background:var(--paper2); border:1.5px solid var(--blue); border-radius:var(--r); padding:0; font-family:var(--font-mono); font-size:var(--step--1); color:var(--ink); margin-bottom:24px; overflow:hidden; position:relative; }
+.cmd__tag{ flex:none; align-self:stretch; display:flex; align-items:center; padding:0 11px; background:var(--blue); color:var(--paper); font-size:10px; letter-spacing:.12em; }
+.cmd .pr{ color:var(--signal); user-select:none; padding-left:13px; }
+.cmd code{ flex:1; white-space:nowrap; overflow-x:auto; scrollbar-width:none; padding:13px 6px 13px 0; }
+.cmd code::-webkit-scrollbar{ display:none; }
+.hero__ctas{ display:flex; flex-wrap:wrap; gap:14px; margin-bottom:26px; }
+
+/* spec strip */
+.specstrip{ display:flex; flex-wrap:wrap; gap:0; font-family:var(--font-mono); font-size:var(--step--2); letter-spacing:.08em; color:var(--blue); text-transform:uppercase; border:1px solid var(--hair); border-radius:var(--r); background:var(--blue-tint); width:fit-content; max-width:100%; }
+.specstrip span{ padding:7px 13px; border-right:1px solid var(--hair); }
+.specstrip span:last-child{ border-right:0; }
+.specstrip b{ color:var(--signal); font-weight:700; }
+
+/* copy button — fixed min-width to avoid layout shift on "Copied" */
+.copy{ flex:none; align-self:center; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:78px; margin-right:8px; background:var(--paper); border:1.5px solid var(--blue); color:var(--blue); border-radius:var(--r-sm); padding:7px 12px; font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), border-color .18s var(--ease-out), transform .12s var(--ease-out); }
+.copy:hover{ background:var(--blue-soft); }
+.copy:active{ transform:scale(.96); }
+.copy.is-done{ color:var(--signal); border-color:var(--signal); background:var(--signal-soft); }
+
+/* hero wheel stage — dimensioned blueprint drawing */
+.hero__right{ position:relative; z-index:2; display:grid; place-items:center; }
+.wheel-stage{ position:relative; width:min(100%, 480px); aspect-ratio:1/1; }
+.wheel-stage svg{ width:100%; height:100%; overflow:visible; }
+/* corner ticks framing the drawing */
+.wheel-frame{ position:absolute; inset:-2%; pointer-events:none; }
+.wheel-frame span{ position:absolute; width:14px; height:14px; }
+.wheel-frame .tl{ left:0; top:0; border-left:1.5px solid var(--blue); border-top:1.5px solid var(--blue); }
+.wheel-frame .tr{ right:0; top:0; border-right:1.5px solid var(--blue); border-top:1.5px solid var(--blue); }
+.wheel-frame .bl{ left:0; bottom:0; border-left:1.5px solid var(--blue); border-bottom:1.5px solid var(--blue); }
+.wheel-frame .br{ right:0; bottom:0; border-right:1.5px solid var(--blue); border-bottom:1.5px solid var(--blue); }
+
+@media (max-width:900px){
+  .hero{ min-height:auto; padding-bottom:clamp(48px,8vh,80px); }
+  .hero__grid{ grid-template-columns:1fr; gap:38px; }
+  .hero__right{ order:-1; max-width:380px; margin-inline:auto; }
+}
+@media (max-width:480px){
+  .specstrip span{ padding:6px 10px; }
+}
+
+/* ============================================================
+   THESIS beat — big drafting statement with leader-line callouts
+   ============================================================ */
+.thesis{ display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:clamp(28px,5vw,72px); align-items:end; }
+.thesis h2{ font-size:var(--step-4); letter-spacing:-.03em; }
+.thesis__body{ color:var(--muted); font-size:var(--step-1); line-height:1.55; max-width:50ch; text-wrap:pretty; }
+.thesis__body strong{ color:var(--ink); font-weight:600; }
+.thesis__meta{ font-family:var(--font-mono); font-size:var(--step--1); color:var(--blue); line-height:2; border-left:1.5px solid var(--hair); padding-left:18px; }
+.thesis__meta span{ display:block; }
+.thesis__meta b{ color:var(--ink); font-weight:500; }
+.thesis__meta .lbl{ color:var(--muted); }
+/* leader-line callout marks on words */
+.annot{ position:relative; color:var(--ink); }
+.annot::after{
+  content:attr(data-note); position:absolute; left:50%; top:-1.55em; transform:translateX(-50%);
+  font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; color:var(--signal); white-space:nowrap;
+  text-transform:uppercase;
+}
+.annot::before{
+  content:""; position:absolute; left:50%; top:-.45em; width:1px; height:.8em; background:var(--signal);
+}
+@media (max-width:820px){ .thesis{ grid-template-columns:1fr; gap:28px; align-items:start; } .thesis__meta{ border-left:0; border-top:1.5px solid var(--hair); padding-left:0; padding-top:18px; } .annot::after, .annot::before{ display:none; } }
+
+/* ============================================================
+   FEATURES — annotated parts legend / drawing
+   ============================================================ */
+.legendgrid{ display:grid; grid-template-columns:repeat(4,1fr); grid-auto-rows:minmax(170px,auto); gap:0; grid-auto-flow:dense; margin-top:44px; border:1.5px solid var(--blue); border-radius:var(--r); background:var(--paper); }
+.part{ position:relative; padding:24px; border-right:1px solid var(--hair); border-bottom:1px solid var(--hair); display:flex; flex-direction:column; transition:background .3s var(--ease-out); }
+.legendgrid > .part:nth-child(4n){ border-right:0; }
+.part:hover{ background:var(--blue-tint); }
+.part__ic{ width:42px; height:42px; border:1.5px solid var(--blue); border-radius:var(--r-sm); display:grid; place-items:center; color:var(--blue); margin-bottom:auto; background:var(--paper); }
+.part__ic svg{ width:22px; height:22px; }
+.part h3{ font-size:var(--step-1); margin:18px 0 7px; font-weight:700; letter-spacing:-.015em; }
+.part p{ margin:0; color:var(--muted); font-size:var(--step--1); line-height:1.5; }
+.part__tag{ position:absolute; top:0; right:0; font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.10em; color:var(--blue); text-transform:uppercase; padding:5px 9px; border-left:1px solid var(--hair); border-bottom:1px solid var(--hair); background:var(--blue-tint); border-bottom-left-radius:var(--r); }
+.part.span2{ grid-column:span 2; }
+.part.tall{ grid-row:span 2; }
+.part--feature{ background:var(--blue-soft); }
+.part--feature:hover{ background:var(--blue-tint); }
+.modelchips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:18px; }
+.modelchips span{ font-family:var(--font-mono); font-size:11px; color:var(--blue-deep); border:1px solid var(--hair); border-radius:var(--r-sm); padding:4px 9px; background:var(--paper); }
+.modelchips span.free{ color:var(--signal); border-color:var(--signal); font-weight:500; }
+.uptime{ margin-top:18px; font-family:var(--font-mono); font-size:11px; line-height:1.85; color:var(--muted); }
+.uptime b{ color:var(--blue); font-weight:500; }
+.uptime .ok{ color:var(--signal); font-weight:500; }
+@media (max-width:900px){
+  .legendgrid{ grid-template-columns:repeat(2,1fr); }
+  .legendgrid > .part:nth-child(4n){ border-right:1px solid var(--hair); }
+  .legendgrid > .part:nth-child(2n){ border-right:0; }
+  .part.span2{ grid-column:span 2; }
+  .part.tall{ grid-row:span 1; }
+}
+@media (max-width:560px){
+  .legendgrid{ grid-template-columns:1fr; }
+  .legendgrid > .part{ border-right:0 !important; }
+  .part.span2{ grid-column:span 1; }
+}
+
+/* ============================================================
+   HOW — dimensioned sequence with leader lines + arrowheads
+   ============================================================ */
+.flow{ position:relative; margin-top:48px; display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(20px,3vw,46px); }
+.flow__line{ position:absolute; top:27px; left:9%; right:9%; height:1.5px; z-index:0; background:repeating-linear-gradient(90deg, var(--blue) 0 8px, transparent 8px 15px); opacity:.7; }
+.flow__line::after{ content:""; position:absolute; right:-2px; top:50%; transform:translateY(-50%); width:0; height:0; border-left:7px solid var(--blue); border-top:4px solid transparent; border-bottom:4px solid transparent; }
+.fstep{ position:relative; z-index:1; }
+.fstep__node{ width:56px; height:56px; border-radius:50%; background:var(--paper); border:1.5px solid var(--blue); display:grid; place-items:center; font-family:var(--font-mono); font-weight:700; font-size:15px; color:var(--blue-deep); position:relative; }
+.fstep__node::after{ content:""; position:absolute; inset:-6px; border:1px dashed var(--hair); border-radius:50%; }
+.fstep__coord{ font-family:var(--font-mono); font-size:10px; letter-spacing:.12em; color:var(--signal); text-transform:uppercase; margin:20px 0 8px; }
+.fstep h3{ font-size:var(--step-1); margin:0 0 8px; font-weight:700; letter-spacing:-.015em; }
+.fstep p{ margin:0; color:var(--muted); font-size:var(--step--1); line-height:1.5; max-width:34ch; }
+@media (max-width:760px){
+  .flow{ grid-template-columns:1fr; gap:0; }
+  .flow__line{ top:0; bottom:0; left:27px; right:auto; width:1.5px; height:auto; background:repeating-linear-gradient(180deg, var(--blue) 0 8px, transparent 8px 15px); }
+  .flow__line::after{ right:auto; left:50%; top:auto; bottom:-2px; transform:translateX(-50%); border-left:4px solid transparent; border-right:4px solid transparent; border-top:7px solid var(--blue); border-bottom:0; }
+  .fstep{ display:grid; grid-template-columns:56px 1fr; gap:18px; padding-bottom:34px; }
+  .fstep__node{ grid-row:span 4; }
+  .fstep__coord{ margin:4px 0 6px; }
+  .fstep p{ max-width:none; }
+}
+
+/* ============================================================
+   TERMINAL window — drafting console note
+   ============================================================ */
+.win{ border:1.5px solid var(--blue); border-radius:var(--r); overflow:hidden; background:var(--paper); }
+.win__bar{ display:flex; align-items:center; gap:13px; padding:10px 15px; background:var(--blue-tint); border-bottom:1.5px solid var(--blue); flex-wrap:wrap; }
+.win__corner{ display:flex; gap:7px; }
+.win__corner i{ width:9px; height:9px; border:1.5px solid var(--blue); display:inline-block; }
+.win__corner i.fill{ background:var(--signal); border-color:var(--signal); }
+.win__title{ font-family:var(--font-mono); font-size:12px; color:var(--blue-deep); letter-spacing:.05em; }
+.win__badge{ margin-left:auto; font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.14em; color:var(--signal); border:1px solid var(--signal); border-radius:var(--r-sm); padding:3px 9px; text-transform:uppercase; }
+.win__body{ padding:22px 20px; font-family:var(--font-mono); font-size:var(--step--1); line-height:1.7; position:relative; background:var(--paper); color:var(--ink); }
+.win__body .cmt{ color:var(--blue); }
+.cmdline{ display:flex; gap:11px; align-items:flex-start; }
+.cmdline .pr{ color:var(--signal); user-select:none; }
+.cmdline code{ color:var(--ink); white-space:pre-wrap; word-break:break-word; }
+.cmdline .inline-note{ color:var(--muted); }
+.caret{ display:inline-block; width:8px; height:1.05em; background:var(--signal); vertical-align:-2px; margin-left:2px; animation:blink 1.05s steps(1) infinite; }
+@keyframes blink{ 50%{ opacity:0 } }
+.win__copy{ position:absolute; top:13px; right:13px; min-width:74px; margin:0; }
+.term-grid{ display:grid; grid-template-columns:1.12fr .88fr; gap:clamp(28px,4vw,56px); align-items:center; margin-top:44px; }
+@media (max-width:860px){ .term-grid{ grid-template-columns:1fr; gap:30px; } }
+.term-aside h3{ font-size:var(--step-2); margin:0 0 16px; letter-spacing:-.02em; }
+.term-aside p{ color:var(--muted); font-size:var(--step-0); line-height:1.55; margin:0 0 16px; max-width:50ch; text-wrap:pretty; }
+.term-aside p strong{ color:var(--ink); font-weight:600; }
+.unified{ display:flex; flex-wrap:wrap; gap:0; margin-top:6px; border:1px solid var(--hair); border-radius:var(--r); width:fit-content; }
+.unified span{ font-family:var(--font-mono); font-size:11px; color:var(--blue-deep); padding:6px 13px; border-right:1px solid var(--hair); display:inline-flex; gap:8px; align-items:center; }
+.unified span:last-child{ border-right:0; }
+.unified span::before{ content:""; width:5px; height:5px; background:var(--signal); }
+.tipline{ margin-top:22px; font-size:var(--step--1); color:var(--muted); line-height:1.6; }
+.tipline b{ color:var(--ink); }
+code.k{ font-family:var(--font-mono); background:var(--blue-tint); border:1px solid var(--hair); border-radius:var(--r-sm); padding:1px 6px; font-size:.9em; color:var(--blue-deep); }
+
+/* ============================================================
+   COMPARE — SPECIFICATION SHEET
+   ============================================================ */
+.cmp-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+.cmpkey{ display:flex; flex-wrap:wrap; gap:8px; margin:26px 0 8px; }
+.cmpkey .chip{ display:inline-flex; align-items:center; gap:8px; background:var(--paper); border:1px solid var(--hair); color:var(--blue-deep); font-family:var(--font-mono); font-size:12px; padding:6px 12px; border-radius:var(--r); }
+.cmpkey .chip b{ color:var(--signal); font-weight:700; }
+.tablewrap{ position:relative; overflow-x:auto; border:1.5px solid var(--blue); border-radius:var(--r); background:var(--paper); margin-top:18px; -webkit-overflow-scrolling:touch; }
+.tablewrap:focus-visible{ outline:2px solid var(--signal); outline-offset:2px; }
+table.cmp{ border-collapse:collapse; width:100%; min-width:1240px; font-family:var(--font-mono); font-size:12.5px; font-variant-numeric:tabular-nums; }
+table.cmp th, table.cmp td{ padding:12px 9px; text-align:center; border-bottom:1px solid var(--hair); border-right:1px solid var(--hair-soft); }
+table.cmp th:first-child, table.cmp td:first-child{ text-align:left; color:var(--ink); font-weight:400; width:236px; min-width:236px; max-width:236px; position:sticky; left:0; background:var(--paper2); z-index:2; }
+table.cmp th:nth-child(2), table.cmp td:nth-child(2){ position:sticky; left:236px; z-index:2; min-width:108px; }
+table.cmp thead th:first-child, table.cmp thead th:nth-child(2){ z-index:6; }
+table.cmp thead th{ font-size:11px; color:var(--blue-deep); font-weight:500; letter-spacing:.02em; background:var(--paper2); vertical-align:bottom; line-height:1.3; white-space:normal; position:sticky; top:0; }
+table.cmp thead tr.grp th{ background:var(--paper2); }
+table.cmp thead tr.grp th.g{ color:var(--blue); font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; background:var(--blue-tint); border-left:1px solid var(--hair); padding:9px; }
+table.cmp thead th.helm{ color:var(--signal); background:var(--signal-col); font-weight:700; }
+table.cmp tbody tr:hover td{ background:var(--blue-tint); }
+table.cmp tbody tr:hover td:first-child{ background:var(--paper3); }
+table.cmp td.helm{ background:var(--signal-col); }
+table.cmp thead th.helm, table.cmp td.helm{ box-shadow:inset 1.5px 0 0 var(--signal), inset -1.5px 0 0 var(--signal); }
+table.cmp tbody tr:hover td.helm{ background:var(--signal-col-hover); }
+.mk{ font-weight:500; font-size:14px; }
+.mk.yes,.tyes{ color:var(--signal) } .mk.part,.tpart{ color:var(--part) } .mk.no,.tno{ color:var(--no) }
+/* Helm marks: the most prominent — bold signal-red */
+td.helm .mk.yes{ color:var(--signal); font-weight:700; font-size:16px; }
+.scrollhint{ font-family:var(--font-mono); color:var(--blue); font-size:11px; margin:12px 0 0; display:flex; align-items:center; gap:8px; }
+.scrollhint .swipe{ display:inline-block; color:var(--signal); }
+@media (min-width:1320px){ .scrollhint{ display:none; } }
+.legend{ display:flex; gap:22px; flex-wrap:wrap; color:var(--blue-deep); font-family:var(--font-mono); font-size:12px; margin-top:18px; }
+.legend b{ font-weight:700; margin-right:7px; }
+.cmpnote{ color:var(--muted); font-size:var(--step--1); margin-top:14px; max-width:80ch; line-height:1.6; }
+@media (max-width:560px){
+  table.cmp th:first-child, table.cmp td:first-child{ width:170px; min-width:170px; max-width:170px; }
+  table.cmp th:nth-child(2), table.cmp td:nth-child(2){ left:170px; }
+}
+
+/* ============================================================
+   DESKTOP — exploded-view callout / app window line-work
+   ============================================================ */
+.desk{ display:grid; grid-template-columns:.92fr 1.08fr; gap:clamp(30px,5vw,72px); align-items:center; }
+@media (max-width:920px){ .desk{ grid-template-columns:1fr; gap:36px; } }
+.desk__copy h2{ font-size:var(--step-3); margin-bottom:18px; }
+.desk__dl{ display:flex; flex-wrap:wrap; gap:12px; margin:26px 0 18px; }
+.desk__note{ color:var(--muted); font-size:var(--step--1); line-height:1.65; max-width:54ch; }
+.desk__note a{ color:var(--blue); text-decoration:underline; text-decoration-color:var(--hair); text-underline-offset:2px; }
+.desk__note b{ color:var(--ink); }
+/* app window as thin line-work on paper */
+.app{ border:1.5px solid var(--blue); border-radius:var(--r); overflow:hidden; background:var(--paper); position:relative; }
+.app__bar{ display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--blue-tint); border-bottom:1.5px solid var(--blue); }
+.app__bar .title{ font-family:var(--font-mono); font-size:11px; color:var(--blue-deep); letter-spacing:.04em; }
+.app__bar .conn{ margin-left:auto; display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:10.5px; color:var(--signal); }
+.app__bar .conn .led{ width:6px; height:6px; border-radius:50%; background:var(--signal); }
+.app__body{ display:grid; grid-template-columns:152px 1fr; min-height:336px; }
+.app__side{ border-right:1.5px solid var(--hair); padding:14px 12px; background:var(--paper2); }
+.app__side .grp{ font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--blue); margin:4px 0 10px; }
+.app__side .row{ display:flex; align-items:center; gap:9px; padding:8px 9px; border-radius:var(--r-sm); font-size:13px; color:var(--muted); margin-bottom:3px; }
+.app__side .row.on{ background:var(--signal-soft); color:var(--ink); box-shadow:inset 2px 0 0 var(--signal); }
+.app__side .row .ico{ width:15px; height:15px; color:var(--blue); flex:none; }
+.app__side .row.on .ico{ color:var(--signal); }
+.app__chat{ padding:18px 18px 16px; display:flex; flex-direction:column; gap:13px; }
+.msg{ max-width:84%; font-size:13.5px; line-height:1.5; padding:11px 14px; border-radius:var(--r); border:1.5px solid var(--hair); }
+.msg.me{ align-self:flex-end; background:var(--signal); border-color:var(--signal); color:var(--paper); font-weight:500; }
+.msg.ai{ align-self:flex-start; background:var(--paper2); border-color:var(--blue); color:var(--ink); }
+.msg .who{ font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--blue); display:block; margin-bottom:5px; }
+.msg.me .who{ color:color-mix(in oklch, var(--paper) 80%, transparent); }
+.msg.ai code{ font-family:var(--font-mono); font-size:12px; background:var(--blue-tint); padding:1px 5px; border-radius:var(--r-sm); color:var(--blue-deep); }
+.thinking{ align-self:flex-start; display:inline-flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:11.5px; color:var(--blue-deep); border:1px solid var(--hair); background:var(--paper2); padding:8px 13px; border-radius:var(--r); }
+.thinking .pulse{ display:inline-flex; gap:3px; }
+.thinking .pulse i{ width:5px; height:5px; border-radius:50%; background:var(--signal); animation:think 1.2s ease-in-out infinite; }
+.thinking .pulse i:nth-child(2){ animation-delay:.18s } .thinking .pulse i:nth-child(3){ animation-delay:.36s }
+@keyframes think{ 0%,100%{ opacity:.3; transform:translateY(0) } 50%{ opacity:1; transform:translateY(-2px) } }
+.app__input{ margin-top:auto; display:flex; align-items:center; gap:10px; border:1.5px solid var(--hair); border-radius:var(--r); padding:9px 12px; background:var(--paper2); color:var(--muted); font-size:13px; }
+.app__input .send{ margin-left:auto; color:var(--signal); }
+/* leader-line label on the app drawing */
+.app__leader{ position:absolute; right:14px; bottom:-1px; transform:translateY(100%); font-family:var(--font-mono); font-size:9px; letter-spacing:.1em; color:var(--blue); text-transform:uppercase; padding-top:6px; display:none; }
+@media (min-width:921px){ .app__leader{ display:block; } }
+@media (max-width:520px){
+  .app__body{ grid-template-columns:1fr; }
+  .app__side{ display:none; }
+}
+
+/* ============================================================
+   INSTALL — assembly instructions
+   ============================================================ */
+.tabbar{ display:flex; gap:7px; flex-wrap:wrap; }
+.tab{ background:var(--paper); border:1.5px solid var(--hair); color:var(--blue-deep); border-radius:var(--r); padding:7px 13px; font-family:var(--font-mono); font-size:12px; cursor:pointer; transition:color .18s var(--ease-out), border-color .18s var(--ease-out), background .18s var(--ease-out); }
+.tab:hover{ border-color:var(--blue); background:var(--blue-soft); }
+.tab[aria-selected="true"]{ background:var(--signal); border-color:var(--signal); color:var(--paper); font-weight:500; }
+.install-note{ color:var(--muted); font-size:var(--step--1); line-height:1.65; margin-top:16px; max-width:78ch; }
+.install-note b{ color:var(--ink); }
+
+/* numbered drafting rows for setup with leader lines */
+.steps{ margin-top:14px; border-top:1.5px solid var(--blue); }
+.srow{ display:grid; grid-template-columns:68px 1fr; gap:22px; padding:22px 4px; border-bottom:1px solid var(--hair); align-items:baseline; position:relative; }
+.srow__n{ font-family:var(--font-mono); font-size:var(--step-2); font-weight:700; color:var(--signal); line-height:1; letter-spacing:-.02em; position:relative; }
+.srow__n::after{ content:""; position:absolute; right:-11px; top:.15em; bottom:.15em; width:1px; background:var(--hair); }
+.srow__b h4{ font-family:var(--font-display); font-size:var(--step-1); font-weight:700; margin:0 0 7px; letter-spacing:-.015em; }
+.srow__b p{ margin:0; color:var(--muted); font-size:var(--step--1); line-height:1.55; max-width:64ch; }
+.srow__b p a{ color:var(--blue); text-decoration:underline; text-decoration-color:var(--hair); text-underline-offset:2px; }
+.srow__b p b{ color:var(--ink); font-weight:600; }
+@media (max-width:520px){ .srow{ grid-template-columns:46px 1fr; gap:16px; } .srow__n{ font-size:var(--step-1); } .srow__n::after{ right:-8px; } }
+
+.subhead{ font-family:var(--font-display); font-size:var(--step-2); font-weight:700; letter-spacing:-.02em; margin:0 0 8px; }
+.subhead-wrap{ margin-top:clamp(54px,8vh,92px); }
+.subhead-kick{ font-family:var(--font-mono); font-size:var(--step--1); color:var(--blue); letter-spacing:.10em; text-transform:uppercase; margin:0 0 12px; display:inline-flex; align-items:center; gap:9px; }
+.subhead-kick::before{ content:""; width:16px; height:1px; background:var(--signal); }
+
+/* option group: varied, not 3 identical cards */
+.optgrid{ display:grid; grid-template-columns:1.25fr 1fr 1fr; gap:0; margin-top:22px; border:1.5px solid var(--blue); border-radius:var(--r); }
+.opt{ padding:22px; border-right:1px solid var(--hair); }
+.opt:last-child{ border-right:0; }
+.opt h4{ font-family:var(--font-display); font-size:var(--step-1); font-weight:700; margin:0 0 8px; letter-spacing:-.015em; display:flex; align-items:center; gap:9px; }
+.opt h4 svg{ width:18px; height:18px; color:var(--signal); flex:none; }
+.opt p{ margin:0; color:var(--muted); font-size:var(--step--1); line-height:1.55; }
+@media (max-width:820px){ .optgrid{ grid-template-columns:1fr; } .opt{ border-right:0; border-bottom:1px solid var(--hair); } .opt:last-child{ border-bottom:0; } }
+
+.safety{ background:var(--blue-tint); border:1.5px solid var(--blue); border-radius:var(--r); padding:24px 26px; margin-top:22px; position:relative; }
+.safety::before{ content:"⚠ NOTE"; position:absolute; top:-1px; left:18px; transform:translateY(-50%); font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.12em; color:var(--signal); background:var(--paper); padding:0 8px; }
+.safety p{ margin:0; color:var(--muted); font-size:var(--step-0); line-height:1.6; max-width:80ch; }
+.safety p b{ color:var(--ink); font-weight:600; }
+
+.uninstall-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
+@media (max-width:680px){ .uninstall-grid{ grid-template-columns:1fr; } }
+
+/* ============================================================
+   FINAL CTA + footer — drawing title block
+   ============================================================ */
+.final{ text-align:center; }
+.final__block{ border:1.5px solid var(--blue); border-radius:var(--r); padding:clamp(40px,7vw,80px) clamp(24px,5vw,60px); position:relative; background:var(--paper); }
+.final__block::before{ content:"SHEET 5 / 5"; position:absolute; top:14px; right:16px; font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.12em; color:var(--signal); }
+.final__block::after{ content:"FIG. 10 — LAUNCH"; position:absolute; top:14px; left:16px; font-family:var(--font-mono); font-size:10px; letter-spacing:.12em; color:var(--blue); }
+.final h2{ font-size:var(--step-4); margin:0 auto 22px; max-width:18ch; }
+.final p{ color:var(--muted); font-size:var(--step-1); max-width:50ch; margin:0 auto 32px; text-wrap:pretty; }
+.final__ctas{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+.final__cmd{ display:inline-flex; align-items:center; gap:10px; margin-top:26px; font-family:var(--font-mono); font-size:var(--step--1); color:var(--blue-deep); border:1px solid var(--hair); border-radius:var(--r); padding:0; background:var(--paper2); overflow:hidden; }
+.final__cmd .pr{ color:var(--signal); padding-left:14px; }
+.final__cmd code{ padding:9px 0; }
+.final__cmd .copy{ margin-right:8px; }
+.titleblock{ margin-top:28px; font-family:var(--font-mono); font-size:var(--step--2); letter-spacing:.12em; color:var(--blue); text-transform:uppercase; display:flex; gap:0; justify-content:center; flex-wrap:wrap; border:1px solid var(--hair); border-radius:var(--r); width:fit-content; margin-inline:auto; }
+.titleblock span{ padding:7px 14px; border-right:1px solid var(--hair); }
+.titleblock span:last-child{ border-right:0; }
+.titleblock b{ color:var(--signal); font-weight:700; }
+
+footer{ border-top:1.5px solid var(--blue); padding-block:48px; position:relative; z-index:2; }
+.foot{ display:grid; grid-template-columns:1.4fr 1fr; gap:30px; align-items:start; }
+.foot__brand{ display:flex; align-items:center; gap:11px; margin-bottom:16px; }
+.foot__brand svg{ width:30px; height:30px; }
+.foot__brand b{ font-family:var(--font-mono); font-weight:700; letter-spacing:.28em; font-size:14px; }
+.foot__tag{ color:var(--muted); font-size:var(--step--1); line-height:1.6; max-width:46ch; }
+.foot__links{ display:flex; flex-direction:column; gap:11px; align-items:flex-start; justify-self:end; }
+.foot__links a{ font-family:var(--font-mono); color:var(--blue-deep); font-size:var(--step--1); transition:color .18s var(--ease-out); display:inline-flex; align-items:center; gap:8px; }
+.foot__links a:hover{ color:var(--signal); }
+.foot__bottom{ margin-top:34px; padding-top:22px; border-top:1px solid var(--hair); display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; font-family:var(--font-mono); font-size:11px; color:var(--blue); letter-spacing:.06em; }
+@media (max-width:640px){ .foot{ grid-template-columns:1fr; gap:24px; } .foot__links{ justify-self:start; } }
+
+/* reveal init state — only applied when JS+motion on */
+.reveal{ opacity:1; }
+html.has-motion .reveal{ opacity:0; transform:translateY(14px); }
+html.has-motion .reveal.is-in{ opacity:1; transform:none; transition:opacity .6s var(--ease-out), transform .6s var(--ease-out); }
+
+/* SVG draw-on: lines start hidden when motion on; drawn instantly otherwise */
+.draw{ stroke-dasharray:var(--len,1000); stroke-dashoffset:0; }
+html.has-motion .draw{ stroke-dashoffset:var(--len,1000); }
+html.has-motion .draw.is-drawn{ stroke-dashoffset:0; transition:stroke-dashoffset 1.4s var(--ease-out); }
+.draw-fade{ opacity:1; }
+html.has-motion .draw-fade{ opacity:0; }
+html.has-motion .draw-fade.is-drawn{ opacity:1; transition:opacity .6s var(--ease-out); }
+
+/* reduced motion: kill movement, keep opacity, halve durations, show drawings fully */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.3s !important; scroll-behavior:auto !important; }
+  .caret{ animation:none !important; }
+  html.has-motion .reveal{ opacity:1 !important; transform:none !important; }
+  html.has-motion .draw{ stroke-dashoffset:0 !important; }
+  html.has-motion .draw-fade{ opacity:1 !important; }
+}
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="gridpaper" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
 
-<div class="wrap">
-  <nav>
-    <a class="skip-link sr-only" href="#main">Skip to content</a>
-    <div class="brand">
-      <!-- circular Helm avatar mark -->
-      <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs>
-        <radialGradient id="nbg" cx="50%" cy="36%" r="75%"><stop offset="0%" stop-color="#1b2942"/><stop offset="55%" stop-color="#0f1722"/><stop offset="100%" stop-color="#070a10"/></radialGradient>
-        <linearGradient id="nwh" gradientUnits="userSpaceOnUse" x1="120" y1="100" x2="392" y2="412"><stop offset="0%" stop-color="#7df0dc"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
-        <radialGradient id="ncore" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#e6fffb"/><stop offset="60%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></radialGradient>
-      </defs>
-      <circle cx="256" cy="256" r="256" fill="url(#nbg)"/>
-      <g transform="translate(256,256)" fill="none" stroke="url(#nwh)" stroke-linecap="round" stroke-linejoin="round">
-        <g stroke-width="22"><line y2="-190"/><line y2="-190" transform="rotate(45)"/><line y2="-190" transform="rotate(90)"/><line y2="-190" transform="rotate(135)"/><line y2="-190" transform="rotate(180)"/><line y2="-190" transform="rotate(225)"/><line y2="-190" transform="rotate(270)"/><line y2="-190" transform="rotate(315)"/></g>
-        <circle r="150" stroke-width="30"/>
-      </g>
-      <circle cx="256" cy="256" r="58" fill="#070a10"/><circle cx="256" cy="256" r="58" fill="none" stroke="url(#nwh)" stroke-width="9"/><circle cx="256" cy="256" r="22" fill="url(#ncore)"/>
+<!-- ============================ NAV ============================ -->
+<header class="nav" id="nav">
+  <div class="nav__inner">
+    <a class="brand" href="#top" aria-label="Helm — home">
+      <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+        <rect x="3" y="3" width="506" height="506" rx="36" fill="none" stroke="var(--blue)" stroke-width="6"/>
+        <g transform="translate(256,256)" fill="none" stroke="var(--blue)" stroke-linecap="round" stroke-linejoin="round">
+          <g stroke-width="14"><line y2="-184"/><line y2="-184" transform="rotate(45)"/><line y2="-184" transform="rotate(90)"/><line y2="-184" transform="rotate(135)"/><line y2="-184" transform="rotate(180)"/><line y2="-184" transform="rotate(225)"/><line y2="-184" transform="rotate(270)"/><line y2="-184" transform="rotate(315)"/></g>
+          <circle r="126" stroke-width="16"/><circle r="52" stroke-width="10"/>
+        </g>
+        <circle cx="256" cy="256" r="15" fill="var(--signal)"/>
       </svg>
-      <span>HELM</span>
-    </div>
-    <div class="nav-links">
+      <b>HELM</b>
+    </a>
+    <nav class="nav__links" aria-label="Primary">
       <a href="#features">What it does</a>
-      <a href="#how">How it works</a>
+      <a href="#how">How</a>
       <a href="#terminal">Terminal</a>
       <a href="#compare">Compare</a>
       <a href="#install">Install</a>
+    </nav>
+    <div class="nav__cta">
+      <a class="btn btn--ghost" href="#compare">Compare</a>
+      <a class="btn btn--primary" href="#install">Install</a>
     </div>
-  </nav>
-</div>
-
-<div class="wrap">
-  <header class="hero">
-    <div class="logo-glow">
-      <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs>
-        <radialGradient id="bg2g" cx="50%" cy="34%" r="80%"><stop offset="0%" stop-color="#1d2738"/><stop offset="55%" stop-color="#111722"/><stop offset="100%" stop-color="#080b11"/></radialGradient>
-        <linearGradient id="wh2" gradientUnits="userSpaceOnUse" x1="110" y1="90" x2="402" y2="422"><stop offset="0%" stop-color="#7df0dc"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient>
-        <radialGradient id="core2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#d6fff7"/><stop offset="60%" stop-color="#5eead4"/><stop offset="100%" stop-color="#14b8a6"/></radialGradient>
-      </defs>
-      <rect width="512" height="512" rx="116" fill="url(#bg2g)"/>
-      <circle cx="256" cy="256" r="158" fill="none" stroke="#2b3a52" stroke-width="2" opacity="0.45"/>
-      <g transform="translate(256,256)" fill="none" stroke="url(#wh2)" stroke-linecap="round" stroke-linejoin="round">
-        <g stroke-width="15"><line y2="-184"/><line y2="-184" transform="rotate(45)"/><line y2="-184" transform="rotate(90)"/><line y2="-184" transform="rotate(135)"/><line y2="-184" transform="rotate(180)"/><line y2="-184" transform="rotate(225)"/><line y2="-184" transform="rotate(270)"/><line y2="-184" transform="rotate(315)"/></g>
-        <circle r="126" stroke-width="20"/><circle r="96" stroke-width="3" opacity="0.5"/>
-      </g>
-      <circle cx="256" cy="256" r="46" fill="#080b11"/><circle cx="256" cy="256" r="46" fill="none" stroke="url(#wh2)" stroke-width="6"/><circle cx="256" cy="256" r="16" fill="url(#core2)"/>
-      </svg>
-    </div>
-    <h1>Your own AI agent,<br><span class="grad">on your own machine.</span></h1>
-    <p class="sub">Helm lives on your hardware with full shell, files, web and screen. You message it from Discord; it actually does the work and reports back. Owner-locked, private, and powered by any model you like: your Claude subscription, an API key, or a free local model.</p>
-    <div class="cta">
-      <a class="btn primary" href="#install">Install options</a>
-      <a class="btn ghost" href="#compare">Compare</a>
-    </div>
-    <div class="tagrow">Runs on macOS, Windows and Linux · Discord &amp; iMessage · No new SaaS bill</div>
-  </header>
-</div>
+  </div>
+</header>
 
 <main id="main">
-<div class="wrap">
-  <section id="features">
-    <p class="eyebrow">What Helm can do</p>
-    <h2>Not a chatbot. An agent that <span class="grad">acts</span>.</h2>
-    <p class="lead">Most assistants answer in a web tab. Helm has your terminal, your files, your browser and your screen, and the judgment to use them.</p>
-    <div class="grid">
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M7 9l2.5 2.5L7 14"/><path d="M13 14h3"/><path d="M9 20h6"/></svg></div><h3>Lives on your machine</h3><p>Full shell, file system and web access, not a locked cloud sandbox. It builds, runs and fixes things for real.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></div><h3>Message it anywhere</h3><p>DM it on Discord, or iMessage on a Mac. No dashboard to babysit. It works like texting a very capable friend.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></div><h3>Owner-locked &amp; private</h3><p>Only your ID can command it. Your data, keys and conversations never leave hardware you own.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/><path d="M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6"/></svg></div><h3>Real long-term memory</h3><p>A structured memory store plus a self-rewriting Markdown knowledge base that learns your preferences and stays consistent over time.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7"/><path d="M18 10.5c0 3-2 4-5 4.6"/></svg></div><h3>Parallel build swarm</h3><p>Spins up multiple agents in isolated git branches to build and review features at once, smoke-gated so a broken change never reaches main.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></div><h3>Sees and drives your screen</h3><p>Takes screenshots, clicks and types on whichever machine Helm runs on (macOS, Windows or Linux). It operates apps that have no API when it has to.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><path d="M20 20v-4h-4"/></svg></div><h3>Thinks 24/7, upgrades itself</h3><p>Background cognition during the day; nightly self-improvement gated by tests that auto-revert on failure.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 7.5l9 4.5 9-4.5L12 3Z"/><path d="M3 12l9 4.5L21 12"/><path d="M3 16.5 12 21l9-4.5"/></svg></div><h3>Runs on any model</h3><p>Claude (subscription or API key), or any other model: local (Ollama, $0, no account) or hosted (OpenAI, Gemini, Groq, OpenRouter). Your choice at install.</p></div>
-      <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5L12 3Z"/><circle cx="12" cy="10" r="1.5"/><path d="M12 11.5v2.5"/></svg></div><h3>Encrypted secrets vault</h3><p>Hand it credentials safely: encrypted at rest, never echoed into chat, logs or git.</p></div>
-    </div>
-  </section>
+<span id="top"></span>
 
-  <section id="how">
-    <p class="eyebrow">How it works</p>
-    <h2>Three moving parts. <span class="grad">That's it.</span></h2>
-    <div class="flow">
-      <div class="step"><div class="n">01</div><h3>You message</h3><p>Send a DM from Discord or iMessage: a task, a question, anything.</p></div>
-      <div class="step"><div class="n">02</div><h3>Helm acts on your machine</h3><p>It runs Claude with full tools right on your hardware: shell, files, web, screen, memory.</p></div>
-      <div class="step"><div class="n">03</div><h3>It reports back</h3><p>You get the result (files built, problems fixed, a screenshot) straight back in the chat.</p></div>
-    </div>
-  </section>
-
-  <section id="terminal">
-    <p class="eyebrow">From your terminal too</p>
-    <h2>One command: <span class="grad">helm</span>.</h2>
-    <p class="lead">Don't want to open Discord? Talk to Helm straight from your shell. The terminal is a live
-      window into the <em>same</em> running agent: one brain, one memory, one conversation, shared with
-      Discord and iMessage. Type in the terminal and your phone sees it; reply on Discord and the
-      terminal shows it.</p>
-    <div class="term">
-      <div class="term-bar">
-        <span class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></span>
-        <span class="oslab" style="margin:0">terminal</span>
-        <span class="beta">macOS · Windows · Linux</span>
+<!-- ============================ HERO ============================ -->
+<section class="hero wrap" aria-labelledby="hero-title">
+  <div class="hero__grid">
+    <div class="hero__left">
+      <p class="hero__draft">Personal AI Agent <span class="tk">— FIG. 01</span></p>
+      <h1 class="hero__title" id="hero-title">
+        <span class="ln"><span>Your own AI agent,</span></span>
+        <span class="ln"><span>on your <span class="mark-box">own machine.</span></span></span>
+      </h1>
+      <p class="hero__sub">Helm runs on your hardware with full shell, files, web and screen. You message it from Discord, iMessage or your terminal — it does the work and reports back. <strong>Owner-locked, private,</strong> and powered by any model you choose.</p>
+      <div class="cmd">
+        <span class="cmd__tag" aria-hidden="true">RUN</span>
+        <span class="pr" aria-hidden="true">$</span>
+        <code id="herocmd">npx github:GOODMAN-PRO/helm</code>
+        <button class="copy" type="button" data-copy="npx github:GOODMAN-PRO/helm" aria-label="Copy install command">Copy</button>
       </div>
-      <div class="term-body">
-        <div class="comment"># register the `helm` command once (works in PowerShell, bash and zsh)</div>
-        <div class="cmdline"><span class="prompt">$</span><code>cd ~/helm; npm link</code></div>
-        <div class="comment" style="margin-top:14px"># then, from anywhere</div>
-        <div class="cmdline"><span class="prompt">$</span><code>helm</code> <span style="color:var(--faint)">&nbsp;&nbsp;# open the chat (starts Helm if it isn't running)</span></div>
-        <div class="cmdline" style="margin-top:6px"><span class="prompt">$</span><code>helm "what changed in this repo today?"</code></div>
-        <div class="cmdline" style="margin-top:6px"><span class="prompt">$</span><code>echo "summarize my downloads" | helm</code></div>
+      <div class="hero__ctas">
+        <a class="btn btn--primary" href="#install">Install options</a>
+        <a class="btn btn--ghost" href="#compare">Compare</a>
+      </div>
+      <div class="specstrip" role="note" aria-label="Helm at a glance">
+        <span><b>OWNER-LOCKED</b></span>
+        <span>macOS · WIN · LINUX</span>
+        <span>ANY MODEL</span>
+        <span>$0 SaaS</span>
       </div>
     </div>
-    <p class="term-note">Run <code>helm</code> with no arguments for an interactive chat, or pass a message for a
-      one-shot reply. It connects to the agent you're already running, so nothing is duplicated. Other commands:
-      <code>helm start</code> (run the service), <code>helm setup</code> (wizard), <code>helm --help</code>.</p>
-    <p class="term-note"><b>Windows tip:</b> in PowerShell, join two commands with <code>;</code> not <code>&amp;&amp;</code> —
-      e.g. <code>cd ~/helm; npm link</code>.</p>
-  </section>
 
-  <section id="compare">
-    <p class="eyebrow">How Helm compares</p>
-    <h2>Built for <span class="grad">you</span>, not a data center.</h2>
-    <p class="lead">The OpenClaw ecosystem and the hosted players each nail one slice: lightweight, secure, edge, or memory. Helm is the one that does all of it on your own hardware.</p>
-    <div class="helmkey">
-      <span class="chip"><b>✓</b> Discord + iMessage gateways</span>
-      <span class="chip"><b>✓</b> Runs on any model: free, local or hosted</span>
-      <span class="chip"><b>✓</b> Persistent memory + self-rewriting brain</span>
-      <span class="chip"><b>✓</b> Thinks 24/7 &amp; self-upgrades</span>
-      <span class="chip"><b>✓</b> Clicks &amp; types in any app</span>
-      <span class="chip"><b>✓</b> Parallel build swarm</span>
-      <span class="chip"><b>✓</b> Encrypted secrets vault</span>
-    </div>
-    <div class="tablewrap" tabindex="0" role="region" aria-label="Feature comparison (scrolls horizontally)">
-      <table>
-        <caption class="sr-only">How Helm compares to other AI agents across capabilities</caption>
-        <thead>
-          <tr class="grp">
-            <th></th>
-            <th></th>
-            <th class="g" colspan="6" scope="colgroup">Open-source &amp; local</th>
-            <th class="g" colspan="5" scope="colgroup">Managed &amp; hosted</th>
-          </tr>
-          <tr>
-            <th scope="col">Capability</th>
-            <th class="helm" scope="col">Helm</th>
-            <th scope="col">OpenClaw</th>
-            <th scope="col">Hermes Agent</th>
-            <th scope="col">TrustClaw</th>
-            <th scope="col">ZeroClaw</th>
-            <th scope="col">PicoClaw</th>
-            <th scope="col">NanoClaw</th>
-            <th scope="col">Claude Cowork</th>
-            <th scope="col">Manus</th>
-            <th scope="col">Perplexity Computer</th>
-            <th scope="col">Kimi Claw</th>
-            <th scope="col">Vellum</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Runs on your own machine</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Open / self-hosted</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Chat from Discord / iMessage</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
-          <tr><td>Full shell + file access</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Clicks &amp; types in any app (no API)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Persistent memory + self-rewriting brain</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td></tr>
-          <tr><td>Background thinking 24/7</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Self-upgrades (auto, tested)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Parallel build swarm</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>Encrypted secrets vault</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
-          <tr><td>Owner-locked &amp; private</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td></tr>
-          <tr><td>Uses your subscription / BYO key</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td></tr>
-          <tr><td>Runs on free / local models</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-          <tr><td>No extra monthly bill</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="part">~</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="no">—</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="scrollhint">Scroll horizontally to compare all agents →</p>
-    <div class="legend">
-      <span><b class="yes">✓</b>Yes</span>
-      <span><b class="part">~</b>Partial / limited</span>
-      <span><b class="no">—</b>No</span>
-    </div>
-    <p class="note">Positioning based on each project's public description, not an exhaustive benchmark. "Partial" means the capability is limited or hosted-only. Product names belong to their owners. Tell us where we've got a row wrong and we'll fix it.</p>
-  </section>
+    <div class="hero__right" aria-hidden="true">
+      <div class="wheel-stage" id="wheelStage">
+        <div class="wheel-frame"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
+        <svg viewBox="0 0 520 520" id="wheelSvg" focusable="false">
+          <!-- ===== construction / dimension layer (drawn first, faint) ===== -->
+          <g fill="none" stroke="var(--blue)" stroke-width="1" opacity="0.55">
+            <!-- pitch / bounding circle (dashed) -->
+            <circle class="draw" cx="260" cy="260" r="232" stroke-dasharray="6 7" data-fixeddash="1"/>
+            <!-- center crosshair -->
+            <line class="draw" x1="260" y1="60" x2="260" y2="142"/>
+            <line class="draw" x1="260" y1="378" x2="260" y2="460"/>
+            <line class="draw" x1="60" y1="260" x2="142" y2="260"/>
+            <line class="draw" x1="378" y1="260" x2="460" y2="260"/>
+          </g>
 
-  <section id="desktop">
-    <p class="eyebrow">Helm Dashboard</p>
-    <h2>A native window for <span class="grad">your Helm</span>.</h2>
-    <p class="lead">Helm Dashboard is the desktop client wired to the same brain as Discord and iMessage — resumable conversations, a live "thinking" status, a background-tasks view, document attachments, and your memory, all in one window.</p>
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-1.0.0-arm64.dmg" download>Download for macOS</a>
-      <a class="btn primary" href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-Setup-1.0.0.exe" download>Download for Windows</a>
-    </div>
-    <p class="note">macOS: <a href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-1.0.0-arm64.dmg">Apple&nbsp;Silicon</a> · <a href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-1.0.0-x64.dmg">Intel</a>. Windows: the <code>.exe</code> installer above.<br>Requires Helm running on your machine (<code>helm</code> in a terminal) — Helm Dashboard connects locally on <code>127.0.0.1:4625</code>. Builds are unsigned: on macOS, first launch is right&#8209;click&nbsp;→&nbsp;<b>Open</b>; on Windows, <b>More info → Run anyway</b>.</p>
-  </section>
+          <!-- ===== radius dimension line with arrowheads + label ===== -->
+          <g fill="none" stroke="var(--blue)" stroke-width="1.25" opacity="0.8">
+            <line class="draw" x1="260" y1="260" x2="438" y2="138"/>
+            <!-- arrowhead at outer end -->
+            <path class="draw" d="M438 138 l-13 1 l6 11" stroke-width="1.25"/>
+          </g>
+          <g class="draw-fade">
+            <rect x="356" y="150" width="62" height="20" fill="var(--paper)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="387" y="164" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--blue-deep)">R 126</text>
+          </g>
 
-  <section id="install">
-    <p class="eyebrow">Get Helm</p>
-    <h2>One command. <span class="grad">Then it's yours.</span></h2>
-    <div class="install">
-      <div class="term">
-        <div class="term-bar">
-          <span class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></span>
-          <div class="tabs">
-            <button class="tab active" data-cmd="npx github:GOODMAN-PRO/helm">npx · any OS</button>
-            <button class="tab" data-cmd="curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh">macOS / Linux</button>
-            <button class="tab" data-cmd="irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex">Windows</button>
-            <button class="tab" data-cmd="git clone https://github.com/GOODMAN-PRO/helm.git helm; cd helm; npm install; npm run wizard">Manual</button>
-            <button class="tab" data-cmd="mkdir helm; curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main | tar -xz -C helm --strip-components=1; cd helm; npm install; npm run wizard">No git</button>
-          </div>
-          <span class="beta">BETA</span>
+          <!-- ===== outer diameter callout ===== -->
+          <g class="draw-fade">
+            <rect x="206" y="14" width="108" height="22" fill="var(--paper)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="260" y="29" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--blue-deep)">&#216; 252</text>
+          </g>
+
+          <!-- ===== spoke angle mark ===== -->
+          <g fill="none" stroke="var(--blue)" stroke-width="1" opacity="0.7">
+            <path class="draw" d="M260 200 A 60 60 0 0 1 302 218" stroke-dasharray="0"/>
+          </g>
+          <g class="draw-fade">
+            <text x="296" y="206" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="var(--blue)">45&#176;</text>
+          </g>
+
+          <!-- ===== THE WHEEL — thin technical strokes ===== -->
+          <g transform="translate(260,260)" fill="none" stroke="var(--blue)" stroke-linecap="round" stroke-linejoin="round">
+            <g stroke-width="6">
+              <line class="draw" y2="-200"/>
+              <line class="draw" y2="-200" transform="rotate(45)"/>
+              <line class="draw" y2="-200" transform="rotate(90)"/>
+              <line class="draw" y2="-200" transform="rotate(135)"/>
+              <line class="draw" y2="-200" transform="rotate(180)"/>
+              <line class="draw" y2="-200" transform="rotate(225)"/>
+              <line class="draw" y2="-200" transform="rotate(270)"/>
+              <line class="draw" y2="-200" transform="rotate(315)"/>
+            </g>
+            <!-- handle knobs at spoke ends -->
+            <g stroke-width="3.5">
+              <circle class="draw" cy="-200" r="9"/>
+              <circle class="draw" cy="-200" r="9" transform="rotate(45)"/>
+              <circle class="draw" cy="-200" r="9" transform="rotate(90)"/>
+              <circle class="draw" cy="-200" r="9" transform="rotate(135)"/>
+              <circle class="draw" cy="-200" r="9" transform="rotate(180)"/>
+              <circle class="draw" cy="-200" r="9" transform="rotate(225)"/>
+              <circle class="draw" cy="-200" r="9" transform="rotate(270)"/>
+              <circle class="draw" cy="-200" r="9" transform="rotate(315)"/>
+            </g>
+            <circle class="draw" r="126" stroke-width="7"/>
+            <circle class="draw" r="96" stroke-width="2.5" opacity="0.55"/>
+            <circle class="draw" r="52" stroke-width="6"/>
+          </g>
+          <!-- hub center -->
+          <circle cx="260" cy="260" r="14" fill="var(--signal)"/>
+
+          <!-- ===== compass rose (top-left), needle in signal ===== -->
+          <g transform="translate(78,78)">
+            <circle class="draw" cx="0" cy="0" r="34" fill="var(--paper)" stroke="var(--blue)" stroke-width="1.25"/>
+            <g class="draw-fade" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--blue)" text-anchor="middle">
+              <text x="0" y="-22">N</text><text x="26" y="4">E</text><text x="0" y="30">S</text><text x="-26" y="4">W</text>
+            </g>
+            <!-- needle: signal pointing N, blue tail -->
+            <path class="draw-fade" d="M0 -16 L5 0 L0 4 L-5 0 Z" fill="var(--signal)" stroke="none"/>
+            <path class="draw-fade" d="M0 16 L4 0 L0 -2 L-4 0 Z" fill="var(--blue)" stroke="none"/>
+            <circle cx="0" cy="0" r="2" fill="var(--ink)"/>
+          </g>
+
+          <!-- ===== drawing labels ===== -->
+          <g class="draw-fade" font-family="JetBrains Mono, monospace" fill="var(--blue-deep)">
+            <text x="14" y="500" font-size="13" font-weight="700" letter-spacing="1">FIG. 01 — THE HELM</text>
+            <text x="430" y="500" font-size="11" fill="var(--blue)">SCALE 1:1</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
+
+<!-- ============================ THESIS ============================ -->
+<section class="section wrap" aria-labelledby="thesis-title">
+  <span class="coords" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span></span>
+  <p class="callout reveal">Sheet 1 / 5 — Thesis</p>
+  <div class="thesis">
+    <div>
+      <h2 id="thesis-title" class="reveal" style="margin-bottom:26px">Not a chatbot.<br>An agent that <span class="annot" data-note="acts">acts</span>.</h2>
+      <p class="thesis__body reveal">Most assistants answer inside a browser tab and stop there. Helm has your <strong>terminal, your files, your browser and your screen</strong> — and the judgment to use them. Ask for the outcome; it opens the tools, does the work on the machine you own, and brings back the result.</p>
+    </div>
+    <div class="thesis__meta reveal" aria-hidden="true">
+      <span><span class="lbl">STATUS</span> &nbsp;<b>resident on your hardware</b></span>
+      <span><span class="lbl">SCOPE</span> &nbsp;<b>shell · files · web · screen</b></span>
+      <span><span class="lbl">ACCESS</span> &nbsp;<b>you only</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FEATURES (PARTS LEGEND) ============================ -->
+<section class="section wrap" id="features" aria-labelledby="features-title">
+  <span class="coords" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span></span>
+  <p class="callout reveal">Section A — Capabilities</p>
+  <h2 class="h2 reveal" id="features-title" style="font-size:var(--step-3)">Everything a real agent needs, <span class="accent-word">on your side of the wire.</span></h2>
+  <p class="lead reveal">Eight things Helm does that a chat window can't. No cloud sandbox, no SaaS account, no data leaving hardware you own.</p>
+
+  <div class="legendgrid">
+    <!-- large feature 1: any model -->
+    <div class="part span2 tall part--feature reveal">
+      <span class="part__tag">A1 · core</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5L12 3Z"/><path d="m9 11 2 2 4-4"/></svg></div>
+      <h3>Runs on any model</h3>
+      <p>Claude on your subscription or an API key — or any other model. Run a free local model with Ollama at $0 and no account, or a hosted one. You pick at install; switch whenever.</p>
+      <div class="modelchips" aria-hidden="true">
+        <span>Claude</span><span class="free">Ollama · $0</span><span>OpenAI</span><span>Gemini</span><span>Groq</span><span>OpenRouter</span>
+      </div>
+    </div>
+
+    <!-- machine -->
+    <div class="part reveal">
+      <span class="part__tag">A2</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M7 9l2.5 2.5L7 14"/><path d="M13 14h3"/><path d="M9 20h6"/></svg></div>
+      <h3>Lives on your machine</h3>
+      <p>Full shell, file system and web access — not a locked cloud sandbox. It builds, runs and fixes things for real.</p>
+    </div>
+
+    <!-- message anywhere -->
+    <div class="part reveal">
+      <span class="part__tag">A3</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></div>
+      <h3>Message it anywhere</h3>
+      <p>DM it on Discord, or iMessage on a Mac, or call it from your shell. No dashboard to babysit.</p>
+    </div>
+
+    <!-- large feature 2: thinks 24/7 -->
+    <div class="part span2 tall reveal">
+      <span class="part__tag">A4 · always-on</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><path d="M20 20v-4h-4"/></svg></div>
+      <h3>Thinks 24/7, upgrades itself</h3>
+      <p>Background cognition through the day; a nightly self-improvement pass gated by tests that auto-revert on failure. It gets better while you sleep — and never ships a broken change to main.</p>
+      <div class="uptime" aria-hidden="true">
+        <div><b>02:14</b> nightly upgrade — running test suite…</div>
+        <div><b>02:17</b> <span class="ok">87/87 passed</span> · merged to main</div>
+        <div><b>09:00</b> background queue — 3 tasks resumed</div>
+      </div>
+    </div>
+
+    <!-- owner locked -->
+    <div class="part reveal">
+      <span class="part__tag">A5</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="9.5" rx="1"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></div>
+      <h3>Owner-locked &amp; private</h3>
+      <p>Only your ID can command it. Your data, keys and conversations never leave hardware you own.</p>
+    </div>
+
+    <!-- memory -->
+    <div class="part reveal">
+      <span class="part__tag">A6</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/><path d="M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6"/></svg></div>
+      <h3>Real long-term memory</h3>
+      <p>A structured memory store plus a self-rewriting Markdown brain that learns your preferences and stays consistent.</p>
+    </div>
+
+    <!-- swarm -->
+    <div class="part reveal">
+      <span class="part__tag">A7</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7"/><path d="M18 10.5c0 3-2 4-5 4.6"/></svg></div>
+      <h3>Parallel build swarm</h3>
+      <p>Spins up agents in isolated git branches to build and review features at once — smoke-gated, so a broken change never reaches main.</p>
+    </div>
+
+    <!-- screen -->
+    <div class="part reveal">
+      <span class="part__tag">A8</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></div>
+      <h3>Sees &amp; drives your screen</h3>
+      <p>Screenshots, clicks and types on whichever machine it runs on. It operates apps that have no API when it has to.</p>
+    </div>
+
+    <!-- vault -->
+    <div class="part reveal">
+      <span class="part__tag">A9</span>
+      <div class="part__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5L12 3Z"/><circle cx="12" cy="10.5" r="1.5"/><path d="M12 12v2.5"/></svg></div>
+      <h3>Encrypted secrets vault</h3>
+      <p>Hand it credentials safely — encrypted at rest, never echoed into chat, logs or git.</p>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
+
+<!-- ============================ HOW ============================ -->
+<section class="section wrap" id="how" aria-labelledby="how-title">
+  <p class="callout reveal">Fig. 02 — Operating sequence</p>
+  <h2 class="h2 reveal" id="how-title" style="font-size:var(--step-3)">Three moving parts. That's the whole loop.</h2>
+  <p class="lead reveal">You don't manage Helm. You talk to it, it acts on your machine, and it answers — one continuous thread across every channel.</p>
+
+  <div class="flow" id="flow">
+    <div class="flow__line" aria-hidden="true"></div>
+    <div class="fstep reveal">
+      <div class="fstep__node" aria-hidden="true">01</div>
+      <p class="fstep__coord">step 01 / send</p>
+      <h3>You message</h3>
+      <p>Send a DM from Discord or iMessage, or run <code class="k">helm</code> in a terminal: a task, a question, anything.</p>
+    </div>
+    <div class="fstep reveal">
+      <div class="fstep__node" aria-hidden="true">02</div>
+      <p class="fstep__coord">step 02 / act</p>
+      <h3>Helm acts on your machine</h3>
+      <p>It runs your chosen model with full tools, right on your hardware — shell, files, web, screen, memory.</p>
+    </div>
+    <div class="fstep reveal">
+      <div class="fstep__node" aria-hidden="true">03</div>
+      <p class="fstep__coord">step 03 / report</p>
+      <h3>It reports back</h3>
+      <p>You get the result — files built, a problem fixed, a screenshot — straight back in the same chat.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TERMINAL ============================ -->
+<section class="section wrap" id="terminal" aria-labelledby="term-title">
+  <p class="callout reveal">Sheet 2 / 5 — Console</p>
+  <h2 class="h2 reveal" id="term-title" style="font-size:var(--step-3)">One command: <span class="accent-word">helm</span>.</h2>
+  <div class="term-grid">
+    <div class="win reveal" id="termWin">
+      <div class="win__bar">
+        <span class="win__corner" aria-hidden="true"><i></i><i></i><i class="fill"></i></span>
+        <span class="win__title">TERMINAL — macOS · WIN · LINUX</span>
+        <span class="win__badge">zsh · bash · pwsh</span>
+      </div>
+      <div class="win__body" id="termBody" aria-label="Example terminal session">
+        <button class="copy win__copy" type="button" data-copy='cd ~/helm; npm link' aria-label="Copy the npm link command">Copy</button>
+        <div class="cmt" data-type># register the `helm` command once</div>
+        <div class="cmdline"><span class="pr">$</span><code data-type>cd ~/helm; npm link</code></div>
+        <div class="cmt" data-type style="margin-top:14px"># then, from anywhere</div>
+        <div class="cmdline" style="margin-top:6px"><span class="pr">$</span><code data-type>helm</code>&nbsp;<span class="inline-note" data-type># open the chat (starts Helm if needed)</span></div>
+        <div class="cmdline" style="margin-top:6px"><span class="pr">$</span><code data-type>helm "what changed in this repo today?"</code></div>
+        <div class="cmdline" style="margin-top:6px"><span class="pr">$</span><code data-type>echo "summarize my downloads" | helm</code><span class="caret" id="termCaret" aria-hidden="true"></span></div>
+      </div>
+    </div>
+    <div class="term-aside">
+      <h3 class="reveal">One brain, every channel.</h3>
+      <p class="reveal">Don't want to open Discord? Talk to Helm straight from your shell. The terminal is a live window into the <strong>same running agent</strong> — one brain, one memory, one conversation, shared with Discord and iMessage. Type in the terminal and your phone sees it; reply on Discord and the terminal shows it.</p>
+      <div class="unified reveal" aria-hidden="true">
+        <span>Discord</span><span>iMessage</span><span>Terminal</span>
+      </div>
+      <p class="tipline reveal">Run <code class="k">helm</code> with no arguments for an interactive chat, or pass a message for a one-shot reply. Other commands: <code class="k">helm start</code>, <code class="k">helm setup</code>, <code class="k">helm --help</code>.</p>
+      <p class="tipline reveal"><b>Windows tip:</b> in PowerShell, join two commands with <code class="k">;</code> not <code class="k">&amp;&amp;</code> — e.g. <code class="k">cd ~/helm; npm link</code>.</p>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
+
+<!-- ============================ COMPARE ============================ -->
+<section class="section wrap" id="compare" aria-labelledby="cmp-title">
+  <div class="cmp-head">
+    <div>
+      <p class="callout reveal">Table 1 — Capability matrix</p>
+      <h2 class="h2 reveal" id="cmp-title" style="font-size:var(--step-3);margin-bottom:0">Built for <span class="accent-word">you</span>, not a data center.</h2>
+    </div>
+  </div>
+  <p class="lead reveal" style="margin-top:18px">The open-source ecosystem and the hosted players each nail one slice — lightweight, secure, edge, or memory. Helm is the one that does all of it on hardware you own.</p>
+
+  <div class="cmpkey reveal" aria-hidden="true">
+    <span class="chip"><b>✓</b> Discord + iMessage</span>
+    <span class="chip"><b>✓</b> Any model: free, local or hosted</span>
+    <span class="chip"><b>✓</b> Memory + self-rewriting brain</span>
+    <span class="chip"><b>✓</b> Thinks 24/7 &amp; self-upgrades</span>
+    <span class="chip"><b>✓</b> Clicks &amp; types in any app</span>
+    <span class="chip"><b>✓</b> Parallel build swarm</span>
+    <span class="chip"><b>✓</b> Encrypted vault</span>
+  </div>
+
+  <div class="tablewrap reveal" tabindex="0" role="region" aria-label="Feature comparison table — scrolls horizontally">
+    <table class="cmp">
+      <caption class="sr-only">How Helm compares to other AI agents across capabilities. Helm column is highlighted.</caption>
+      <thead>
+        <tr class="grp">
+          <th></th>
+          <th></th>
+          <th class="g" colspan="6" scope="colgroup">Open-source &amp; local</th>
+          <th class="g" colspan="5" scope="colgroup">Managed &amp; hosted</th>
+        </tr>
+        <tr>
+          <th scope="col">Capability</th>
+          <th class="helm" scope="col">Helm</th>
+          <th scope="col">OpenClaw</th>
+          <th scope="col">Hermes Agent</th>
+          <th scope="col">TrustClaw</th>
+          <th scope="col">ZeroClaw</th>
+          <th scope="col">PicoClaw</th>
+          <th scope="col">NanoClaw</th>
+          <th scope="col">Claude Cowork</th>
+          <th scope="col">Manus</th>
+          <th scope="col">Perplexity Computer</th>
+          <th scope="col">Kimi Claw</th>
+          <th scope="col">Vellum</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Runs on your own machine</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>Open / self-hosted</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>Chat from Discord / iMessage</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td></tr>
+        <tr><td>Full shell + file access</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tyes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>Clicks &amp; types in any app (no API)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>Persistent memory + self-rewriting brain</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tyes">✓</span></td></tr>
+        <tr><td>Background thinking 24/7</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>Self-upgrades (auto, tested)</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>Parallel build swarm</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>Encrypted secrets vault</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tyes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td></tr>
+        <tr><td>Owner-locked &amp; private</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td></tr>
+        <tr><td>Uses your subscription / BYO key</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tyes">✓</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td></tr>
+        <tr><td>Runs on free / local models</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tyes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+        <tr><td>No extra monthly bill</td><td class="helm"><span class="mk yes">✓</span></td><td><span class="tyes">✓</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tpart">~</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td><td><span class="tno">—</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="scrollhint" aria-hidden="true"><span class="swipe">→</span> Scroll horizontally to compare all twelve agents</p>
+  <div class="legend">
+    <span><b class="tyes">✓</b>Yes</span>
+    <span><b class="tpart">~</b>Partial / limited</span>
+    <span><b class="tno">—</b>No</span>
+  </div>
+  <p class="cmpnote">Positioning is based on each project's public description, not an exhaustive benchmark. "Partial" means the capability is limited or hosted-only. Product names belong to their owners. Tell us where we've got a row wrong and we'll fix it.</p>
+</section>
+
+<div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
+
+<!-- ============================ DESKTOP ============================ -->
+<section class="section wrap" id="desktop" aria-labelledby="desk-title">
+  <div class="desk">
+    <div class="desk__copy">
+      <p class="callout reveal">Fig. 03 — Desktop dashboard</p>
+      <h2 class="reveal" id="desk-title">A native window for your Helm.</h2>
+      <p class="lead reveal" style="font-size:var(--step-0)">The desktop client, wired to the same brain as Discord and iMessage — resumable conversations, a live "thinking" status, a background-tasks view, document attachments, and your memory, all in one window.</p>
+      <div class="desk__dl reveal">
+        <a class="btn btn--primary" href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-1.0.0-arm64.dmg" download>Download for macOS</a>
+        <a class="btn btn--ghost" href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-Setup-1.0.0.exe" download>Download for Windows</a>
+      </div>
+      <p class="desk__note reveal">macOS: <a href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-1.0.0-arm64.dmg">Apple&nbsp;Silicon</a> · <a href="https://github.com/GOODMAN-PRO/helm/releases/download/v1.0.0/Helm-Dashboard-1.0.0-x64.dmg">Intel</a>. Windows: the <code class="k">.exe</code> installer above.<br><br>Requires Helm running on your machine (<code class="k">helm</code> in a terminal) — Helm Dashboard connects locally on <code class="k">127.0.0.1:4625</code>. Builds are unsigned: on macOS, first launch is right&#8209;click&nbsp;→&nbsp;<b>Open</b>; on Windows, <b>More info → Run anyway</b>.</p>
+    </div>
+
+    <div class="app reveal" role="img" aria-label="Helm Dashboard desktop app: a conversation with the agent, a live thinking status, and a connection indicator reading connected on 127.0.0.1:4625.">
+      <div class="app__bar">
+        <span class="win__corner" aria-hidden="true"><i></i><i></i><i class="fill"></i></span>
+        <span class="title">Helm Dashboard</span>
+        <span class="conn"><span class="led" aria-hidden="true"></span>connected · 127.0.0.1:4625</span>
+      </div>
+      <div class="app__body">
+        <aside class="app__side" aria-hidden="true">
+          <div class="grp">Channels</div>
+          <div class="row on"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3z"/></svg> Chat</div>
+          <div class="row"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/></svg> Tasks</div>
+          <div class="row"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/></svg> Memory</div>
+          <div class="grp" style="margin-top:18px">Engine</div>
+          <div class="row"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5z"/></svg> Claude</div>
+        </aside>
+        <div class="app__chat">
+          <div class="msg me"><span class="who">you</span>tidy ~/Downloads and tell me what's safe to delete</div>
+          <div class="msg ai"><span class="who">helm</span>Scanned 214 files. Grouped 38 installers and 11 duplicates into <code>~/Downloads/_review</code>. Nothing deleted yet — want me to clear the duplicates?</div>
+          <div class="thinking" aria-label="Helm is thinking"><span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span> thinking · reading file metadata…</div>
+          <div class="app__input" aria-hidden="true">Message Helm…<span class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
         </div>
-        <div class="term-body">
-          <div class="comment"># Works everywhere. Installs everything. You message it from Discord.</div>
-          <div class="cmdline"><span class="prompt">$</span><code id="acmd">npx github:GOODMAN-PRO/helm</code></div>
-          <button class="tcopy" onclick="copyTerm(this)">Copy</button>
+      </div>
+      <span class="app__leader" aria-hidden="true">DETAIL — LOCAL LINK 127.0.0.1:4625</span>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
+
+<!-- ============================ INSTALL ============================ -->
+<section class="section wrap" id="install" aria-labelledby="inst-title">
+  <span class="coords" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></span>
+  <p class="callout reveal">Sheet 4 / 5 — Assembly instructions</p>
+  <h2 class="h2 reveal" id="inst-title" style="font-size:var(--step-3)">One command. Then it's <span class="accent-word">yours</span>.</h2>
+  <p class="lead reveal">It brings everything it needs — Node, the Claude Code engine, dependencies — then a wizard walks you through the rest. macOS, Windows and Linux.</p>
+
+  <div class="win reveal" style="margin-top:34px" id="installWin">
+    <div class="win__bar">
+      <span class="win__corner" aria-hidden="true"><i></i><i></i><i class="fill"></i></span>
+      <div class="tabbar" role="tablist" aria-label="Install method">
+        <button class="tab" role="tab" id="tab-npx" aria-selected="true" aria-controls="installcmd" data-cmd="npx github:GOODMAN-PRO/helm">npx · any OS</button>
+        <button class="tab" role="tab" id="tab-unix" aria-selected="false" aria-controls="installcmd" data-cmd="curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.sh | sh">macOS / Linux</button>
+        <button class="tab" role="tab" id="tab-win" aria-selected="false" aria-controls="installcmd" data-cmd="irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/install.ps1 | iex">Windows</button>
+        <button class="tab" role="tab" id="tab-manual" aria-selected="false" aria-controls="installcmd" data-cmd="git clone https://github.com/GOODMAN-PRO/helm.git helm; cd helm; npm install; npm run wizard">Manual</button>
+        <button class="tab" role="tab" id="tab-nogit" aria-selected="false" aria-controls="installcmd" data-cmd="mkdir helm; curl -fsSL https://codeload.github.com/GOODMAN-PRO/helm/tar.gz/refs/heads/main | tar -xz -C helm --strip-components=1; cd helm; npm install; npm run wizard">No git</button>
+      </div>
+      <span class="win__badge">BETA</span>
+    </div>
+    <div class="win__body">
+      <button class="copy win__copy" type="button" id="installCopy" data-copy="npx github:GOODMAN-PRO/helm" aria-label="Copy install command">Copy</button>
+      <div class="cmt"># Works everywhere. Installs everything. You message it from Discord.</div>
+      <div class="cmdline" role="tabpanel" id="installcmd" aria-labelledby="tab-npx"><span class="pr">$</span><code id="installCmdText">npx github:GOODMAN-PRO/helm</code></div>
+    </div>
+  </div>
+  <p class="install-note reveal">Brings everything it needs: Node, Claude Code (the engine) and dependencies are installed for you. Then pick any model in the wizard; the free/local path (Ollama) needs no Anthropic account at all.</p>
+  <p class="install-note reveal"><b>Windows tip:</b> the PowerShell line works even when scripts are "Restricted". If a bare <code class="k">npx</code> says <em>"running scripts is disabled"</em>, use the PowerShell line above, or run <code class="k">npx.cmd github:GOODMAN-PRO/helm</code>.</p>
+
+  <!-- setup as numbered drafting rows -->
+  <div class="subhead-wrap">
+    <p class="subhead-kick reveal">Setup, step by step</p>
+    <h3 class="subhead reveal">The command handles 1–2. The wizard walks you through 3–5.</h3>
+    <div class="steps reveal">
+      <div class="srow"><div class="srow__n">01</div><div class="srow__b"><h4>Prerequisites</h4><p>The installer auto-installs Node 18+ and Claude Code (the engine) if they're missing. Nothing to set up by hand.</p></div></div>
+      <div class="srow"><div class="srow__n">02</div><div class="srow__b"><h4>Fetch &amp; install</h4><p>Downloads Helm and runs <code class="k">npm install</code> for you.</p></div></div>
+      <div class="srow"><div class="srow__n">03</div><div class="srow__b"><h4>Make a Discord bot</h4><p><a href="https://discord.com/developers/applications">Developer Portal</a> → New Application → Bot → Reset Token. Copy the token.</p></div></div>
+      <div class="srow"><div class="srow__n">04</div><div class="srow__b"><h4>Run the wizard</h4><p>Paste the token and your Discord user ID, then pick your gateway, your model (including free), and whether to run 24/7.</p></div></div>
+      <div class="srow"><div class="srow__n">05</div><div class="srow__b"><h4>Message it</h4><p>DM your bot on Discord (or iMessage on a Mac). It acts on your machine and reports back.</p></div></div>
+    </div>
+  </div>
+
+  <!-- option group: varied, not 3 identical cards -->
+  <div class="optgrid">
+    <div class="opt reveal">
+      <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 2.5V11c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V5.5z"/><path d="m9 11 2 2 4-4"/></svg>Any model, including free</h4>
+      <p>Claude (subscription or API key), or pick a free local model from a list and setup downloads it for you (via Ollama, $0, no account). Hosted models — OpenAI, Gemini, Groq, OpenRouter — work too.</p>
+    </div>
+    <div class="opt reveal">
+      <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H7l-3 3z"/></svg>Multiple gateways</h4>
+      <p>A guided setup screen turns on Discord, iMessage, or both. More on the way.</p>
+    </div>
+    <div class="opt reveal">
+      <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Run it 24/7</h4>
+      <p>Optionally install it as a background service so it's always there.</p>
+    </div>
+  </div>
+
+  <!-- Discord bot steps -->
+  <div class="subhead-wrap">
+    <p class="subhead-kick reveal">Create your Discord bot · ~2 min</p>
+    <h3 class="subhead reveal">The one part that's yours to do.</h3>
+    <div class="steps reveal">
+      <div class="srow"><div class="srow__n">1</div><div class="srow__b"><h4>New Application</h4><p><a href="https://discord.com/developers/applications">Developer Portal</a> → <b>New Application</b> → name it → <b>Create</b>.</p></div></div>
+      <div class="srow"><div class="srow__n">2</div><div class="srow__b"><h4>Get the token</h4><p><b>Bot</b> → <b>Reset Token</b> → <b>Copy</b>. That's your <code class="k">DISCORD_TOKEN</code>. Keep it secret. No special intents needed.</p></div></div>
+      <div class="srow"><div class="srow__n">3</div><div class="srow__b"><h4>Your user ID</h4><p>Discord <b>Settings → Advanced → Developer Mode</b> on, then right-click your name → <b>Copy User ID</b>. That's <code class="k">OWNER_ID</code> — it locks the bot to you.</p></div></div>
+      <div class="srow"><div class="srow__n">4</div><div class="srow__b"><h4>Add &amp; DM it</h4><p><b>OAuth2 → URL Generator</b> → scope <b>bot</b> → open the URL → add to a server. Then DM the bot. Paste both values into the wizard.</p></div></div>
+    </div>
+  </div>
+
+  <!-- safety -->
+  <div class="subhead-wrap">
+    <p class="subhead-kick reveal">Safety &amp; permissions</p>
+    <div class="safety reveal">
+      <p>Helm is a real agent on your machine: shell, files, web, screen, mouse/keyboard, scheduled actions, and a tested nightly self-upgrade. It's <b>owner-locked</b> to your Discord ID, secrets live in an encrypted vault, and it confirms before anything destructive. Start in <b>"ask before each action"</b> mode (the wizard's recommended default) and switch to full autonomy only once you trust it on that machine. Run it on hardware you own. It uses your own Claude account.</p>
+    </div>
+  </div>
+
+  <!-- uninstall -->
+  <div class="subhead-wrap">
+    <p class="subhead-kick reveal">Decommission</p>
+    <h3 class="subhead reveal">One line. It leaves your vault and backups alone.</h3>
+    <p class="install-note reveal" style="margin-top:8px">Stops every service, kills the processes, and removes the install (asks first; your HelmBrain vault and backups are left alone).</p>
+    <div class="uninstall-grid">
+      <div class="win reveal">
+        <div class="win__body">
+          <button class="copy win__copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.sh | sh" aria-label="Copy macOS / Linux uninstall command">Copy</button>
+          <div class="cmt"># macOS / Linux</div>
+          <div class="cmdline"><span class="pr">$</span><code>curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.sh | sh</code></div>
         </div>
       </div>
-      <p class="term-note">Brings everything it needs: Node, Claude Code (the engine) and dependencies are installed for you. Then pick any model in the wizard; the free/local path (Ollama) needs no Anthropic account at all. macOS, Windows and Linux.</p>
-      <p class="term-note"><b>Windows tip:</b> the PowerShell line works even when scripts are "Restricted". If a bare <code>npx</code> says <em>"running scripts is disabled"</em>, use the PowerShell line above, or run <code>npx.cmd github:GOODMAN-PRO/helm</code>.</p>
-
-      <h3 class="setup-h">Setup, step by step</h3>
-      <p class="term-note">The command above handles 1-2; the wizard walks you through 3-5. Same on macOS, Windows and Linux.</p>
-      <div class="flow">
-        <div class="step"><div class="n">01</div><h3>Prerequisites</h3><p>The installer auto-installs Node 18+ and Claude Code (the engine) if they're missing. Nothing to set up by hand.</p></div>
-        <div class="step"><div class="n">02</div><h3>Fetch &amp; install</h3><p>Downloads Helm and runs <code>npm install</code> for you.</p></div>
-        <div class="step"><div class="n">03</div><h3>Make a Discord bot</h3><p><a href="https://discord.com/developers/applications">Developer Portal</a> → New Application → Bot → Reset Token. Copy the token.</p></div>
-        <div class="step"><div class="n">04</div><h3>Run the wizard</h3><p>Paste the token + your Discord user ID, then pick your gateway, your model (incl. free), and whether to run 24/7.</p></div>
-        <div class="step"><div class="n">05</div><h3>Message it</h3><p>DM your bot on Discord (or iMessage on a Mac). It acts on your machine and reports back.</p></div>
+      <div class="win reveal">
+        <div class="win__body">
+          <button class="copy win__copy" type="button" data-copy="irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.ps1 | iex" aria-label="Copy Windows uninstall command">Copy</button>
+          <div class="cmt"># Windows (PowerShell)</div>
+          <div class="cmdline"><span class="pr">$</span><code>irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.ps1 | iex</code></div>
+        </div>
       </div>
-
-      <div class="opts">
-        <div class="opt"><h3>Multiple gateways</h3><p>A guided setup screen turns on Discord, iMessage, or both. More on the way.</p></div>
-        <div class="opt"><h3>Any model, including free</h3><p>Claude (subscription or API key), or pick a free local model from a list, and the setup downloads it for you (via Ollama, $0, no account). Hosted models (OpenAI, Gemini, Groq, OpenRouter) work too.</p></div>
-        <div class="opt"><h3>Run it 24/7</h3><p>Optionally install it as a background service so it's always there.</p></div>
-      </div>
-
-      <h3 class="setup-h">Create your Discord bot (~2 min)</h3>
-      <p class="term-note">The one part that's yours to do. Discord requires a bot you own:</p>
-      <div class="flow">
-        <div class="step"><div class="n">1</div><h3>New Application</h3><p><a href="https://discord.com/developers/applications">Developer Portal</a> → <b>New Application</b> → name it → <b>Create</b>.</p></div>
-        <div class="step"><div class="n">2</div><h3>Get the token</h3><p><b>Bot</b> → <b>Reset Token</b> → <b>Copy</b>. That's your <code>DISCORD_TOKEN</code>. Keep it secret. No special intents needed.</p></div>
-        <div class="step"><div class="n">3</div><h3>Your user ID</h3><p>Discord <b>Settings → Advanced → Developer Mode</b> on, then right-click your name → <b>Copy User ID</b>. That's <code>OWNER_ID</code>. It locks the bot to you.</p></div>
-        <div class="step"><div class="n">4</div><h3>Add &amp; DM it</h3><p><b>OAuth2 → URL Generator</b> → scope <b>bot</b> → open the URL → add to a server. Then DM the bot. Paste both values into the wizard.</p></div>
-      </div>
-
-      <h3 class="setup-h">Safety &amp; permissions</h3>
-      <p class="term-note">Helm is a real agent on your machine: shell, files, web, screen, mouse/keyboard, scheduled actions, and a tested nightly self-upgrade. It's <b>owner-locked</b> to your Discord ID, secrets live in an encrypted vault, and it confirms before anything destructive. Start in <b>“ask before each action”</b> mode (the wizard's recommended default) and switch to full autonomy only once you trust it on that machine. Run it on hardware you own. It uses your own Claude account.</p>
-
-      <h3 class="setup-h">Uninstall</h3>
-      <p class="term-note">One line — stops every service, kills the processes, and removes the install (asks first; your HelmBrain vault and backups are left alone):</p>
-      <div class="term"><div class="term-body"><div class="comment"># macOS / Linux</div><div class="cmdline"><span class="prompt">$</span><code>curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.sh | sh</code></div><button class="tcopy" onclick="copyText('curl -fsSL https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.sh | sh', this)">Copy</button></div></div>
-      <div class="term"><div class="term-body"><div class="comment"># Windows (PowerShell)</div><div class="cmdline"><span class="prompt">$</span><code>irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.ps1 | iex</code></div><button class="tcopy" onclick="copyText('irm https://raw.githubusercontent.com/GOODMAN-PRO/helm/main/scripts/uninstall.ps1 | iex', this)">Copy</button></div></div>
     </div>
-  </section>
-</div>
+  </div>
+</section>
+
+<div class="wrap"><div class="ruler" aria-hidden="true"></div></div>
+
+<!-- ============================ FINAL CTA ============================ -->
+<section class="section wrap final" aria-labelledby="final-title">
+  <div class="final__block reveal">
+    <h2 class="reveal" id="final-title">Put an agent on your own machine.</h2>
+    <p class="reveal">No SaaS bill, no account required for the free path, no data leaving your hardware. One command and it's yours.</p>
+    <div class="final__ctas reveal">
+      <a class="btn btn--primary" href="#install">Install Helm</a>
+      <a class="btn btn--ghost" href="https://github.com/GOODMAN-PRO/helm">View on GitHub</a>
+    </div>
+    <div class="final__cmd reveal">
+      <span class="pr" aria-hidden="true">$</span>
+      <code>npx github:GOODMAN-PRO/helm</code>
+      <button class="copy" type="button" data-copy="npx github:GOODMAN-PRO/helm" aria-label="Copy install command">Copy</button>
+    </div>
+    <div class="titleblock reveal" aria-label="Drawing title block">
+      <span>HELM</span><span><b>SHEET 5 / 5</b></span><span>DRAWN BY YOU</span><span>SCALE 1:1</span>
+    </div>
+  </div>
+</section>
 </main>
 
+<!-- ============================ FOOTER ============================ -->
 <footer>
-  <div class="wrap">Helm: a personal AI agent that runs on your hardware. Your machine, your data, your agent.</div>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div class="foot__brand">
+          <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+            <rect x="3" y="3" width="506" height="506" rx="36" fill="none" stroke="var(--blue)" stroke-width="6"/>
+            <g transform="translate(256,256)" fill="none" stroke="var(--blue)" stroke-linecap="round" stroke-linejoin="round">
+              <g stroke-width="14"><line y2="-184"/><line y2="-184" transform="rotate(45)"/><line y2="-184" transform="rotate(90)"/><line y2="-184" transform="rotate(135)"/><line y2="-184" transform="rotate(180)"/><line y2="-184" transform="rotate(225)"/><line y2="-184" transform="rotate(270)"/><line y2="-184" transform="rotate(315)"/></g>
+              <circle r="126" stroke-width="16"/><circle r="52" stroke-width="10"/>
+            </g>
+            <circle cx="256" cy="256" r="15" fill="var(--signal)"/>
+          </svg>
+          <b>HELM</b>
+        </div>
+        <p class="foot__tag">Helm: a personal AI agent that runs on your hardware. Your machine, your data, your agent.</p>
+      </div>
+      <nav class="foot__links" aria-label="Footer">
+        <a href="https://github.com/GOODMAN-PRO/helm">GitHub<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+        <a href="https://github.com/GOODMAN-PRO/helm/releases">Releases<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+        <a href="#install">Install</a>
+      </nav>
+    </div>
+    <div class="foot__bottom">
+      <span>OWNER-LOCKED · SELF-HOSTED · $0 SAAS</span>
+      <span>Powered by the Claude Code engine</span>
+    </div>
+  </div>
 </footer>
 
+<!-- ============================ SCRIPTS ============================ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
 <script>
-function flash(btn){ if(!btn) return; const o=btn.textContent; btn.textContent='Copied'; setTimeout(()=>{btn.textContent=o;},1400); }
-function fallbackCopy(text, btn){
-  try{
-    const ta=document.createElement('textarea');
-    ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='-1000px';
-    document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta); flash(btn);
-  }catch(e){}
-}
-function copyText(text, btn){
-  if(navigator.clipboard && window.isSecureContext){
-    navigator.clipboard.writeText(text).then(()=>flash(btn)).catch(()=>fallbackCopy(text,btn));
-  } else { fallbackCopy(text, btn); }
-}
-function copyCmd(btn){ copyText(btn.previousElementSibling.textContent, btn); }
-function copyTerm(btn){ copyText(document.getElementById('acmd').textContent, btn); }
-// terminal install card: tabs swap the active command
-document.querySelectorAll('.tab').forEach(tab=>{
-  tab.addEventListener('click',()=>{
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('acmd').textContent=tab.dataset.cmd;
+(function(){
+  "use strict";
+  var REDUCE = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var hasGSAP = !!(window.gsap && window.ScrollTrigger);
+  var hasLenis = !!window.Lenis;
+
+  /* ---------- copy buttons (real, with no-shift "Copied") ---------- */
+  function flash(btn){
+    if(!btn) return;
+    var prev = btn.getAttribute("data-label") || btn.textContent;
+    if(!btn.getAttribute("data-label")) btn.setAttribute("data-label", prev);
+    btn.textContent = "Copied";
+    btn.classList.add("is-done");
+    clearTimeout(btn._t);
+    btn._t = setTimeout(function(){ btn.textContent = btn.getAttribute("data-label"); btn.classList.remove("is-done"); }, 1500);
+  }
+  function fallbackCopy(text, btn){
+    try{
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly",""); ta.style.position="fixed"; ta.style.top="-1000px";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta); flash(btn);
+    }catch(e){}
+  }
+  function copyText(text, btn){
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(function(){ flash(btn); }).catch(function(){ fallbackCopy(text, btn); });
+    } else { fallbackCopy(text, btn); }
+  }
+  document.addEventListener("click", function(e){
+    var btn = e.target.closest && e.target.closest(".copy");
+    if(!btn) return;
+    var txt = btn.getAttribute("data-copy");
+    if(txt == null){
+      var code = btn.parentElement && btn.parentElement.querySelector("code");
+      txt = code ? code.textContent : "";
+    }
+    copyText(txt, btn);
   });
-});
+
+  /* ---------- install tabs (keyboard-operable) ---------- */
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[role="tab"]'));
+  var installCmd = document.getElementById("installCmdText");
+  var installCopy = document.getElementById("installCopy");
+  function selectTab(tab){
+    tabs.forEach(function(t){ t.setAttribute("aria-selected", t === tab ? "true" : "false"); });
+    var cmd = tab.getAttribute("data-cmd");
+    if(installCmd) installCmd.textContent = cmd;
+    if(installCopy) installCopy.setAttribute("data-copy", cmd);
+    if(installCmd && installCmd.closest("[role=tabpanel]")) installCmd.closest("[role=tabpanel]").setAttribute("aria-labelledby", tab.id);
+  }
+  tabs.forEach(function(tab, i){
+    tab.addEventListener("click", function(){ selectTab(tab); });
+    tab.addEventListener("keydown", function(e){
+      var n = null;
+      if(e.key === "ArrowRight" || e.key === "ArrowDown") n = tabs[(i+1)%tabs.length];
+      else if(e.key === "ArrowLeft" || e.key === "ArrowUp") n = tabs[(i-1+tabs.length)%tabs.length];
+      else if(e.key === "Home") n = tabs[0];
+      else if(e.key === "End") n = tabs[tabs.length-1];
+      if(n){ e.preventDefault(); n.focus(); selectTab(n); }
+    });
+  });
+
+  /* ---------- nav: solid on scroll ---------- */
+  var nav = document.getElementById("nav");
+  function onScrollNav(){ if(nav){ nav.classList.toggle("is-solid", window.scrollY > 24); } }
+  onScrollNav();
+  window.addEventListener("scroll", onScrollNav, { passive:true });
+
+  /* ---------- Lenis smooth scroll + GSAP ---------- */
+  var lenis = null;
+  if(hasLenis && !REDUCE){
+    lenis = new Lenis({ duration:1.1, smoothWheel:true });
+    window.__lenis = lenis;
+    if(hasGSAP){
+      lenis.on("scroll", ScrollTrigger.update);
+      gsap.ticker.add(function(t){ lenis.raf(t*1000); });
+      gsap.ticker.lagSmoothing(0);
+    } else {
+      (function rafL(t){ lenis.raf(t); requestAnimationFrame(rafL); })(0);
+    }
+  }
+
+  /* ---------- smooth-scroll for in-page links (nav-height offset) ---------- */
+  var navH = 60;
+  function scrollToTarget(target){
+    if(!target) return;
+    if(lenis){ lenis.scrollTo(target, { offset:-navH, duration:1.0 }); }
+    else {
+      var y = target.getBoundingClientRect().top + window.scrollY - navH;
+      window.scrollTo({ top:y, behavior: REDUCE ? "auto" : "smooth" });
+    }
+  }
+  document.addEventListener("click", function(e){
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if(!a) return;
+    var id = a.getAttribute("href");
+    if(id === "#" || id.length < 2) return;
+    var target = document.querySelector(id);
+    if(!target) return;
+    e.preventDefault();
+    scrollToTarget(target);
+    if(history.replaceState) history.replaceState(null, "", id);
+  });
+
+  if(hasGSAP){
+    gsap.registerPlugin(ScrollTrigger);
+    window.ScrollTrigger = ScrollTrigger;
+  }
+
+  /* ---------- SVG draw-on: measure each path length, set dash ---------- */
+  function setupDraw(){
+    var draws = Array.prototype.slice.call(document.querySelectorAll(".draw"));
+    draws.forEach(function(el){
+      var len;
+      try{ len = el.getTotalLength ? el.getTotalLength() : 0; }catch(e){ len = 0; }
+      if(!len || !isFinite(len)) len = 1000;
+      // for fixed-dash construction circles, keep their dash pattern but still allow draw via offset
+      el.style.setProperty("--len", Math.ceil(len));
+      if(el.getAttribute("data-fixeddash")){
+        // keep visual dash but animate from fully hidden: use a large offset
+        el.style.strokeDasharray = Math.ceil(len);
+      }
+    });
+  }
+
+  function drawIn(scope){
+    var draws = Array.prototype.slice.call((scope||document).querySelectorAll(".draw, .draw-fade"));
+    draws.forEach(function(el, i){
+      // small stagger so it reads like a hand drawing
+      setTimeout(function(){ el.classList.add("is-drawn"); }, i*22);
+    });
+  }
+
+  /* ---------- reveals + hero ---------- */
+  if(hasGSAP && !REDUCE){
+    document.documentElement.classList.add("has-motion");
+    setupDraw();
+
+    // hero headline mask reveal
+    var heroLines = document.querySelectorAll(".hero__title .ln > span");
+    if(heroLines.length){
+      gsap.set(heroLines, { yPercent:115 });
+      gsap.to(heroLines, { yPercent:0, duration:1.0, ease:"power3.out", stagger:0.1, delay:0.15 });
+    }
+    // hero left supporting elements
+    gsap.from(".hero__draft, .hero__sub, .cmd, .hero__ctas, .specstrip", {
+      opacity:0, y:16, duration:0.7, ease:"power3.out", stagger:0.08, delay:0.5
+    });
+
+    // hero wheel draws itself in on load
+    setTimeout(function(){ drawIn(document.getElementById("wheelSvg")); }, 350);
+
+    // generic reveals
+    var reveals = gsap.utils.toArray(".reveal");
+    reveals.forEach(function(el){
+      ScrollTrigger.create({
+        trigger: el, start: "top 88%", once: true,
+        onEnter: function(){ el.classList.add("is-in"); }
+      });
+    });
+  } else {
+    // reduced motion / no GSAP: everything visible
+    document.documentElement.classList.add("has-motion");
+    setupDraw();
+    document.querySelectorAll(".reveal").forEach(function(el){ el.classList.add("is-in"); });
+    document.querySelectorAll(".draw, .draw-fade").forEach(function(el){ el.classList.add("is-drawn"); });
+  }
+
+  /* ---------- terminal type-on-view ---------- */
+  (function(){
+    var body = document.getElementById("termBody");
+    var caret = document.getElementById("termCaret");
+    if(!body) return;
+    var nodes = Array.prototype.slice.call(body.querySelectorAll("[data-type]"));
+    if(!nodes.length) return;
+    var fullText = nodes.map(function(n){ return n.textContent; });
+
+    if(REDUCE || !hasGSAP){
+      if(caret) caret.style.display = "none";
+      return;
+    }
+    nodes.forEach(function(n){ n.textContent = ""; });
+    var started = false;
+    function typeAll(){
+      if(started) return; started = true;
+      var i = 0;
+      function typeNode(){
+        if(i >= nodes.length){ return; }
+        var node = nodes[i], txt = fullText[i], c = 0;
+        var iv = setInterval(function(){
+          node.textContent = txt.slice(0, c++);
+          if(c > txt.length){
+            clearInterval(iv);
+            i++;
+            setTimeout(typeNode, 90);
+          }
+        }, 16);
+      }
+      typeNode();
+    }
+    ScrollTrigger.create({ trigger: body, start: "top 80%", once:true, onEnter: typeAll });
+  })();
+
+  /* refresh ScrollTrigger after fonts load (layout shift safety) */
+  if(hasGSAP && document.fonts && document.fonts.ready){
+    document.fonts.ready.then(function(){ ScrollTrigger.refresh(); });
+  }
+})();
 </script>
 </body>
 </html>
