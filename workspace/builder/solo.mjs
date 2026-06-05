@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// solo.mjs — single-agent website builder (the "one agent builds it" mode).
-//
-// Why this exists: the 40-agent swarm produced incoherent, average sites and failed under rate limits.
-// Quality and coherence come from ONE capable agent with a great design system + research playbook, not
-// from many agents improvising. So: ONE agent builds the whole site, guided by WEBSITE_PLAYBOOK.md
-// (distilled from research into apple/awwwards/stripe/linear craft). Then a deterministic build-until-green
-// loop guarantees it actually compiles — no more shipping broken code.
-
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -23,7 +15,7 @@ const CRAFT_PATH = path.join(__dirname, 'CRAFT_PLAYBOOK.md');
 const CHECKLIST_PATH = path.join(__dirname, 'CHECKLIST.md');
 
 const slugify = s => String(s || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'site';
-const tsNow = () => new Date().toISOString().replace(/[:.tz]/gi, '-').slice(0, 19);   // npm-name-safe (no 'T')
+const tsNow = () => new Date().toISOString().replace(/[:.tz]/gi, '-').slice(0, 19);
 
 function readFileSafe(p) { try { return readFileSync(p, 'utf8'); } catch { return ''; } }
 function readPlaybook() { return readFileSafe(PLAYBOOK_PATH); }
@@ -48,14 +40,14 @@ function runAgent(prompt, projectDir, { model = 'sonnet', timeoutMs = 2_700_000,
     const tick = setInterval(() => { onProgress?.({ status: 'working', elapsed: Math.round((Date.now() - t0) / 1000) }); }, 15_000);
     child.on('error', e => { clearTimeout(timer); clearInterval(tick); resolve({ ok: false, output: String(e?.message ?? e), durationMs: Date.now() - t0 }); });
     child.on('close', code => { clearTimeout(timer); clearInterval(tick); resolve({ ok: code === 0, output: out, durationMs: Date.now() - t0 }); });
-    // EPIPE guard: claude may exit before reading the large prompt; the stream 'error' fires async
-    // (try/catch can't catch it) and is otherwise a fatal uncaught exception.
+
+
     child.stdin?.on('error', () => {});
     try { child.stdin?.write(prompt); child.stdin?.end(); } catch {}
   });
 }
 
-// Run `npm run build` and return { ok, errors } (last chunk of output on failure). Fast-ish gate for the loop.
+
 function quickBuild(projectDir) {
   try {
     const r = spawnSync('npm', ['run', 'build'], { cwd: projectDir, encoding: 'utf8', timeout: 300_000, env: { ...process.env, CI: '1', NEXT_TELEMETRY_DISABLED: '1' }, maxBuffer: 24 * 1024 * 1024 });
@@ -108,7 +100,7 @@ function buildPrompt({ brief, stack, playbook, craft, checklist }) {
   ].join('\n');
 }
 
-// De-AI craft elevation pass: a fresh critical look that hunts the generic tells and elevates the site.
+
 function polishPrompt({ brief, craft }) {
   return [
     SYSTEM, '',
@@ -138,8 +130,8 @@ function fixPrompt(errors) {
   ].join('\n');
 }
 
-// Audit-fix pass: the site builds, but the automated auditor found real defects (broken images, console
-// errors, cutoff text, invisible canvas, stuck reveals, missing meta…). Send the agent the exact failures.
+
+
 function auditPrompt({ brief, failures, craft }) {
   return [
     SYSTEM, '',
@@ -200,14 +192,14 @@ export async function buildSolo(options = {}) {
     return v;
   };
 
-  // 2. ONE agent designs + builds the whole bespoke site (foundation + craft + checklist).
+
   emit('build', 'start', { model, playbook: playbook ? `${playbook.length}c` : 'missing', craft: craft ? `${craft.length}c` : 'missing', checklist: checklist ? `${checklist.length}c` : 'missing' });
   const built = await runAgent(buildPrompt({ brief, stack, playbook, craft, checklist }), projectDir, { model, timeoutMs: 2_700_000, onProgress: e => emit('build', `working ${e.elapsed}s`) });
   emit('build', built.ok ? 'agent done' : `agent exited (${(built.output || '').slice(0, 80)})`);
   let verify = await buildGreen();
   emit('verify', verify.ok ? 'build passes ✓' : `build failing after ${rounds} fix(es)`);
 
-  // 3. De-AI craft polish pass — elevate against the anti-AI ban list, then re-green.
+
   if (polish && verify.ok && craft) {
     emit('polish', 'start (de-AI craft elevation)');
     await runAgent(polishPrompt({ brief, craft }), projectDir, { model, timeoutMs: 2_100_000, onProgress: e => emit('polish', `working ${e.elapsed}s`) });
@@ -215,8 +207,8 @@ export async function buildSolo(options = {}) {
     emit('polish', verify.ok ? 'polished + builds ✓' : 'polished but build failing');
   }
 
-  // 4. AUDIT → FIX loop — the deterministic "follow the checklist until done" gate. Build + Playwright
-  //    walkthrough at 1440 & 375; feed the exact failures to a fix agent; re-green; re-audit; repeat.
+
+
   let auditReport = null;
   let auditRounds = 0;
   if (audit && verify.ok) {
@@ -229,7 +221,7 @@ export async function buildSolo(options = {}) {
       const failures = failuresForAgent(auditReport);
       emit('audit', `round ${auditRounds} — fixing ${auditReport.summary.critical + auditReport.summary.major} blocking issue(s)`);
       await runAgent(auditPrompt({ brief, failures, craft }), projectDir, { model, timeoutMs: 2_100_000, onProgress: e => emit('audit', `round ${auditRounds} working ${e.elapsed}s`) });
-      verify = await buildGreen();                       // they may have touched code; keep it compiling
+      verify = await buildGreen();
       if (!verify.ok) { emit('audit', `round ${auditRounds} — build broke during fixes; repairing`); }
       auditReport = await auditSite(projectDir, { screenshotDir: projectDir, requireCanvas: wantCanvas }).catch(e => auditReport);
       emit('audit', `round ${auditRounds} — ${auditReport.summary.passed}/${auditReport.summary.total} pass · ${auditReport.summary.critical}C/${auditReport.summary.major}M failing`);
@@ -237,7 +229,7 @@ export async function buildSolo(options = {}) {
     emit('audit', auditReport.ok ? `green ✓ (${auditRounds} round(s))` : `${auditReport.summary.critical}C/${auditReport.summary.major}M still failing after ${auditRounds} round(s)`);
   }
 
-  // 5. Final full verify for the report.
+
   let full = null;
   try { full = await verifyProject(projectDir); } catch {}
 

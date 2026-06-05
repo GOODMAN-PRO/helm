@@ -1,8 +1,3 @@
-// kinetic-typography-engineer.mjs — role definition for Kinetic Typography Engineer.
-// Animated headlines: per-char/word staggered reveals on scroll, gradient/variable-font
-// effects, text-mask reveals, marquees, stat counters. GSAP + ScrollTrigger + Framer Motion.
-// SSR-safe, no CLS, font-load aware, prefers-reduced-motion respected everywhere.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -223,7 +218,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
                                               fail('system prompt too short or not a string');
   if (typeof r.task !== 'function')           fail('task must be a function');
 
-  // task() non-empty with a fake context (per CONTRACT §1 fakeCtx shape)
+
   const fakeCtx = {
     brief: 'x',
     stack: { summary: 'Next.js', notes: '' },

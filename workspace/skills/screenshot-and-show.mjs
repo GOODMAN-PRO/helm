@@ -1,5 +1,3 @@
-// screenshot-and-show skill — take a screenshot and return the path for display
-
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,6 +13,6 @@ export async function execute(args = '') {
   if (!r.ok) return `Screenshot failed: ${r.error}`;
   if (!existsSync(shot)) return 'Screenshot file not created.';
 
-  // Return the path in a format that index.js can recognize and attach
+
   return `Screenshot ready: ${shot}`;
 }

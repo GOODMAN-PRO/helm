@@ -1,5 +1,3 @@
-// search_file(file, pattern, cwd) -> { line, text }[]
-// Returns up to 20 lines from the file whose text matches pattern (case-insensitive regex).
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 

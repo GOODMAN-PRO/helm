@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// pages.wait — poll a URL until it actually serves (HTTP 200), so Helm only tells the owner a site is
-// "live" once it really is. GitHub Pages' FIRST build takes ~1 minute, during which the URL 404s — that
-// gap is why "Done, it's live" then shows a 404. Call this after deploying and report live only when it
-// confirms.
-//
-// Usage: node pages.wait.mjs --url <url> [--timeout <sec, default 180>]
-
 import { fileURLToPath } from 'node:url';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));

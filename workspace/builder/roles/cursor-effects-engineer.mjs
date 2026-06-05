@@ -1,8 +1,3 @@
-// cursor-effects-engineer.mjs — role definition for Cursor & Pointer FX Engineer.
-// Implements a tasteful Awwwards-grade custom cursor with context-aware states,
-// magnetic CTAs, and a pointer-follow hero accent — gated behind (pointer:fine)
-// + prefers-reduced-motion so touch/keyboard users are never affected.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -107,8 +102,8 @@ Fall back to the browser's native cursor. No lerp, no spring, nothing.
 - No stubs, no TODO, no commented-out code. Every state, every transition, every fallback is
   fully implemented and wired.`,
 
-    // task(ctx) returns the concrete instruction string for the agent.
-    // The agent has full file-write access to ctx.projectDir.
+
+
     task(ctx) {
       const notes = ctx.stack?.notes ?? '';
       const digest = ctx.artifactsDigest();
@@ -229,7 +224,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (typeof r.task !== 'function')
     fail('task must be a function');
 
-  // task() non-empty with a fake context matching the spec shape
+
   const fakeCtx = {
     brief: 'x',
     stack: { summary: 'Next.js', notes: '' },

@@ -1,38 +1,34 @@
-// quality-gates.mjs — static quality gates for a generated full-stack project.
-// Runs fast, offline (no network). Two exports: scanForStubs and runQualityGates.
-// Contract: §7 of CONTRACT.md. Never throw — catch internally and return structured results.
-
 import { readdirSync, readFileSync, existsSync, statSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { animationGate } from './quality/animation-gate.mjs';   // premium-animation + reduced-motion gate
+import { animationGate } from './quality/animation-gate.mjs';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
-const MAX_FINDINGS   = 200;   // cap total stub findings
-const MAX_FILE_BYTES = 512 * 1024; // 512 KB per file — skip larger files
-const MAX_FILES      = 2000;  // cap total files walked
 
-// Directories to skip entirely during walk (build outputs, vendor code, vcs)
+
+
+const MAX_FINDINGS   = 200;
+const MAX_FILE_BYTES = 512 * 1024;
+const MAX_FILES      = 2000;
+
+
 const SKIP_DIRS = new Set([
   'node_modules', '.next', 'dist', 'build', '.git', '.helm-build',
   '.turbo', '.vercel', 'out', '.output', '.nuxt', '.svelte-kit',
 ]);
 
-// Extensions that contain source we should scan
+
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.astro', '.vue']);
 
-// Extensions that might contain HTML/JSX for a11y / SEO scans (wider net)
+
 const MARKUP_EXTS = new Set([...SOURCE_EXTS, '.html', '.htm', '.svelte']);
 
-// ---------------------------------------------------------------------------
-// File walker
-// ---------------------------------------------------------------------------
 
-// Walk projectDir recursively and yield absolute paths for files whose
-// extension is in the allowed set. Skips SKIP_DIRS and caps at MAX_FILES.
+
+
+
+
+
 function* walkFiles(dir, exts) {
   const stack = [dir];
   let count = 0;
@@ -56,7 +52,7 @@ function* walkFiles(dir, exts) {
   }
 }
 
-// Read a file safely, honouring MAX_FILE_BYTES. Returns null on error.
+
 function safeRead(filePath) {
   try {
     const st = statSync(filePath);
@@ -65,18 +61,18 @@ function safeRead(filePath) {
   } catch { return null; }
 }
 
-// ---------------------------------------------------------------------------
-// Stub / placeholder patterns
-// ---------------------------------------------------------------------------
 
-// Each pattern: { kind, critical, regex, label }
-// critical=true means a finding marks the scan as not-ok.
-// We match line by line for precise line numbers.
+
+
+
+
+
+
 const LINE_PATTERNS = [
   {
     kind: 'todo-comment',
     critical: true,
-    // TODO or FIXME (case-insensitive) in a comment or anywhere
+
     regex: /\b(TODO|FIXME)\b/i,
   },
   {
@@ -87,7 +83,7 @@ const LINE_PATTERNS = [
   {
     kind: 'throw-stub',
     critical: true,
-    // throw new Error('...not implemented...' / '...todo...' / '...stub...')
+
     regex: /throw\s+new\s+Error\s*\(\s*['"`][^'"`]*?(not\s+implemented|todo|stub)[^'"`]*?['"`]/i,
   },
   {
@@ -98,14 +94,14 @@ const LINE_PATTERNS = [
   {
     kind: 'placeholder-url',
     critical: false,
-    // example.com, your-domain, lipsum.com
+
     regex: /\b(example\.com|your[-_]?domain|lipsum\.com)\b/i,
   },
   {
     kind: 'empty-handler',
     critical: false,
-    // Arrow function used as a route/handler body that is empty: => {}
-    // Heuristic: `=> {}` where the surrounding context looks like a handler/route/middleware param
+
+
     regex: /(?:handler|route|middleware|callback|controller|resolver|action)\s*[:=,\(][^;{]*=>\s*\{[\s]*\}/i,
   },
   {
@@ -115,16 +111,11 @@ const LINE_PATTERNS = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// export: scanForStubs
-// ---------------------------------------------------------------------------
 
-/**
- * Walk source files under projectDir and detect stub/placeholder patterns.
- * @param {string} projectDir — absolute path to the project root
- * @returns {{ ok: boolean, findings: Array<{file,line,kind,excerpt}> }}
- *   ok = false if any CRITICAL finding exists (not-implemented / throw-stub / TODO)
- */
+
+
+
+
 export function scanForStubs(projectDir) {
   const findings = [];
   let criticalFound = false;
@@ -150,27 +141,27 @@ export function scanForStubs(projectDir) {
               file:    rel,
               line:    i + 1,
               kind:    pat.kind,
-              // Trim the excerpt so it's readable and not huge
+
               excerpt: line.trim().slice(0, 120),
             });
-            // One finding per line max (first matching pattern wins per line)
+
             break;
           }
         }
       }
     }
   } catch {
-    // walk errors are silent — return what we have so far
+
   }
 
   return { ok: !criticalFound, findings };
 }
 
-// ---------------------------------------------------------------------------
-// Gate helpers
-// ---------------------------------------------------------------------------
 
-// Gate: no-stubs — delegates to scanForStubs
+
+
+
+
 function gateNoStubs(projectDir) {
   const result = scanForStubs(projectDir);
   const criticalCount = result.findings.filter(f =>
@@ -192,12 +183,12 @@ function gateNoStubs(projectDir) {
   };
 }
 
-// Gate: secrets-safe
-// Checks: .gitignore exists AND contains .env; no committed .env with suspicious content.
+
+
 function gateSecretsSafe(projectDir) {
   const issues = [];
 
-  // Check .gitignore
+
   const gitignorePath = path.join(projectDir, '.gitignore');
   if (!existsSync(gitignorePath)) {
     issues.push('.gitignore missing');
@@ -211,9 +202,9 @@ function gateSecretsSafe(projectDir) {
     if (!ignoresEnv) issues.push('.gitignore does not ignore .env');
   }
 
-  // Check for committed .env files with actual secret-like content
-  // (We can't check git index without spawning git; look for .env files
-  //  that exist AND have content that looks like real secrets)
+
+
+
   const secretPattern = /(?:API_KEY|SECRET|PASSWORD|TOKEN|DATABASE_URL|DB_PASS)\s*=\s*["']?[A-Za-z0-9+/=_\-.]{8,}/i;
   for (const envFile of ['.env', '.env.local', '.env.production']) {
     const p = path.join(projectDir, envFile);
@@ -445,14 +436,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '}',
     ].join('\n'));
 
-    // Clean file — no stubs
+
     writeFileSync(path.join(tmpDir, 'clean.ts'), [
       'export function cleanFn(x: number): number {',
       '  return x * 2;',
       '}',
     ].join('\n'));
 
-    // package.json with scripts.build
+
     writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
       name: 'test-project',
       version: '1.0.0',
@@ -460,10 +451,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       dependencies: { react: '^18' },
     }, null, 2));
 
-    // .gitignore ignoring .env
+
     writeFileSync(path.join(tmpDir, '.gitignore'), '.env\n.env.local\nnode_modules/\n');
 
-    // --- Test scanForStubs ---
+
     const scan = scanForStubs(tmpDir);
     assert(typeof scan.ok === 'boolean', 'scanForStubs returns ok boolean');
     assert(Array.isArray(scan.findings), 'scanForStubs returns findings array');
@@ -476,7 +467,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(todoFinding.line === 2, `finding is on line 2 (got ${todoFinding?.line})`);
     assert(typeof todoFinding.excerpt === 'string', 'finding has excerpt string');
 
-    // Clean file should not produce critical findings
+
     const cleanDir = mkdtempSync(path.join(os.tmpdir(), 'quality-gates-clean-'));
     writeFileSync(path.join(cleanDir, 'clean.ts'), 'export const x = 1;\n');
     const cleanScan = scanForStubs(cleanDir);
@@ -484,7 +475,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(cleanScan.findings.length === 0, 'clean project has 0 findings');
     rmSync(cleanDir, { recursive: true, force: true });
 
-    // --- Test runQualityGates ---
+
     const gates = await runQualityGates(tmpDir);
     assert(typeof gates.ok === 'boolean', 'runQualityGates returns ok boolean');
     assert(Array.isArray(gates.gates), 'runQualityGates returns gates array');
@@ -509,17 +500,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(!!secretsGate, 'secrets-safe gate present');
     assert(secretsGate.ok, 'secrets-safe gate passes (.gitignore ignores .env)');
 
-    // --- Test ctx tolerance (undefined) ---
+
     const gatesNoCtx = await runQualityGates(tmpDir, undefined);
     assert(typeof gatesNoCtx.ok === 'boolean', 'runQualityGates tolerates undefined ctx');
 
-    // --- Test non-existent dir ---
+
     const gatesMissing = await runQualityGates('/tmp/helm-qg-nonexistent-9999xyz');
     assert(typeof gatesMissing.ok === 'boolean', 'runQualityGates handles missing dir');
     assert(Array.isArray(gatesMissing.gates), 'runQualityGates handles missing dir (gates array)');
 
   } finally {
-    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch {  }
   }
 
   console.log(`\n${pass ? 'ALL TESTS PASSED' : 'SOME TESTS FAILED'}`);

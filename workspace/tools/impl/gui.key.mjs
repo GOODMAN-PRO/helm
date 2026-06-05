@@ -13,7 +13,7 @@ const mods = get('mods');
 if (!code) { console.error('--code required'); process.exit(1); }
 
 if (process.platform === 'win32') {
-  // On Windows `code` is a key name/token (enter, esc, tab, up, f5, ...), not a macOS keycode.
+
   const r = winInput({ verb: 'key', code });
   if (!r.ok) { console.error(r.error || 'windows key failed'); process.exit(1); }
   console.log(JSON.stringify({ ok: true, code }));

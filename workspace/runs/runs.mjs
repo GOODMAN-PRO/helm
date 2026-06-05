@@ -1,6 +1,3 @@
-// Runs subsystem. Each scheduler job gets its own runs/<ts>-<slug>/ directory.
-// Exported functions are used by scheduler.mjs and tools.
-
 import { mkdirSync, appendFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';

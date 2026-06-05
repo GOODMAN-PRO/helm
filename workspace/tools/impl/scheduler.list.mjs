@@ -15,7 +15,7 @@ db.exec(`
     created INTEGER NOT NULL DEFAULT (unixepoch())
   );
 `);
-try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch { /* already present */ }
+try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch {  }
 
 const jobs = db.prepare(`SELECT * FROM jobs ORDER BY id`).all();
 db.close();

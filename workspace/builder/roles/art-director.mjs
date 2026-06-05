@@ -1,8 +1,3 @@
-// art-director.mjs — defines the visual art direction for each key section of the site.
-// Slot: roles/art-director.mjs → consumed by the roles aggregator (roles.mjs).
-// CONTRACT §1 Role schema, §2 BuildContext, §8 Award-grade web standard.
-// Depends on: creative-director (creative-direction artifact), ui-visual-designer (design-system artifact).
-
 import { fileURLToPath } from 'node:url';
 
 const ART_DIRECTOR_SYSTEM = `\
@@ -45,7 +40,7 @@ export const roles = [
     system: ART_DIRECTOR_SYSTEM,
 
     task(ctx) {
-      // Pull creative-direction and design-system artifacts for context.
+
       const creativeDirection = ctx.getArtifact
         ? ctx.getArtifact('creative-direction') ?? ''
         : '';
@@ -105,7 +100,7 @@ How it works / Process, Pricing, Final CTA / Footer), write a block with this ex
   Pin/sticky scroll behavior? Name the CSS/GSAP/ScrollTrigger pattern the engineer should use.
 
 - **Imagery treatment:** What visual lives here? A real photograph (give a specific Unsplash URL:
-  \`https://images.unsplash.com/photo-<id>?w=1600&q=85\`), a CSS gradient (give the exact
+  \`https:
   \`linear-gradient\` / \`radial-gradient\` value), SVG art, a video loop, or a Three.js/WebGL
   accent? If Unsplash: pick a real, on-brand photo — describe what the photo shows, why it works,
   and give the URL. NEVER leave this blank or write "placeholder image". If no photo fits, use CSS art.
@@ -169,7 +164,7 @@ For each: name the library (GSAP / Framer Motion), the trigger, and the key prop
 Enumerate every image slot in the site with its fallback strategy. Format:
 | Slot | Preferred | Fallback if unavailable |
 |------|-----------|------------------------|
-| Hero background | \`https://images.unsplash.com/photo-...\` | \`linear-gradient(135deg, #0f0c29, #302b63, #24243e)\` |
+| Hero background | \`https:
 | ... | ... | ... |
 
 Every row must have a concrete fallback. No row may say "TBD" or leave fallback blank.

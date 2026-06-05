@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Click a CSS selector on the current page; follows navigation.
-// playwright is imported lazily inside runBrowser — safe to import without launching a browser.
-
 import { fileURLToPath } from 'node:url';
 
 async function main() {

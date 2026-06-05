@@ -1,9 +1,3 @@
-// Helm — your own tiny AI agent.
-//
-//   Discord DM (you only)  ->  claude -p  (your Max subscription, full tools)  ->  reply
-//
-// No framework, no plugins, no gateway service. Read it top to bottom.
-
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -23,29 +17,29 @@ import { startCliBridge, mirrorReply, mirrorEcho, mirrorStatus, mirrorAttach } f
 import { listSkills, runSkillCommand } from './workspace/skills/loader.mjs';
 import { renderProjects, addProject, cancelProject, deleteProject, doneProject } from './workspace/projects/projects.mjs';
 
-// Resolve .env and workspace relative to THIS file, so the agent runs from any cwd.
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.join(__dirname, '.env'), override: true });
 
-// ---- config (.env) ----
+
 const {
   DISCORD_TOKEN,
   OWNER_ID,
   CLAUDE_BIN = 'claude',
   MODEL = 'sonnet',
   PERMISSION_MODE = 'bypassPermissions',
-  AUTH_MODE = 'subscription',   // 'subscription' (OAuth) | 'apikey' (ANTHROPIC_API_KEY) | 'vertex' (Claude on Google Vertex AI) | 'custom' (free/local via proxy)
+  AUTH_MODE = 'subscription',
 } = process.env;
 const WORKSPACE = path.resolve(__dirname, process.env.WORKSPACE || './workspace');
 
-// Env handed to the `claude` engine. In subscription mode we strip ANTHROPIC_API_KEY so a stray
-// shell var can't override the OAuth login; in apikey mode we keep it (Claude Code auto-uses it).
-// Resolve a runnable `claude` on this OS. On Windows, CLAUDE_BIN is often the extension-less npm
-// shim (e.g. ...\npm\claude) which Node can't spawn — prefer claude.exe, else claude.cmd (needs a shell).
-// An npm `.cmd` shim just wraps the real claude.exe (it literally calls
-// node_modules\@anthropic-ai\claude-code\bin\claude.exe). Spawning that .cmd THROUGH A SHELL ENOENTs on
-// some Windows setups ("The system cannot find the file specified"), so prefer the wrapped .exe — it
-// runs directly (shell:false), which is more reliable and also avoids the shell-escaping deprecation.
+
+
+
+
+
+
+
+
 function preferExe(p) {
   if (/\.exe$/i.test(p)) return { cmd: p, shell: false };
   if (/\.cmd$/i.test(p)) {
@@ -60,10 +54,10 @@ function resolveClaude() {
   if (process.platform !== 'win32') return { cmd: bin, shell: false };
   if (/\.(exe)$/i.test(bin) && existsSync(bin)) return { cmd: bin, shell: false };
   if (/\.(cmd|bat|ps1)$/i.test(bin) && existsSync(bin)) return preferExe(bin);
-  // CLAUDE_BIN points at the extension-less npm shim (...\npm\claude) — use the sibling .cmd/.exe.
+
   if (existsSync(bin + '.exe')) return { cmd: bin + '.exe', shell: false };
   if (existsSync(bin + '.cmd')) return preferExe(bin + '.cmd');
-  // Stale/wrong CLAUDE_BIN with no runnable sibling: ask Windows where claude actually is.
+
   try {
     const r = spawnSync('where', ['claude'], { encoding: 'utf8' });
     if (r.status === 0 && r.stdout) {
@@ -74,40 +68,40 @@ function resolveClaude() {
       if (cmd) return preferExe(cmd);
     }
   } catch {}
-  // `where` failed — the engine may be installed but just not on THIS process's PATH (common when the
-  // brain runs detached / from a scheduled task). Probe the usual Windows install locations directly.
+
+
   const guesses = [
     process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'claude.exe'),
     process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'claude.cmd'),
     process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
     process.env.APPDATA && path.join(process.env.APPDATA, 'Claude', 'claude.exe'),
     process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs', 'claude', 'claude.exe'),
-    // ~/.local/bin toolchain (no-admin installs) — claude.exe or the native-installer shim
+
     process.env.USERPROFILE && path.join(process.env.USERPROFILE, '.local', 'bin', 'claude.exe'),
-    // prefer the package's claude.exe over the npm shims
+
     process.env.APPDATA && path.join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
   ].filter(Boolean);
   for (const g of guesses) if (existsSync(g)) return preferExe(g);
-  return { cmd: bin, shell: true };   // last resort: let the shell resolve via PATHEXT
+  return { cmd: bin, shell: true };
 }
 
-// When a spawn fails because the engine binary can't be found, say so usefully instead of leaking the
-// raw OS error ("The system cannot find the file specified." / "is not recognized").
+
+
 const ENGINE_HELP = "Helm's engine (Claude Code) isn't installed or isn't on this machine's PATH, so I can't run. Fix it with:  npm install -g @anthropic-ai/claude-code   then `restart`. (A free/local model like Qwen still needs Claude Code as the engine — it runs your model behind a local proxy.) If it IS installed somewhere unusual, set CLAUDE_BIN in .env to its full path.";
 function looksLikeMissingEngine(e) {
   const s = typeof e === 'string' ? e : `${e?.code || ''} ${e?.message || e}`;
   return /ENOENT|EINVAL|cannot find the file|is not recognized|no such file/i.test(s);
 }
 const engineOr = msg => (looksLikeMissingEngine(msg) ? ENGINE_HELP : msg);
-// A free ONLINE model (Groq/OpenRouter/Together/Cerebras/...) is configured when these are set.
-// We run a tiny local proxy (workspace/proxy/llm-proxy.mjs) that translates Claude Code's
-// Anthropic API to the provider's OpenAI-compatible API, and point Claude Code at the proxy.
+
+
+
 const PROXY_PORT = parseInt(process.env.PROXY_PORT || '8787', 10);
 function proxyConfigured() {
   return AUTH_MODE === 'custom' && !!process.env.OPENAI_BASE_URL && !!process.env.OPENAI_MODEL;
 }
-// Fast TCP probe so a dead local model endpoint (e.g. Ollama not running) fails with a clear message
-// instead of hanging the whole turn on a connection that never answers.
+
+
 function endpointUp(url, timeout = 2500) {
   return new Promise(res => {
     try {
@@ -124,38 +118,38 @@ function endpointUp(url, timeout = 2500) {
 function claudeEnv() {
   const e = { ...process.env };
   if (AUTH_MODE === 'apikey') {
-    delete e.ANTHROPIC_BASE_URL;                 // hosted Anthropic API — just the key
+    delete e.ANTHROPIC_BASE_URL;
   } else if (AUTH_MODE === 'custom') {
-    // free / local / custom endpoint: Claude Code needs an auth token even for a local server
-    // (e.g. Ollama requires ANTHROPIC_AUTH_TOKEN set). Use the provided key, else a local placeholder.
+
+
     if (!e.ANTHROPIC_AUTH_TOKEN) e.ANTHROPIC_AUTH_TOKEN = e.ANTHROPIC_API_KEY || 'ollama';
-    // Free online model: route Claude Code through the local translation proxy.
+
     if (proxyConfigured()) {
       e.ANTHROPIC_BASE_URL = `http://127.0.0.1:${PROXY_PORT}`;
-      e.ANTHROPIC_AUTH_TOKEN = 'helm-proxy';     // proxy ignores it; just satisfy Claude Code
+      e.ANTHROPIC_AUTH_TOKEN = 'helm-proxy';
     }
   } else if (AUTH_MODE === 'vertex') {
-    // Claude models on Google Vertex AI. Claude Code speaks to Vertex natively (no proxy); auth is
-    // gcloud Application Default Credentials (auto-refreshed), so strip any Anthropic key/url that
-    // would override it. Project + region come from .env (friendly aliases accepted).
+
+
+
     e.CLAUDE_CODE_USE_VERTEX = '1';
     e.ANTHROPIC_VERTEX_PROJECT_ID = process.env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.GCP_PROJECT_ID || process.env.VERTEX_PROJECT_ID || '';
     e.CLOUD_ML_REGION = process.env.CLOUD_ML_REGION || process.env.VERTEX_REGION || 'us-east5';
-    // Give background/small tasks a valid Vertex model too, so Claude Code never 404s on a default id.
+
     e.ANTHROPIC_SMALL_FAST_MODEL = process.env.VERTEX_SMALL_MODEL || process.env.ANTHROPIC_SMALL_FAST_MODEL || vertexModel();
     delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
   } else {
-    // subscription (OAuth) — strip anything that would override the login
+
     delete e.ANTHROPIC_API_KEY; delete e.ANTHROPIC_AUTH_TOKEN; delete e.ANTHROPIC_BASE_URL;
   }
   return e;
 }
 
-// ---- which "pathway" (auth + model route) am I on right now? ----
-// Helm should always be able to tell the owner whether it's running on their Claude subscription, an
-// Anthropic API key, Claude on Vertex AI, a free online model (via the local translation proxy), or a
-// local/custom model. One source of truth, used by the `pathway` command AND injected into the persona
-// so Helm answers "which model/backend are you using?" correctly.
+
+
+
+
+
 function describePathway() {
   if (AUTH_MODE === 'apikey') {
     return { id: 'apikey', label: 'Anthropic API key',
@@ -184,10 +178,10 @@ function describePathway() {
     engine: 'Claude Code → your Claude login', model: getModelPref() || 'auto-route',
     endpoint: 'claude.ai (OAuth)', cost: 'included in your Claude plan' };
 }
-// One-line summary for the persona / status.
+
 const pathwayLine = () => { const p = describePathway(); return `${p.label} · model ${p.model} · ${p.endpoint}`; };
-// Snapshot of background work for the desktop "Tasks" tab: scheduled jobs, in-flight tasks, projects,
-// recent runs and the nightly self-upgrade status. Returned as JSON so the UI can render it richly.
+
+
 function buildTasksReport() {
   const out = { running: 0, scheduled: [], projects: [], recentRuns: [], nightly: null };
   try { out.running = running.size; } catch {}
@@ -206,7 +200,7 @@ function buildTasksReport() {
   try { out.nightly = JSON.parse(readFileSync(path.join(__dirname, '.last-nightly-upgrade'), 'utf8')); } catch {}
   return JSON.stringify(out);
 }
-// Multi-line report for the `pathway` command.
+
 function pathwayReport() {
   const p = describePathway();
   return [
@@ -219,15 +213,15 @@ function pathwayReport() {
   ].join('\n');
 }
 
-// Discord is OPTIONAL — Helm can run terminal-only (the `helm` CLI talks to the brain over the local
-// bridge). Only connect to Discord when it's actually configured; otherwise start without it.
+
+
 const DISCORD_ON = !!DISCORD_TOKEN && !!OWNER_ID && !/paste-your-discord-bot-token|^your-/.test(DISCORD_TOKEN);
 if (!DISCORD_ON) console.error('Discord not configured - running terminal-only. Use `helm` in a terminal; add DISCORD_TOKEN + OWNER_ID to .env and restart to enable Discord.');
 mkdirSync(WORKSPACE, { recursive: true });
 
-// First-run onboarding: ensure a private owner.md exists (CLAUDE.md imports @owner.md). On a fresh
-// install there's none (it's gitignored), so seed it from the committed template — its "NOT STARTED"
-// status tells Helm to interview the owner on their first message. Never overwrites an existing one.
+
+
+
 (() => {
   try {
     const ownerFile = path.join(WORKSPACE, 'owner.md');
@@ -239,8 +233,8 @@ mkdirSync(WORKSPACE, { recursive: true });
   } catch {}
 })();
 
-// ---- autonomy mode (suggest / copilot / autopilot) ----
-// Stored as preference 'helm.autonomy_mode' in memory.db.
+
+
 const MEMORY_DB = path.join(WORKSPACE, 'memory/memory.db');
 const VALID_MODES = ['suggest', 'copilot', 'autopilot'];
 
@@ -261,29 +255,29 @@ function setAutonomyMode(mode) {
   return r.status === 0;
 }
 
-// Map of pending autopilot auto-proceed timers keyed by channel id.
+
 const autopilotTimers = new Map();
 
-// The Vertex Claude model id (e.g. claude-sonnet-4-5@20250929). Set VERTEX_MODEL in .env to the exact
-// id you enabled in Vertex Model Garden; this default is a known-good Claude Sonnet on Vertex.
+
+
 function vertexModel() {
   return process.env.VERTEX_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5@20250929';
 }
-// Pick --model for this turn: fixed pref overrides the complexity classifier.
+
 async function pickModel(prompt) {
-  // Claude on Vertex: pass the Vertex model id straight through.
+
   if (AUTH_MODE === 'vertex') return vertexModel();
-  // free online model behind the proxy: the proxy forces OPENAI_MODEL upstream, so --model is
-  // cosmetic — pass the provider model id so logs/UX read sensibly.
+
+
   if (proxyConfigured()) return process.env.OPENAI_MODEL;
-  // custom/local endpoints expect their own model id (e.g. an Ollama model name)
+
   if (AUTH_MODE === 'custom' && process.env.ANTHROPIC_MODEL) return process.env.ANTHROPIC_MODEL;
   return getModelPref() ?? (await classifyComplexity(prompt));
 }
-// Returns an inline MCP config JSON string built from workspace/mcp/servers.json.
-// Only includes servers with enabled !== false. Strips Helm-only schema fields
-// (healthCheck, enabled) before passing to Claude Code. Falls back to empty config
-// if the file is missing or malformed — bot starts regardless.
+
+
+
+
 function mcpConfigArg() {
   const p = path.join(__dirname, 'workspace/mcp/servers.json');
   try {
@@ -292,10 +286,10 @@ function mcpConfigArg() {
     for (const [name, entry] of Object.entries(raw.mcpServers || {})) {
       if (entry.enabled === false) continue;
       const { healthCheck: _h, enabled: _e, comment: _c, ...mcpEntry } = entry;
-      // Expand the install-root token so server paths are correct on any machine (Mac/Windows).
+
       if (Array.isArray(mcpEntry.args)) mcpEntry.args = mcpEntry.args.map(a => typeof a === 'string' ? a.split('__HELM_ROOT__').join(__dirname) : a);
-      // On Windows, `npx` is npx.cmd and can't be spawned directly — wrap it as `cmd /c npx ...`
-      // so the MCP server actually launches (parity with macOS/Linux).
+
+
       if (process.platform === 'win32' && mcpEntry.command === 'npx') {
         mcpEntry.args = ['/c', 'npx', ...(mcpEntry.args || [])];
         mcpEntry.command = 'cmd';
@@ -306,24 +300,24 @@ function mcpConfigArg() {
   } catch { return '{"mcpServers":{}}'; }
 }
 
-// ---- single machine ----
-// Helm runs on ONE machine. It detects which OS it's on (see OS_NAME below) but there is no fleet,
-// no peer, no cross-machine sync — every task runs locally, right here.
 
-// Process inline directives the brain can emit in a reply:
-//   [STUCK: <what blocked me>]  -> queued for the nightly self-upgrade
-// Returns the reply text with directives stripped.
+
+
+
+
+
+
 function handleDirectives(replyText, userText = '') {
   // Strip + record any [STUCK: ...] markers (shared capture logic).
   const { text: stripped, recorded } = processStuckMarkers(replyText, userText);
   // Auto-upgrade safety net: if Helm says/implies it can't do something but didn't emit [STUCK],
-  // detect it and queue it anyway so the nightly self-upgrade builds the missing capability.
+
   if (!recorded) { try { autoCaptureCant(stripped, userText); } catch {} }
   return stripped.trim();
 }
 
-// ---- persona: appended to Claude Code's own (tool-enabled) system prompt ----
-// Describe the machine Helm is actually running on, so it never assumes a Mac.
+
+
 const OS_NAME = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux';
 const PERSONA_BASE =
   'You are Helm, your owner\'s personal AI assistant, talking to them over Discord DMs. ' +
@@ -375,7 +369,7 @@ function buildPersona(mode = 'copilot') {
     `subscription vs a free/local model — answer accurately from this. They can also type \`pathway\` for the full breakdown.`;
   return `${PERSONA_BASE}${ownerPersonaOverride()}\n${pathway}\n${guidance}`;
 }
-// Optional persona/style override applied by an imported Helm template.
+
 function ownerPersonaOverride() {
   try {
     const p = path.join(WORKSPACE, 'persona.local.md');
@@ -388,12 +382,12 @@ function ownerPersonaOverride() {
 // ---- unified session (shared with iMessage — one owner, one brain thread) ----
 // Key is always 'owner' since this bot is owner-locked.
 
-// ---- the brain: one Claude run on your subscription ----
-// Track in-flight runs so "stop" can actually kill them. Per-task hard cap (configurable) for chat.
+
+
 const running = new Set();
-// Hard wall-clock cap per task before SIGKILL. Big build/scrape jobs (e.g. "scrape this site and
-// rebuild it") routinely need more than the old fixed 10 min, so make it configurable: set
-// HELM_TASK_CAP_MIN in .env (e.g. 30) to give long tasks more room. Default 20.
+
+
+
 const TASK_CAP_MIN = Math.max(1, parseInt(process.env.HELM_TASK_CAP_MIN || '20', 10) || 20);
 const TASK_CAP_MS  = TASK_CAP_MIN * 60_000;
 const CAP_MSG      = `hit ${TASK_CAP_MIN}-min cap`;
@@ -409,7 +403,7 @@ function runClaude(args, prompt) {
     const child = spawn(cb.cmd, args, { cwd: WORKSPACE, env: claudeEnv(), shell: cb.shell, windowsHide: true });
     running.add(child);
     let out = '', err = '';
-    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, TASK_CAP_MS); // configurable cap (HELM_TASK_CAP_MIN, default 20)
+    const kill = setTimeout(() => { child._timedOut = true; try { child.kill('SIGKILL'); } catch {} }, TASK_CAP_MS);
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
     child.on('error', e => { clearTimeout(kill); running.delete(child); reject(looksLikeMissingEngine(e) ? new Error(ENGINE_HELP) : e); });
@@ -420,13 +414,13 @@ function runClaude(args, prompt) {
       if (code === 0) resolve(out);
       else reject(new Error(engineOr(err.trim() || `claude exited ${code}`)));
     });
-    child.stdin.on('error', () => {}); // EPIPE if claude exits before reading stdin
+    child.stdin.on('error', () => {});
     child.stdin.write(prompt);
     child.stdin.end();
   });
 }
 
-// Turn a stream-json event into a short, human progress label (or null to keep the current one).
+
 function eventLabel(evt) {
   if (!evt || !evt.type) return null;
   if (evt.type === 'system' && evt.subtype === 'init') return 'thinking…';
@@ -489,10 +483,10 @@ function runClaudeStream(args, prompt, onEvent) {
   });
 }
 
-// ---- memory: retrieval-augmented recall + lightweight capture ----
-// Before each turn, pull the most relevant things Helm already knows and inject them into the prompt so
-// it actually USES its memory instead of just storing it. After a turn, archive the exchange (so past
-// conversations are recall-able) and capture any explicit "remember …" facts.
+
+
+
+
 function recallMemories(text) {
   try {
     const q = String(text || '').replace(/\s+/g, ' ').slice(0, 240);
@@ -586,10 +580,10 @@ function captureTurn(userText, reply, channel = 'chat') {
 }
 
 async function ask(prompt, onProgress, mode = 'copilot', opts = {}) {
-  const sessionKey = opts.sessionKey || 'owner';   // per-conversation sessions enable resumable chats
-  // Single machine: every task runs locally on this box. (No fleet / peer SSH / cross-machine sync.)
-  // Free/local backend preflight: if the model endpoint isn't reachable, say so clearly and fast —
-  // otherwise the engine hangs forever trying to reach a dead Ollama/proxy upstream.
+  const sessionKey = opts.sessionKey || 'owner';
+
+
+
   if (proxyConfigured() && !(await endpointUp(process.env.OPENAI_BASE_URL))) {
     return `⚠️ I can't reach your model endpoint (${process.env.OPENAI_BASE_URL}), so I can't think yet. ` +
       `If it's a free local model: install Ollama from https://ollama.com, run \`ollama pull ${process.env.OPENAI_MODEL}\`, ` +
@@ -601,19 +595,19 @@ async function ask(prompt, onProgress, mode = 'copilot', opts = {}) {
   const model = await pickModel(prompt);
   console.log(`[route] model=${model}`);
   const base = [
-    '-p', '--output-format', 'stream-json', '--verbose',   // stream events so we can show live progress
+    '-p', '--output-format', 'stream-json', '--verbose',
     '--model', model,
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', buildPersona(mode) + recallMemories(prompt),
     '--add-dir', WORKSPACE,
-    '--add-dir', os.homedir(), // full home access (ultimate powers), on whatever OS this is
-    '--strict-mcp-config', '--mcp-config', mcpConfigArg(), // workspace/mcp/servers.json (filesystem + fetch)
+    '--add-dir', os.homedir(),
+    '--strict-mcp-config', '--mcp-config', mcpConfigArg(),
   ];
   const sid = getSession(sessionKey);
   const args = sid ? [...base, '--resume', sid] : base;
 
-  // Live status: surface what the engine is actually doing, with elapsed time, so it never looks
-  // frozen. Updates on each meaningful event + a steady tick; throttled so we don't spam Discord.
+
+
   const startTs = Date.now();
   let lastStatus = 'thinking…', lastPush = 0;
   const elapsed = () => Math.round((Date.now() - startTs) / 1000);
@@ -625,15 +619,15 @@ async function ask(prompt, onProgress, mode = 'copilot', opts = {}) {
     onProgress(`⚙️ ${lastStatus} · ${elapsed()}s`);
   };
   const onEvent = evt => { const l = eventLabel(evt); if (l) { lastStatus = l; push(); } };
-  const ticker = setInterval(() => push(true), 1000);   // tick the elapsed-time status every second
+  const ticker = setInterval(() => push(true), 1000);
   push(true);
 
   let r;
   try {
     r = await runClaudeStream(args, prompt, onEvent);
   } catch (e) {
-    if (e.stopped || e.timedOut || !sid) { clearInterval(ticker); throw e; }  // never retry a cancel/timeout
-    deleteSession(sessionKey);   // stale/expired session -> retry fresh once
+    if (e.stopped || e.timedOut || !sid) { clearInterval(ticker); throw e; }
+    deleteSession(sessionKey);
     lastStatus = 'retrying…'; push(true);
     r = await runClaudeStream(base, prompt, onEvent);
   } finally {
@@ -665,9 +659,9 @@ const chunks = (s, max = 1900) => {
   let rest = s;
   while (rest.length > max) {
     const win = rest.slice(0, max);
-    let cut = win.lastIndexOf('\n');                                 // prefer a line break
-    if (cut < max * 0.6) cut = Math.max(cut, win.lastIndexOf(' '));  // else a word break
-    if (cut <= 0) cut = max;                                         // oversized token: hard split
+    let cut = win.lastIndexOf('\n');
+    if (cut < max * 0.6) cut = Math.max(cut, win.lastIndexOf(' '));
+    if (cut <= 0) cut = max;
     out.push(rest.slice(0, cut).trimEnd());
     rest = rest.slice(cut).trimStart();
   }
@@ -675,9 +669,9 @@ const chunks = (s, max = 1900) => {
   return out.length ? out : ['(empty)'];
 };
 
-// Reverse-engineering ALWAYS writes a PDF report, but the engine sometimes forgets to emit the
-// `ATTACH:` line (especially now that it can paste the summary inline). So we deterministically attach
-// any report written to workspace/reverse during this turn — never model-dependent.
+
+
+
 function freshReverseReports(sinceMs) {
   try {
     const dir = path.join(WORKSPACE, 'reverse');
@@ -689,8 +683,8 @@ function freshReverseReports(sinceMs) {
 }
 const mergeFiles = (files, extra) => { for (const p of extra) if (!files.includes(p)) files.push(p); return files; };
 
-// Pull the leading "## Summary" + "## How It Works" sections out of a reverse report's .md so the chat
-// reply ALWAYS shows them — even when the engine writes a terse "report attached" message and drops them.
+
+
 function reverseSummaryText(pdfPath) {
   try {
     const md = readFileSync(pdfPath.replace(/\.pdf$/i, '.md'), 'utf8');
@@ -714,7 +708,7 @@ function withReverseSummary(body, reports) {
   return `${t}\n\n${tail}`;
 }
 
-// Agent can attach files by ending lines with "ATTACH: /abs/path" (e.g. screenshots).
+
 function splitAttachments(s) {
   const files = [];
   const text = (s || '').split('\n').filter(line => {
@@ -730,8 +724,8 @@ client.once(Events.ClientReady, c => {
   console.log(`✅ Helm online as ${c.user.tag}  ·  model=${pref || 'auto-route'}  ·  owner=${OWNER_ID}`);
   const cb = resolveClaude();
   console.log(`   engine: ${cb.cmd}${cb.shell ? ' (via shell)' : ''}`);
-  // Verify the engine actually launches; if not, tell the owner UP FRONT (don't make them discover it
-  // by sending a message and getting "The system cannot find the file specified").
+
+
   try {
     const probe = spawnSync(cb.cmd, ['--version'], { encoding: 'utf8', shell: cb.shell, timeout: 8000, windowsHide: true });
     if (probe.error && looksLikeMissingEngine(probe.error)) {
@@ -739,14 +733,14 @@ client.once(Events.ClientReady, c => {
       c.users.fetch(OWNER_ID).then(u => u.send('⚠️ ' + ENGINE_HELP)).catch(() => {});
     }
   } catch {}
-  // Liveness marker the nightly self-upgrade health-check reads (cross-platform — doesn't depend on
-  // launchd redirecting stdout to agent.log, so it works when Helm runs locally on Windows too).
+
+
   try { writeFileSync(path.join(WORKSPACE, '.online'), new Date().toISOString()); } catch {}
-  // Probe MCP servers only AFTER we're connected — running it before login meant a failed login
-  // (bad token) raced spawning/killing probe children, which trips a libuv assertion on Windows.
+
+
   runHealthChecks().catch(() => {});
-  // If we just came back from a Discord `restart`, post "back online" to the channel that asked, then
-  // clear the marker so a normal (non-restart) startup never announces itself.
+
+
   try {
     const marker = path.join(WORKSPACE, '.restarting');
     if (existsSync(marker)) {
@@ -755,18 +749,18 @@ client.once(Events.ClientReady, c => {
       if (chId) c.channels.fetch(chId).then(ch => ch?.send('✅ Back online.')).catch(() => {});
     }
   } catch {}
-  // Catch up on anything the owner DM'd while we were offline — Discord won't replay it. Delay a few
-  // seconds so the gateway/DM channel is fully ready before we fetch history.
+
+
   setTimeout(() => catchUpDiscord(c).catch(() => {}), 3000);
 });
 
 client.on(Events.MessageCreate, async msg => {
   if (msg.author.bot) return;
   console.log(`[msg] from=${msg.author.id} dm=${!msg.guild} content=${JSON.stringify((msg.content || '').slice(0, 120))}`);
-  if (msg.author.id !== OWNER_ID) return;                       // owner-only lock
-  setLastSeen(msg.id);                                          // mark progress so a reboot knows where to resume
+  if (msg.author.id !== OWNER_ID) return;
+  setLastSeen(msg.id);
   const dm = !msg.guild;
-  if (!dm && !msg.mentions.users.has(client.user.id)) return;   // in servers: only when @mentioned
+  if (!dm && !msg.mentions.users.has(client.user.id)) return;
 
   const text = msg.content.replace(`<@${client.user.id}>`, '').trim();
   if (!text && !msg.attachments.size) return;   // allow image-only messages
@@ -784,9 +778,9 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- restart/reboot: relaunch the brain from Discord (loads new code/env — what you'd otherwise do
-  // with `helm stop; helm`). A detached relauncher waits for THIS process to exit (freeing the
-  // single-instance lock), then starts a fresh brain, which DMs "back online" here once it's ready.
+
+
+
   if (/^\s*\/?(restart|reboot)\s*$/i.test(text)) {
     try { writeFileSync(path.join(WORKSPACE, '.restarting'), String(msg.channel.id)); } catch {}
     await msg.reply('♻️ Restarting — back in ~10s. (If I don\'t check back in, run `helm` in a terminal.)');
@@ -794,11 +788,11 @@ client.on(Events.MessageCreate, async msg => {
       spawn(process.execPath, [path.join(__dirname, 'scripts', 'relaunch.mjs')],
         { cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true, env: process.env }).unref();
     } catch (e) { try { unlinkSync(path.join(WORKSPACE, '.restarting')); } catch {} await msg.reply('Restart failed (couldn\'t spawn relauncher): ' + String(e.message || e).slice(0, 200)); return; }
-    setTimeout(() => process.exit(0), 1500);   // let Discord flush the reply, then exit so the lock frees
+    setTimeout(() => process.exit(0), 1500);
     return;
   }
 
-  // ---- doctor: run the setup self-check (Node, engine, model, config) and report ----
+
   if (/^\s*\/?doctor\s*$/i.test(text)) {
     const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'doctor.mjs')], { cwd: __dirname, encoding: 'utf8', timeout: 60_000 });
     const out = ((r.stdout || '') + (r.stderr || '')).trim() || 'doctor produced no output';
@@ -806,13 +800,13 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- pathway: report which auth + model route is active (subscription / API key / free / local) ----
+
   if (/^\s*\/?pathway\s*$/i.test(text)) {
     await msg.reply('```\n' + pathwayReport() + '\n```');
     return;
   }
 
-  // ---- scan/catchup: deep-scan this channel's whole history into memory (manual backfill) ----
+
   if (/^\s*\/?(scan|catch\s?up)\s*$/i.test(text)) {
     await msg.reply('Scanning this channel\'s history into memory…');
     try {
@@ -825,7 +819,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- !mode: get or set the autonomy mode ----
+
   if (/^!mode\s*$/i.test(text)) {
     await msg.reply(`Current mode: **${getAutonomyMode()}**. Options: \`suggest\` | \`copilot\` | \`autopilot\`.`);
     return;
@@ -838,7 +832,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- vault: store a secret straight from chat ("vault NAME value" / "vault list") ----
+
   if (/^vault(\s|$)/i.test(text)) {
     if (/^vault\s+list\s*$/i.test(text)) {
       const r = spawnSync(process.execPath, ['workspace/secrets/secrets.mjs', 'list'], { cwd: __dirname, encoding: 'utf8' });
@@ -863,7 +857,7 @@ client.on(Events.MessageCreate, async msg => {
 
   const low = text.toLowerCase();
 
-  // ---- project tracker: owner can list / add / cancel / finish / delete projects ----
+
   if (/^\/?projects?\s*$/i.test(low)) { await msg.reply('**Projects**\n' + renderProjects()); return; }
   let pm;
   if ((pm = text.match(/^\/?(?:new|add)\s+project\s+(.+)/i))) {
@@ -879,7 +873,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- self-review: scan today's messages for tasks I declined/failed, queue them for self-upgrade ----
+
   if (/^\/?(self-?review|review (the )?(day|today|messages|chat))\b/i.test(low)) {
     await msg.reply("Reviewing today's messages for anything I declined or failed…");
     try {
@@ -892,7 +886,7 @@ client.on(Events.MessageCreate, async msg => {
   }
 
 
-  // ---- template sharing: export your Helm's flavor, or import someone else's ----
+
   const tplM = low.match(/^\/?template\s+(export|list|import)\b/);
   if (tplM) {
     const sub = tplM[1];
@@ -908,7 +902,7 @@ client.on(Events.MessageCreate, async msg => {
         const out = exportTemplate(name, desc);
         await msg.reply(`Exported **${path.basename(out)}** — share this file to give someone your Helm's setup (persona, gateways, model, free tools). No secrets, keys, identity, or memory are included.`);
         try { await msg.reply({ files: [out] }); } catch {}
-      } else { // import
+      } else {
         const att = [...msg.attachments.values()].find(a => /\.helmtemplate\.json$/i.test(a.name || ''));
         let target = arg;
         if (att) {
@@ -930,7 +924,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- Helm Mind: AI-first second brain over HelmBrain ----
+
   const mindM = text.match(/^\/?mind\s+(save|capture|find|synthesize|research|daily|recap|health)\b\s*([\s\S]*)$/i);
   if (mindM) {
     const verb = mindM[1].toLowerCase();
@@ -945,7 +939,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- /skill: run a skill command (e.g. /skill helm-core, /skill reverse-engineering web <url>) ----
+
   const skillM = text.match(/^\/?skill\s+(\w+(?:-\w+)*)\s*([\s\S]*)$/i);
   if (skillM) {
     const skillName = skillM[1].toLowerCase();
@@ -970,7 +964,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- /cost: today's usage summary (notional tokens, Max subscription) ----
+
   if (/^\/cost\b/.test(low)) {
     try {
       const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -984,7 +978,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // !model: inspect or override per-message model routing
+
   const modelCmdM = text.match(/^!model(?:\s+(\S+))?\s*$/i);
   if (modelCmdM) {
     if (!modelCmdM[1]) {
@@ -1003,7 +997,7 @@ client.on(Events.MessageCreate, async msg => {
     return;
   }
 
-  // ---- download any attachments so Helm can actually SEE/read them ----
+
   let prompt = text;
   if (msg.attachments.size) {
     const INBOX = path.join(WORKSPACE, 'inbox');
@@ -1015,7 +1009,7 @@ client.on(Events.MessageCreate, async msg => {
         const buf = Buffer.from(await res.arrayBuffer());
         const p = path.join(INBOX, `${Date.now()}-${(a.name || 'file').replace(/[^\w.\-]/g, '_')}`);
         writeFileSync(p, buf); saved.push(p);
-      } catch { /* skip a failed download */ }
+      } catch {  }
     }
     const refs = saved;
     if (refs.length) {
@@ -1035,7 +1029,7 @@ client.on(Events.MessageCreate, async msg => {
   const typing = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
   // Live status: one message that gets edited as Helm works, so you can see what it's doing
-  // (running a command, editing a file, …) and the elapsed time — not just an endless typing dot.
+
   let statusMsg = null, creating = false, lastEdit = 0;
   const onProgress = txt => {
     const now = Date.now();
@@ -1050,12 +1044,12 @@ client.on(Events.MessageCreate, async msg => {
     clearInterval(typing);
     clearStatus();
     let { text: rawBody, files } = splitAttachments(reply);
-    const reverseReports = freshReverseReports(turnStart);   // any reverse PDF written this turn
-    mergeFiles(files, reverseReports);                        // always attach it
-    rawBody = handleDirectives(rawBody, text);   // [STUCK: ...] -> queue for the nightly self-upgrade
+    const reverseReports = freshReverseReports(turnStart);
+    mergeFiles(files, reverseReports);
+    rawBody = handleDirectives(rawBody, text);
 
-    // Autopilot plan detection: if Claude included [PLAN-PENDING], strip the marker,
-    // post the plan, then auto-send "go" after 60 s (cancellable by "stop").
+
+
     const hasPlanPending = mode === 'autopilot' && rawBody.includes('[PLAN-PENDING]');
     let body = rawBody.replace(/\[PLAN-PENDING\]/g, '').trim();
     if (!hasPlanPending) body = withReverseSummary(body, reverseReports);   // surface the report summary in chat
@@ -1083,7 +1077,7 @@ client.on(Events.MessageCreate, async msg => {
           if (!e.stopped) await channelRef.send(`Plan execution error: ${String(e.message || e).slice(0, 800)}`).catch(() => {});
         }
       }, 60_000);
-      // Clear any prior pending plan for this channel so it can't fire orphaned (untracked by `stop`).
+
       const prevTimer = autopilotTimers.get(msg.channel.id);
       if (prevTimer) clearTimeout(prevTimer);
       autopilotTimers.set(msg.channel.id, timer);
@@ -1093,12 +1087,12 @@ client.on(Events.MessageCreate, async msg => {
         try { await msg.reply({ files: [f] }); }
         catch (e) { await msg.reply(`(couldn't attach ${f}: ${String(e.message || e).slice(0, 200)})`); }
       }
-      try { mirrorReply(body || '(see attachment)'); } catch {}   // show Discord replies in any open terminal
-      if (files.length) { try { mirrorAttach(files); } catch {} }  // let any open terminal OPEN the images too
-      try { captureTurn(text, body, 'discord'); } catch {}         // build memory from this exchange
+      try { mirrorReply(body || '(see attachment)'); } catch {}
+      if (files.length) { try { mirrorAttach(files); } catch {} }
+      try { captureTurn(text, body, 'discord'); } catch {}
     }
     console.log(`📤 replied (${body.length} chars, ${files.length} files, mode=${mode}, planPending=${hasPlanPending})`);
-    // durable transcript so nothing is ever lost (the brain distills these into memory)
+
     try {
       const conv = path.join(WORKSPACE, 'conversations');
       mkdirSync(conv, { recursive: true });
@@ -1108,9 +1102,9 @@ client.on(Events.MessageCreate, async msg => {
   } catch (e) {
     clearInterval(typing);
     clearStatus();
-    if (e.stopped) return;  // the stop command already acknowledged
+    if (e.stopped) return;
     console.error(e);
-    // Helm got stuck — remember it for the overnight self-upgrade to fix the root cause.
+
     try {
       recordStuck(
         e.timedOut
@@ -1118,7 +1112,7 @@ client.on(Events.MessageCreate, async msg => {
           : `Failed on "${(text || '(attachment)').slice(0, 60)}": ${String(e.message || e).slice(0, 140)}`,
         String(e.message || e).slice(0, 500), 'auto');
     } catch {}
-    // On a free/local backend, a failure is usually the model endpoint being down or the model not pulled.
+
     const errStr = String(e.message || e);
     const localHint = (AUTH_MODE === 'custom' && /econnrefused|connect|fetch failed|not found|404|model|11434/i.test(errStr))
       ? `\n\n_Local model issue: make sure Ollama is running and the model is pulled — \`ollama pull ${process.env.ANTHROPIC_MODEL || 'llama3.1'}\`. Endpoint: ${process.env.ANTHROPIC_BASE_URL || '(unset)'}._`
@@ -1132,13 +1126,13 @@ client.on(Events.MessageCreate, async msg => {
 
 // Prevent Discord WebSocket errors from crashing Node (unhandled EventEmitter error event = fatal).
 client.on('error', err => console.error('Discord client error:', err));
-// Prevent any stray unhandled async rejection from killing the process.
+
 process.on('unhandledRejection', reason => console.error('Unhandled rejection:', reason));
 
-// (MCP health check runs in the ClientReady handler, after a successful login.)
 
-// Free online model: start the Anthropic->OpenAI translation proxy and keep it alive.
-// Claude Code talks to it (ANTHROPIC_BASE_URL), it forwards to OPENAI_BASE_URL (Groq/OpenRouter/...).
+
+
+
 let proxyChild = null;
 function startProxy() {
   if (!proxyConfigured() || proxyChild) return;
@@ -1148,7 +1142,7 @@ function startProxy() {
     cwd: __dirname,
     env: { ...process.env, PROXY_PORT: String(PROXY_PORT) },
     stdio: ['ignore', 'inherit', 'inherit'],
-    windowsHide: true,   // don't pop a console window on Windows
+    windowsHide: true,
   });
   console.log(`🔌 Free-model proxy: Claude Code -> http://127.0.0.1:${PROXY_PORT} -> ${process.env.OPENAI_BASE_URL} (${process.env.OPENAI_MODEL})`);
   proxyChild.on('exit', code => {
@@ -1162,38 +1156,38 @@ for (const sig of ['SIGINT', 'SIGTERM', 'exit']) {
   process.on(sig, () => { try { proxyChild?.kill(); } catch {} });
 }
 
-// ---- single-instance lock (prevents DUPLICATE replies) ----
-// One Discord token = one bot. If two `index.js` run at once (e.g. a stray old brain plus a freshly
-// started one), BOTH log into Discord and BOTH answer every message — you see each reply twice. Hold a
-// loopback lock port: if it's already taken, another Helm brain owns this machine, so exit cleanly and
-// let it keep serving. The OS releases the port the instant a process dies, so there's no stale lock.
+
+
+
+
+
 const LOCK_PORT = parseInt(process.env.HELM_LOCK_PORT || '4624', 10);
 await new Promise(resolve => {
   const lock = net.createServer();
   lock.once('error', e => {
     if (e.code === 'EADDRINUSE') {
       console.error(`✋ Another Helm brain is already running on this machine (lock ${LOCK_PORT} held). Not starting a second one — that would double every reply. Run \`helm stop\` first, or kill the stray \`node index.js\`.`);
-      process.exit(0);   // the existing brain keeps serving; this duplicate bows out before touching Discord
+      process.exit(0);
     }
     console.error(`[lock] couldn't bind lock port ${LOCK_PORT} (${e.code}); continuing without the single-instance guard.`);
     resolve();
   });
-  lock.listen(LOCK_PORT, '127.0.0.1', () => { lock.unref(); resolve(); });   // unref'd so it never blocks a clean exit
+  lock.listen(LOCK_PORT, '127.0.0.1', () => { lock.unref(); resolve(); });
 });
 
-// Terminal bridge: let `node cli.js` talk to THIS running brain (one conversation shared across
-// terminal/Discord/iMessage), instead of spawning a second brain. A terminal line runs through the
-// same ask() + 'owner' session; the reply is mirrored to every channel.
+
+
+
 let cliBusy = false;
 startCliBridge(async (text, reply, convId) => {
-  // Each desktop conversation carries its own id -> its own resumable Claude session. No id = the shared
-  // 'owner' thread (terminal / cross-channel).
+
+
   const sessionKey = convId ? `conv:${String(convId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40)}` : 'owner';
   try { mirrorEcho(text, 'you (terminal)'); } catch {}
   if (/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) { const n = killAll(); reply(n ? `Stopped — killed ${n} task(s).` : 'Nothing was running.'); return; }
-  if (/^\s*\/?pathway\s*$/i.test(text)) { reply(pathwayReport()); return; }   // same command works in the terminal
-  if (/^\s*\/?tasks\s*$/i.test(text)) { reply(buildTasksReport()); return; }   // desktop Tasks tab (JSON)
-  // Control commands over the bridge (terminal + desktop app), parity with the Discord gateway:
+  if (/^\s*\/?pathway\s*$/i.test(text)) { reply(pathwayReport()); return; }
+  if (/^\s*\/?tasks\s*$/i.test(text)) { reply(buildTasksReport()); return; }
+
   const mModel = text.match(/^!model(?:\s+(\S+))?\s*$/i);
   if (mModel) { if (!mModel[1]) reply(`Model: ${getModelPref() || 'auto-route'}`); else { const ok = setModelPref(mModel[1]); reply(ok ? `Model set to ${mModel[1]}.` : `Unknown model "${mModel[1]}". Use opus | sonnet | haiku | auto.`); } return; }
   const mMode = text.match(/^!mode(?:\s+(suggest|copilot|autopilot))?\s*$/i);
@@ -1206,14 +1200,14 @@ startCliBridge(async (text, reply, convId) => {
     const mode = getAutonomyMode();
     const raw = await ask(text, s => { try { mirrorStatus(s); } catch {} }, mode, { sessionKey });
     const { text: rawBody, files } = splitAttachments(raw);
-    const reverseReports = freshReverseReports(turnStart);   // any reverse PDF written this turn
-    mergeFiles(files, reverseReports);                        // always attach it
+    const reverseReports = freshReverseReports(turnStart);
+    mergeFiles(files, reverseReports);
     let body = handleDirectives(rawBody, text).replace(/\[PLAN-PENDING\]/g, '').trim() || '(done)';
     body = withReverseSummary(body, reverseReports);         // surface the report summary in chat
     try { captureTurn(text, body, convId ? 'desktop' : 'terminal'); } catch {}
-    reply(body);   // broadcasts to every terminal once (no separate mirrorReply, or it'd double-send)
-    // Helm produced files (e.g. a generated image, a screenshot). Discord/iMessage attach them; the
-    // terminal can't show inline pixels, so send the paths and let the terminal client OPEN them.
+    reply(body);
+
+
     if (files.length) { try { mirrorAttach(files); } catch {} }
     try {
       const conv = path.join(WORKSPACE, 'conversations');
@@ -1227,7 +1221,7 @@ startCliBridge(async (text, reply, convId) => {
   } finally { cliBusy = false; }
 });
 
-// Connect to Discord, with a clear reason if it can't (so "offline" isn't a mystery).
+
 if (!DISCORD_ON) {
   console.error('Discord login skipped (not configured) - terminal-only. Run `helm`, or add a real DISCORD_TOKEN + OWNER_ID and restart.');
 } else client.login(DISCORD_TOKEN).catch(async e => {
@@ -1237,10 +1231,10 @@ if (!DISCORD_ON) {
   } else {
     console.error('✋ Could not connect to Discord (network/proxy/firewall?). If git also failed earlier, your network is blocking it. Error: ' + m.slice(0, 200));
   }
-  // Tear down the client's sockets/timers, then let the process exit NATURALLY (set exitCode, don't
-  // call process.exit()). Forcing process.exit() while discord.js handles are mid-close trips a libuv
-  // assertion on Windows (UV_HANDLE_CLOSING in async.c). A watchdog force-exits only if something
-  // keeps the loop alive (unref'd so it never blocks a clean exit).
+
+
+
+
   try { await client.destroy(); } catch {}
   process.exitCode = 1;
   setTimeout(() => process.exit(1), 3000).unref();

@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// UI Automation element targeting for Helm — Windows-only.
-// Locates real UI controls by accessibility properties and returns exact pixel coordinates.
-//
-// Subcommands:
-//   uia.mjs tree   [--title <substr>] [--max N=200]
-//   uia.mjs find   --name <text> [--role <controlType>] [--title <window substr>] [--exact]
-//   uia.mjs invoke --name <text> [--role <controlType>] [--title <window substr>] [--exact]
-//
-// Also accepts --json '{"sub":"tree",...}' from the dispatcher (mirrors window.mjs convention).
-
 import { spawnSync } from 'node:child_process';
 
 if (process.platform !== 'win32') {
@@ -16,12 +6,12 @@ if (process.platform !== 'win32') {
   process.exit(1);
 }
 
-// ---------------------------------------------------------------------------
-// Arg parsing — supports both positional subcommand and --json dispatcher form
-// ---------------------------------------------------------------------------
+
+
+
 const rawArgs = process.argv.slice(2);
 
-// Check for --json dispatcher form first
+
 let sub, opts;
 const jsonIdx = rawArgs.indexOf('--json');
 if (jsonIdx !== -1) {
@@ -48,9 +38,9 @@ if (jsonIdx !== -1) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// PowerShell runner — base64 encoded UTF-16LE, exactly like capture-screen.mjs
-// ---------------------------------------------------------------------------
+
+
+
 function runPs(script, timeoutMs = 30_000) {
   const b64 = Buffer.from(script, 'utf16le').toString('base64');
   return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', b64], {
@@ -59,9 +49,9 @@ function runPs(script, timeoutMs = 30_000) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Shared PowerShell preamble: load UIA assemblies + P/Invoke for foreground window
-// ---------------------------------------------------------------------------
+
+
+
 const PS_PREAMBLE = `
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
@@ -78,7 +68,7 @@ public struct RECT { public int Left; public int Top; public int Right; public i
 "@
 `.trim();
 
-// Helper: get element value via ValuePattern (swallows exceptions)
+
 const PS_VALUE_HELPER = `
 function Get-UiaValue($el) {
     try {
@@ -89,7 +79,7 @@ function Get-UiaValue($el) {
 }
 `.trim();
 
-// Helper: convert a BoundingRectangle to a safe rect hashtable; returns $null for empty/offscreen rects
+
 const PS_RECT_HELPER = `
 function Convert-Rect($br) {
     # BoundingRectangle uses doubles; Width/Height 0 or huge = offscreen/invisible
@@ -105,8 +95,8 @@ function Convert-Rect($br) {
 }
 `.trim();
 
-// Helper: resolve the root element for a given optional --title filter
-// Returns $rootEl and $winTitle, or writes error JSON and exits
+
+
 const PS_ROOT_HELPER = `
 function Get-RootElement($titleFilter) {
     $rootEl = $null
@@ -153,9 +143,9 @@ function Get-RootElement($titleFilter) {
 }
 `.trim();
 
-// ---------------------------------------------------------------------------
-// Subcommand: tree
-// ---------------------------------------------------------------------------
+
+
+
 function runTree() {
   const titleFilter = opts.title   || '';
   const maxCount    = parseInt(opts.max || '200', 10) || 200;
@@ -256,7 +246,7 @@ try {
     console.log(JSON.stringify({ ok: false, error: errText }));
     process.exit(1);
   }
-  // Find last JSON line (PS may print blank lines or warnings before it)
+
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const jsonLine = lines.reverse().find(l => l.startsWith('{') || l.startsWith('['));
   if (!jsonLine) {
@@ -266,10 +256,10 @@ try {
   console.log(jsonLine);
 }
 
-// ---------------------------------------------------------------------------
-// Shared PS: find best matching element (used by both find and invoke)
-// Returns a PS snippet that sets $foundEl and $foundEntry, or outputs error JSON
-// ---------------------------------------------------------------------------
+
+
+
+
 function makeFindScript(nameFilter, roleFilter, titleFilter, exact) {
   const namePsLit  = (nameFilter  || '').replace(/'/g, "''");
   const rolePsLit  = (roleFilter  || '').replace(/'/g, "''");
@@ -379,9 +369,9 @@ try {
 `.trim();
 }
 
-// ---------------------------------------------------------------------------
-// Subcommand: find
-// ---------------------------------------------------------------------------
+
+
+
 function runFind() {
   const nameFilter  = opts.name  || '';
   const roleFilter  = opts.role  || '';
@@ -422,9 +412,9 @@ ${makeFindScript(nameFilter, roleFilter, titleFilter, exact)}
   console.log(jsonLine);
 }
 
-// ---------------------------------------------------------------------------
-// Subcommand: invoke
-// ---------------------------------------------------------------------------
+
+
+
 function runInvoke() {
   const nameFilter  = opts.name  || '';
   const roleFilter  = opts.role  || '';
@@ -493,9 +483,9 @@ ${makeFindScript(nameFilter, roleFilter, titleFilter, exact)}
   console.log(jsonLine);
 }
 
-// ---------------------------------------------------------------------------
-// Dispatch
-// ---------------------------------------------------------------------------
+
+
+
 if (!sub) {
   console.log(JSON.stringify({ ok: false, error: 'subcommand required: tree | find | invoke' }));
   process.exit(1);

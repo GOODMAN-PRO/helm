@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Scroll the wheel at the current cursor (or at --x/--y). amount = notches; negative = down (default -3).
 import { winInput } from './win-input.mjs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';

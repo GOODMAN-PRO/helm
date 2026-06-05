@@ -1,11 +1,3 @@
-// app-build skill — scaffold a REAL, working app, then make Helm verify it before claiming "done".
-//
-// Why this exists: Helm's failure mode when "build me an app" is to produce a convincing UI shell with
-// the functionality STUBBED (e.g. an IPC handler that just echoes), then report "built & running" without
-// ever launching it. This skill hands back a skeleton whose core wiring is ALREADY REAL (a desktop app
-// that talks to Helm's own brain over the loopback bridge), plus a hard checklist that forbids stubs and
-// fake completion. Use it whenever you're asked to build an app.
-
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
@@ -28,7 +20,7 @@ const PKG = (name) => JSON.stringify({
   devDependencies: { electron: '^42.0.0', 'electron-builder': '^26.0.0' },
 }, null, 2) + '\n';
 
-// main.js — the IPC handler is REAL: it relays to the running Helm brain over the bridge cli.js uses.
+
 const MAIN_JS = `const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const net = require('net');
@@ -78,7 +70,7 @@ contextBridge.exposeInMainWorld('helm', {
 });
 `;
 
-// index.html — a clean, retheme-able design system (warm neutral defaults). Wired to window.helm.
+
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Helm</title><style>

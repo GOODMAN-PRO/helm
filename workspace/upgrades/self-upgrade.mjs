@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// Helm nightly self-upgrade — the Phase 4.3 self-modification gate, made real.
-//
-//   snapshot (git) -> npm update -> claude self-improves from QUEUE.md
-//   -> node --check + smoke.mjs gate -> commit OR auto-revert
-//   -> restart Discord bot -> health-check -> roll back if unhealthy -> DM owner.
-//
-// Safe to run manually. Env flags for testing:
-//   HELM_UPGRADE_DRYRUN=1     skip npm update + the claude self-improve pass
-//   HELM_UPGRADE_SKIP_SMOKE=1 skip the smoke gate (plumbing test only)
-
 import { spawnSync, spawn } from 'node:child_process';
 import { resolveClaude } from '../lib/engine.mjs';
 import { existsSync, writeFileSync, appendFileSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -17,14 +7,14 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { renderStuckForPrompt, archiveAll } from './stuck.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/upgrades
-const ROOT = path.resolve(__dirname, '../..');                  // secondme/
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '../..');
 loadEnv({ path: path.join(ROOT, '.env'), override: true });
 const { CLAUDE_BIN = 'claude', MODEL = 'opus' } = process.env;
 const DRYRUN = process.env.HELM_UPGRADE_DRYRUN === '1';
 const SKIP_SMOKE = process.env.HELM_UPGRADE_SKIP_SMOKE === '1';
-// Owner kill-switch for the auto-publish step: set HELM_UPGRADE_NO_PUSH=1 in .env to keep nightly
-// self-improvements LOCAL (still commits + gates + restarts), e.g. while unreleased work is in the tree.
+
+
 const NO_PUSH = process.env.HELM_UPGRADE_NO_PUSH === '1';
 
 const LOCK = path.join(ROOT, '.upgrade.lock');
@@ -32,30 +22,30 @@ const LOG = path.join(__dirname, 'self-upgrade.log');
 const QUEUE = path.join(__dirname, 'QUEUE.md');
 const HISTORY = path.join(__dirname, 'UPGRADE_LOG.md');
 const AGENT_LOG = path.join(ROOT, 'agent.log');
-const MARKER = path.join(ROOT, '.last-nightly-upgrade');   // heartbeat the status-check / health watch reads
+const MARKER = path.join(ROOT, '.last-nightly-upgrade');
 
 const ts = () => new Date().toISOString();
 const log = m => { const l = `[${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
-// Record that (and when) the nightly job last ran, with its outcome — so "is self-upgrade alive?" has a
-// real answer even on a no-op night. Written at start and overwritten with the result at the end.
+
+
 const markRun = (status, head) => { try { writeFileSync(MARKER, JSON.stringify({ time: ts(), status, head: head || null, dryrun: DRYRUN }) + '\n'); } catch {} };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
-// On Windows npm is `npm.cmd`, and patched Node refuses to spawn a .cmd without a shell (ENOENT/EINVAL).
-// Route npm through the shell there so nightly self-upgrade doesn't silently fail to update deps.
+
+
 const IS_WIN = process.platform === 'win32';
 const npm = (args, opts = {}) => sh(IS_WIN ? 'npm.cmd' : 'npm', args, { shell: IS_WIN, timeout: 5 * 60_000, ...opts });
 const git = (...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', ...a]);
 const notify = msg => { try { sh(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
 
-// Cross-platform sync sleep (no `sleep` binary on Windows).
+
 function sleepMs(ms) { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} }
 
-// Restart the Discord bot on whatever OS this is (launchd / Task Scheduler / systemd).
+
 function restartBot() {
   const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
   if (process.platform === 'win32') {
-    // Kill the running brain, then relaunch it hidden + detached so it survives this process —
-    // robust whether the bot was started by the Startup VBS launcher, a scheduled task, or `helm`.
+
+
     sh('powershell', ['-NoProfile', '-Command', "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*index.js*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"], { timeout: 15_000 });
     sleepMs(2500);
     try { spawn(process.execPath, ['index.js'], { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true }).unref(); } catch {}
@@ -67,8 +57,8 @@ function restartBot() {
 }
 
 function restartAndHealth() {
-  // The bot writes workspace/.online (an ISO timestamp) when it connects to Discord. Restart, then
-  // wait for that marker to be refreshed — cross-platform, no dependence on stdout→agent.log.
+
+
   const ONLINE = path.join(ROOT, 'workspace', '.online');
   const t0 = Date.now();
   restartBot();
@@ -82,26 +72,26 @@ function restartAndHealth() {
 function appendHistory(status, base, head, summary) {
   const entry = `\n## ${ts()} — ${status}\n- base: ${base}\n- head: ${head}\n- summary: ${(summary || '').slice(0, 1200).replace(/\n+/g, ' ')}\n`;
   try { appendFileSync(HISTORY, entry); } catch {}
-  markRun(status, head);   // update the heartbeat with the run's outcome
+  markRun(status, head);
 }
 function rollback(base, why, summary) {
   log(`ROLLBACK (${why}) -> ${base}`);
   git('reset', '--hard', base);
-  git('clean', '-fd'); // remove untracked files created by the aborted upgrade pass
-  npm(['ci', '--no-audit', '--no-fund']); // resync node_modules to restored lock
+  git('clean', '-fd');
+  npm(['ci', '--no-audit', '--no-fund']);
   const healthy = restartAndHealth();
   appendHistory(`REVERTED (${why})`, base, base, summary);
   notify(`Helm self-upgrade reverted (${why}). Code restored to ${base.slice(0, 7)}${healthy ? '' : ' — WARNING: bot still unhealthy, check manually'}.`);
 }
 
 if (existsSync(LOCK)) {
-  // Check if the process that wrote the lock is still alive. A killed/crashed
-  // upgrader leaves the lock file behind permanently; treat that as stale.
+
+
   let stale = false;
   try {
     const pid = parseInt(readFileSync(LOCK, 'utf8').trim(), 10);
     if (isNaN(pid)) { stale = true; }
-    else { try { process.kill(pid, 0); } catch { stale = true; } } // ESRCH = not running
+    else { try { process.kill(pid, 0); } catch { stale = true; } }
   } catch { stale = true; }
   if (stale) { log(`stale lock (pid gone) — removing and continuing`); rmSync(LOCK); }
   else { log('lock present — another upgrade running; exit'); process.exit(0); }
@@ -113,23 +103,23 @@ try {
   log(`=== self-upgrade start ${DRYRUN ? '(DRYRUN) ' : ''}===`);
   markRun('started');
 
-  // 0. snapshot current state as the precise revert point
+
   git('add', '-A');
-  git('commit', '-q', '-m', `pre-upgrade snapshot ${ts()}`); // no-op (nonzero) if nothing to commit
+  git('commit', '-q', '-m', `pre-upgrade snapshot ${ts()}`);
   const base = git('rev-parse', 'HEAD').stdout.trim();
   log(`base ${base}`);
 
-  // 1. tooling update (deps; package-lock is tracked so it's revertable)
+
   if (!DRYRUN) { const r = npm(['update', '--no-audit', '--no-fund']); log(`npm update exit ${r.status}`); }
 
-  // 2. self-improve via claude (no time cap)
+
   let summary = '(dryrun: no changes)';
   if (!DRYRUN) {
     let queue = '(no queue file)';
     try { queue = readFileSync(QUEUE, 'utf8'); } catch {}
-    // First, sweep TODAY's owner<->Helm messages for tasks Helm declined or failed (bug / missing
-    // capability) and queue them — so this run builds the fixes. The review feeds the same stuck queue
-    // we read on the next line.
+
+
+
     try { const rv = sh(process.execPath, [path.join(__dirname, 'review-day.mjs')], { timeout: 60_000 }); log(`daily review: ${(rv.stdout || '').trim().split('\n').pop() || 'done'}`); } catch (e) { log('daily review skipped: ' + (e?.message || e)); }
     const stuck = renderStuckForPrompt();
     const prompt = [
@@ -181,17 +171,17 @@ try {
 
   if (!syntaxOk || !smokeOk) { rollback(base, !syntaxOk ? 'syntax' : 'smoke', summary); process.exit(0); }
 
-  // 4. commit improvements
+
   git('add', '-A');
   git('commit', '-q', '-m', `self-upgrade ${ts()}`);
   const head = git('rev-parse', 'HEAD').stdout.trim();
   const changed = head !== base;
   log(`head ${head}${changed ? '' : ' (no changes)'}`);
 
-  // 5. restart + health-check; roll back if unhealthy
+
   if (!restartAndHealth()) { rollback(base, 'unhealthy after restart', summary); process.exit(0); }
 
-  // 5b. push the upgrade to origin so it's backed up / pullable. (Single machine — no peer to sync.)
+
   if (changed && !DRYRUN && !NO_PUSH) {
     const pushed = git('push', 'origin', 'HEAD:main').status === 0;
     log(`push origin ${pushed ? 'ok' : 'FAIL (will retry next run)'}`);
@@ -199,7 +189,7 @@ try {
     log('push skipped (HELM_UPGRADE_NO_PUSH=1) — changes committed locally only');
   }
 
-  // Clear the stuck queue once changes are applied and healthy (kept if nothing changed, so it retries).
+
   const archived = (changed && !DRYRUN) ? archiveAll() : 0;
   if (archived) log(`archived ${archived} stuck item(s) addressed this run`);
 

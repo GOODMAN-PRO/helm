@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Tool: notify.recent [--limit N]
-// Returns last N notification events from events.db.
-
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Press the left button at (x,y), drag to (x2,y2), release. For selecting, moving, drag-and-drop.
 import { winInput } from './win-input.mjs';
 
 const args = process.argv.slice(2);

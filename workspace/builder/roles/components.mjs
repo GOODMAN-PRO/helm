@@ -1,7 +1,3 @@
-// components.mjs — role definition for Component Engineer.
-// Builds the full reusable UI component library (layout, nav, data display,
-// forms, feedback) using Tailwind + shadcn/ui tokens. No stubs — real code.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -13,8 +9,8 @@ export const roles = [
     model: 'sonnet',
     produces: [],
 
-    // Rich senior-frontend-engineer persona covering accessibility, composability,
-    // type-safety, and visual polish — the agent writes to real project files.
+
+
     system: `You are a Senior Frontend Engineer who specialises in building
 production-grade, accessible, fully-typed React component libraries.
 
@@ -86,9 +82,9 @@ works correctly.
 Record a concise spec of the component inventory and export paths via
 ctx.setArtifact('component-library', ...) so downstream roles can reference it.`,
 
-    // task() builds the concrete instruction injected at prompt-assembly time.
-    // ctx.stack.notes contains the stack-specific conventions (Tailwind version,
-    // shadcn/ui config, src-dir layout, etc.) so the agent writes idiomatic code.
+
+
+
     task(ctx) {
       const notes = ctx.stack?.notes ?? '';
       const digest = ctx.artifactsDigest();
@@ -151,7 +147,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
                                        fail('system prompt too short or not a string');
   if (typeof r.task !== 'function')    fail('task must be a function');
 
-  // task() non-empty with a fake context
+
   const fakeCtx = {
     brief: 'x',
     stack: { summary: 'Next.js+Tailwind', notes: 'Tailwind, shadcn/ui' },

@@ -1,5 +1,3 @@
-// view_file(file, startLine, cwd) -> string
-// Returns a 100-line window of the file starting at startLine (1-indexed), with line numbers.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 

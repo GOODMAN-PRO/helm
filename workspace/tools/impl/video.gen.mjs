@@ -1,38 +1,18 @@
 #!/usr/bin/env node
-// video.gen — text-to-video for Helm (no paid API).
-// Expands a prompt into N scene descriptions via claude, generates one image per scene via
-// image.generate (pollinations.ai), assembles with ffmpeg: varied Ken Burns motion (pans + zooms)
-// joined by varied crossfades, optional burned-in captions, optional background music, and optional
-// per-scene narration via Windows SAPI.
-//
-// Usage:
-//   node video.gen.mjs --prompt "a space explorer story" [--scenes 4] [--secs 3]
-//                      [--out <path.mp4>] [--narrate true] [--captions true] [--music <file>]
-//                      [--aspect landscape|portrait|square|wide|story] [--res 720|1080]
-//                      [--size 1280x720]   (explicit --size overrides --aspect/--res)
-//
-// Output: single JSON object  { ok, path, scenes, durationSec, size, fps, ... }
-//
-// Dependencies (zero npm installs):
-//   ffmpeg / ffprobe   — on PATH or at FFMPEG_BIN env / hard-coded WinGet path
-//   image.generate.mjs — pollinations.ai, free, no key
-//   claude CLI         — scene expansion + narration lines
-//   Windows SAPI       — PowerShell System.Speech (narration only, Windows-only)
-
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, existsSync, statSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+
 
 const args = process.argv.slice(2);
 const get  = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 const bool = k => { const v = get(k); return v !== null && /^(true|1|yes|on)$/i.test(v); };
 const die  = (msg, code = 1) => { console.log(JSON.stringify({ ok: false, error: msg })); process.exit(code); };
 
-// ── parameters ───────────────────────────────────────────────────────────────
+
 
 const prompt = get('prompt');
 if (!prompt) die('--prompt required');
@@ -43,7 +23,7 @@ const narrate = bool('narrate');
 const captions = bool('captions');
 const musicArg = get('music');
 
-// Size: explicit --size wins; otherwise --aspect + --res presets (default landscape 720p = back-compat 1280x720).
+
 const ASPECTS = {
   landscape: [16, 9], wide: [21, 9], square: [1, 1],
   portrait: [9, 16], story: [9, 16], vertical: [9, 16],
@@ -57,12 +37,12 @@ function resolveSize() {
   }
   const aspect = (get('aspect') || 'landscape').toLowerCase();
   const ratio = ASPECTS[aspect] || ASPECTS.landscape;
-  const res = parseInt(get('res') || '720', 10) || 720;        // short-side target
+  const res = parseInt(get('res') || '720', 10) || 720;
   const portrait = ratio[1] > ratio[0];
   let w, h;
   if (portrait) { h = Math.round(res * ratio[1] / ratio[0] / 2) * 2; w = res; }
   else { w = Math.round(res * ratio[0] / ratio[1] / 2) * 2; h = res; }
-  // Keep within sane bounds and even-dimensioned (H.264 yuv420p requirement).
+
   w = Math.min(2560, Math.max(64, w - (w % 2)));
   h = Math.min(2560, Math.max(64, h - (h % 2)));
   return [w, h];
@@ -71,7 +51,7 @@ const [vidW, vidH] = resolveSize();
 
 const outPath = get('out') || path.join(tmpdir(), `helm-video-${Date.now()}.mp4`);
 
-// ── ffmpeg resolution ─────────────────────────────────────────────────────────
+
 
 const WINGET_FFMPEG = 'C:/Users/User/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.1.1-full_build/bin/ffmpeg.exe';
 const WINGET_FFPROBE = 'C:/Users/User/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.1.1-full_build/bin/ffprobe.exe';
@@ -89,7 +69,7 @@ const FFPROBE = resolveBin('ffprobe');
 if (!FFMPEG)  die('ffmpeg not found — install it or ensure the WinGet path exists');
 if (!FFPROBE) die('ffprobe not found — install it or ensure the WinGet path exists');
 
-// ── claude CLI ────────────────────────────────────────────────────────────────
+
 
 const CLAUDE_BIN = 'C:/Users/User/.local/bin/claude.exe';
 const claudeBin  = existsSync(CLAUDE_BIN) ? CLAUDE_BIN : 'claude';
@@ -107,13 +87,13 @@ const __dirname     = path.dirname(fileURLToPath(import.meta.url));
 const IMAGE_GEN_MJS = path.join(__dirname, 'image.generate.mjs');
 if (!existsSync(IMAGE_GEN_MJS)) die('image.generate.mjs not found at ' + IMAGE_GEN_MJS);
 
-// ── temp workspace ────────────────────────────────────────────────────────────
+
 
 const tmpDir = mkdtempSync(path.join(tmpdir(), 'helm-vid-'));
 const tmpFile = name => path.join(tmpDir, name);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// ── step 1: expand prompt into per-scene image prompts ────────────────────────
+
 
 let scenePrompts = [];
 try {
@@ -124,10 +104,10 @@ try {
     const parsed = JSON.parse(match[0]);
     if (Array.isArray(parsed) && parsed.length > 0) scenePrompts = parsed.slice(0, scenes).map(String);
   }
-} catch (_e) { /* fall through to padded prompts */ }
+} catch (_e) {  }
 while (scenePrompts.length < scenes) scenePrompts.push(`${prompt} — scene ${scenePrompts.length + 1}`);
 
-// ── step 2: generate one image per scene ─────────────────────────────────────
+
 
 const frameFiles = [];
 const SCENE_COLOURS = ['0x1a3a5c', '0x2d5a27', '0x5c1a1a', '0x1a4a5c', '0x3d2d5c', '0x5c3d1a'];
@@ -147,7 +127,7 @@ function generatePlaceholderFrame(i) {
 
 async function generateFrame(i) {
   const framePath = tmpFile(`frame-${i}.jpg`);
-  // The hardened image.generate already retries with backoff + validates bytes.
+
   const r = spawnSync(process.execPath, [
     IMAGE_GEN_MJS,
     '--prompt', scenePrompts[i],
@@ -163,20 +143,20 @@ async function generateFrame(i) {
 }
 
 for (let i = 0; i < scenes; i++) {
-  if (i > 0) await sleep(2500);  // be polite to the free image service (1 concurrent / IP)
+  if (i > 0) await sleep(2500);
   frameFiles.push(await generateFrame(i));
 }
 
-// ── step 3: assemble video with ffmpeg ────────────────────────────────────────
+
 
 const FPS    = 30;
-const XF_DUR = Math.min(0.6, secs * 0.4);                       // crossfade length (≤ ~half of secs)
+const XF_DUR = Math.min(0.6, secs * 0.4);
 const totalDur = scenes * secs - (scenes - 1) * XF_DUR;
-const N = Math.ceil(secs * FPS);                               // frames per scene
+const N = Math.ceil(secs * FPS);
 
-// Varied Ken Burns motion presets (zoom + pan combos) for visual variety across scenes.
-const zIn  = `1.0+0.12*on/${N}`;   // zoom 1.00 → 1.12
-const zOut = `1.12-0.12*on/${N}`;  // zoom 1.12 → 1.00
+
+const zIn  = `1.0+0.12*on/${N}`;
+const zOut = `1.12-0.12*on/${N}`;
 const cX = `iw/2-(iw/zoom/2)`, cY = `ih/2-(ih/zoom/2)`;
 const panR = `(iw-iw/zoom)*on/${N}`, panL = `(iw-iw/zoom)*(1-on/${N})`;
 const panD = `(ih-ih/zoom)*on/${N}`, panU = `(ih-ih/zoom)*(1-on/${N})`;
@@ -192,11 +172,11 @@ const MOTIONS = [
 ];
 function kbFilter(i) {
   const m = MOTIONS[i % MOTIONS.length];
-  // Scale up 2x so zoompan has room to crop; output exactly N frames at target size.
+
   return `[${i}:v]scale=${vidW * 2}:${vidH * 2},zoompan=zoom='${m.z}':x='${m.x}':y='${m.y}':d=${N}:s=${vidW}x${vidH}:fps=${FPS},trim=end_frame=${N},setpts=PTS-STARTPTS[v${i}]`;
 }
 
-// Varied crossfade transitions, cycled per cut.
+
 const TRANSITIONS = ['fade', 'dissolve', 'smoothleft', 'smoothright', 'smoothup',
   'circleopen', 'wipeleft', 'slideup', 'fadeblack', 'radial', 'diagtl', 'pixelize'];
 
@@ -217,16 +197,16 @@ for (let i = 1; i < scenes; i++) {
 
 let filterComplex = scenes === 1 ? filterParts[0].replace(/\[v0\]$/, '[vout]') : filterParts.join(';');
 
-// Optional burned-in captions (one short line per scene, shown during that scene's window).
+
 let mapVideo = '[vout]';
 let captionCwd;
 if (captions) {
   const FONTS = ['C:/Windows/Fonts/arial.ttf', 'C:/Windows/Fonts/segoeui.ttf', 'C:/Windows/Fonts/calibri.ttf'];
   const font = FONTS.find(existsSync);
   if (!font) die('--captions needs a TTF font; none found in C:/Windows/Fonts');
-  // ffmpeg's filtergraph parser can't handle a Windows drive-colon in fontfile/textfile, so copy the
-  // font into the temp dir and reference the font + caption files by RELATIVE basename, with ffmpeg's
-  // working directory set to tmpDir (captionCwd). No colons → no escaping headaches.
+
+
+
   copyFileSync(font, tmpFile('font.ttf'));
   captionCwd = tmpDir;
   const fpx = Math.max(20, Math.round(vidH * 0.045));
@@ -266,7 +246,7 @@ const ffmpegVideoArgs = [
 const vr = spawnSync(FFMPEG, ffmpegVideoArgs, { encoding: 'utf8', timeout: 600_000, cwd: captionCwd });
 if (vr.status !== 0) die(`ffmpeg video assembly failed (exit ${vr.status}):\n${(vr.stderr || '').slice(-900)}`);
 
-// ── step 4: optional audio (narration + music) ────────────────────────────────
+
 
 if (hasAudio) {
   let narrWav = null;
@@ -276,7 +256,7 @@ if (hasAudio) {
     try {
       const nrPrompt = `Write exactly ${scenes} short narration sentences (one per line, no numbering, no extra text) for a video with these scene descriptions:\n${scenePrompts.map((p, i) => `Scene ${i + 1}: ${p}`).join('\n')}\nEach sentence should be 10-20 words, evocative, present tense.`;
       lines = runClaude(nrPrompt, 60_000).split('\n').map(l => l.trim()).filter(Boolean).slice(0, scenes);
-    } catch (_e) { /* fall back to scene prompts */ }
+    } catch (_e) {  }
     while (lines.length < scenes) lines.push(scenePrompts[lines.length] || `Scene ${lines.length + 1}.`);
 
     const wavFiles = [];
@@ -308,7 +288,7 @@ $synth.SetOutputToDefaultAudioDevice()
     if (!existsSync(music)) die(`--music file not found: ${music}`);
   }
 
-  // Assemble the mux: [0:v] from the rendered video + audio from narration and/or looped music.
+
   const muxIn = ['-i', videoOutPath];
   let narrIdx = -1, musicIdx = -1, idx = 1;
   if (narrWav) { narrIdx = idx++; muxIn.push('-i', narrWav); }
@@ -332,7 +312,7 @@ $synth.SetOutputToDefaultAudioDevice()
   if (mr.status !== 0) die(`audio mux failed: ${(mr.stderr || '').slice(-500)}`);
 }
 
-// ── verify + return ─────────────────────────────────────────────────────────
+
 
 if (!existsSync(outPath)) die('output file was not created — ffmpeg may have silently failed');
 const outStat = statSync(outPath);

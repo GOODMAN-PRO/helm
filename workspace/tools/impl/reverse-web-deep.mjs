@@ -1,57 +1,3 @@
-// reverse-web-deep.mjs — the DEEP BEHAVIORAL layer for the web reverse-engineering report.
-//
-// The base `web` pass (reverse.mjs) already captures tech stack, raw network requests, and an AST
-// pass over JS bundles. It does NOT explain WHAT the app does or HOW it works. This module adds that:
-// third-party services, an API operation catalog with inferred purposes, an inferred data model,
-// auth/session mechanics, security-header explanations, form/data-collection scan, storage/cookies,
-// and a high-level "what it does" feature list.
-//
-// ETHICS: this only reads/analyzes data already fetched for an authorized target — no network I/O here.
-//
-// Public API (exact signature):
-//   export function webDeepDive(ctx) -> { lines: string[], findings: object }
-//
-// `ctx` shape (any field may be missing/empty — be defensive):
-//   {
-//     url: string,
-//     html: string,                 // raw fetched HTML (may be a logged-out shell)
-//     headers: object,              // response headers, LOWERCASED keys (may include 'set-cookie')
-//     scripts: string[],            // script src URLs
-//     links: string[],              // <a href> URLs / route hints
-//     content: object,              // already-extracted og/JSON-LD content (author/caption/video/etc.)
-//     apiCalls: Array<{ method, path, status, contentType, reqContentType, friendlyName,
-//                       graphql?: {doc_id, operationName, query_hash, query_snippet, variables_keys},
-//                       bodyParamKeys?: string[] }>,
-//     netData: { requests: Array<{ url, type, status, contentType, contentLength, body?,
-//                                  requestHeaders?, postData? }>, html?: string } | null
-//   }
-//
-// Returns { lines, findings }:
-//   `lines`    — Markdown lines to append (## / ### headings, "- " bullets, fenced code as separate "```").
-//   `findings` — structured object the caller's synthesis reads. KEYS (all may be empty / absent):
-//     services        : Array<{ name, category, host, evidence }>   detected 3rd-party SDKs/services
-//     serviceCategories : { [category]: string[] }                  service names grouped by category
-//     apiCatalog      : Array<{ host, kind:'graphql'|'rest', name, method?, path?, operationName?,
-//                               doc_id?, query_hash?, variableKeys?[], bodyParamKeys?[], status?,
-//                               purpose }>                            every API op with an INFERRED purpose
-//     apiHosts        : string[]                                    distinct API hosts seen
-//     dataModel       : Array<{ entity, fields:string[], source }>  inferred entities + fields
-//     auth            : { providers:string[], cookies:[{name,flags:[]}], tokenHeaders:string[],
-//                         csrf:boolean, loginWall:boolean, notes:string[] }
-//     security        : { headers:[{name,value,meaning}], csp?:{directives:{[k]:string[]}, notes:[]},
-//                         flags:[{level:'strong'|'weak'|'info', text}] }
-//     forms           : Array<{ action, method, fields:[{name,type}], sensitive:string[] }>
-//     storage         : { cookies:[{name,flags:[]}], localStorage:boolean, sessionStorage:boolean,
-//                         indexedDB:boolean, hints:string[] }
-//     features        : string[]                                   high-level "what it does" inferences
-//     error           : string                                     present only if a stage threw
-//
-// NEVER throws: everything is wrapped; on total failure returns { lines: [], findings: {} }.
-
-// ----------------------------------------------------------------------------
-// Small self-contained helpers (reimplemented locally to avoid importing reverse.mjs).
-// ----------------------------------------------------------------------------
-
 function hostOf(u) {
   try { return new URL(u).host.toLowerCase(); } catch { return ''; }
 }
@@ -67,8 +13,8 @@ function setCookieList(headers) {
   const raw = headers && (headers['set-cookie'] ?? headers['Set-Cookie']);
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.filter(Boolean);
-  // A single string may contain several cookies; splitting on commas is unsafe (Expires uses commas),
-  // so split on newlines first, then only on a comma that is followed by `<token>=` (a new cookie).
+
+
   return String(raw).split(/\n/).flatMap(s => s.split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)).map(s => s.trim()).filter(Boolean);
 }
 
@@ -88,13 +34,13 @@ function parseCookie(cookieStr) {
   return { name, flags };
 }
 
-// ----------------------------------------------------------------------------
-// 1) Third-party services & SDKs — match by hostname pattern + inline global signature.
-// Each entry: { name, category, hostRe, globalRe? } — hostRe matches a request/script host;
-// globalRe (optional) matches inline HTML/JS for SDKs that load without an obvious external host.
-// ----------------------------------------------------------------------------
+
+
+
+
+
 const SERVICE_SIGNATURES = [
-  // analytics
+
   { name: 'Google Analytics / GTM', category: 'analytics', hostRe: /(googletagmanager\.com|google-analytics\.com|analytics\.google\.com|\bg\/collect)/, globalRe: /\b(gtag|dataLayer|ga\.getAll|GoogleAnalyticsObject)\b|UA-\d{4,}|G-[A-Z0-9]{6,}|GTM-[A-Z0-9]+/ },
   { name: 'Segment', category: 'analytics', hostRe: /(cdn\.segment\.com|api\.segment\.io)/, globalRe: /\banalytics\.(track|identify|page)\b|window\.analytics\b/ },
   { name: 'Amplitude', category: 'analytics', hostRe: /(amplitude\.com|cdn\.amplitude\.com|api\d*\.amplitude\.com)/, globalRe: /\bamplitude\.(getInstance|init|logEvent)\b/ },
@@ -105,26 +51,26 @@ const SERVICE_SIGNATURES = [
   { name: 'Plausible', category: 'analytics', hostRe: /plausible\.io/ },
   { name: 'Fathom', category: 'analytics', hostRe: /usefathom\.com/ },
   { name: 'Matomo / Piwik', category: 'analytics', hostRe: /(matomo|piwik)\b/, globalRe: /\b_paq\b|matomo\.js/ },
-  // error / perf monitoring
+
   { name: 'Sentry', category: 'monitoring', hostRe: /(sentry\.io|sentry-cdn\.com|browser\.sentry-cdn\.com|ingest\.sentry\.io)/, globalRe: /\bSentry\.(init|captureException)\b|__SENTRY__/ },
   { name: 'Datadog', category: 'monitoring', hostRe: /(datadoghq\.com|datad0g\.com|browser-intake-datadoghq\.com)/, globalRe: /\bDD_RUM\b|datadogRum\b/ },
   { name: 'New Relic', category: 'monitoring', hostRe: /(newrelic\.com|nr-data\.net|js-agent\.newrelic\.com)/, globalRe: /\bNREUM\b|newrelic\b/ },
   { name: 'Bugsnag', category: 'monitoring', hostRe: /(bugsnag\.com|d2wy8f7a9ursnm\.cloudfront\.net)/, globalRe: /\bBugsnag\.(start|notify)\b/ },
   { name: 'LogRocket', category: 'monitoring', hostRe: /(logrocket\.(com|io)|cdn\.logrocket\.io)/, globalRe: /\bLogRocket\.(init)\b/ },
-  // auth
+
   { name: 'Firebase Auth', category: 'auth', hostRe: /(identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|firebaseapp\.com)/, globalRe: /firebase(?:\.auth)?\b|__FIREBASE_DEFAULTS__/ },
   { name: 'Auth0', category: 'auth', hostRe: /(auth0\.com|\.auth0\.com|cdn\.auth0\.com)/, globalRe: /\bauth0\b|Auth0Client\b/ },
   { name: 'Clerk', category: 'auth', hostRe: /(clerk\.(com|dev|accounts\.dev)|clerk\.[a-z0-9-]+\.lcl\.dev)/, globalRe: /\b__clerk|Clerk\b|data-clerk/ },
   { name: 'AWS Cognito', category: 'auth', hostRe: /(cognito-idp\.[a-z0-9-]+\.amazonaws\.com|cognito-identity\.[a-z0-9-]+\.amazonaws\.com)/, globalRe: /CognitoUserPool\b|AmazonCognito/ },
   { name: 'Okta', category: 'auth', hostRe: /(okta\.com|oktacdn\.com|\.okta\.com)/, globalRe: /\bOktaAuth\b|okta-signin/ },
   { name: 'Supabase', category: 'auth', hostRe: /(supabase\.co|supabase\.in)/, globalRe: /\bcreateClient\(|supabase(?:Url|Key|Client)\b/ },
-  // payments
+
   { name: 'Stripe', category: 'payments', hostRe: /(js\.stripe\.com|api\.stripe\.com|stripe\.com|m\.stripe\.network)/, globalRe: /\bStripe\(|stripe\.elements\b/ },
   { name: 'PayPal', category: 'payments', hostRe: /(paypal\.com|paypalobjects\.com|www\.paypal\.com\/sdk)/, globalRe: /\bpaypal\.(Buttons|Checkout)\b/ },
   { name: 'Braintree', category: 'payments', hostRe: /(braintreegateway\.com|braintree-api\.com|js\.braintreegateway\.com)/, globalRe: /\bbraintree\.(client|setup)\b/ },
   { name: 'Adyen', category: 'payments', hostRe: /(adyen\.com|checkoutshopper-live\.adyen\.com|adyen\.net)/, globalRe: /\bAdyenCheckout\b/ },
   { name: 'Square', category: 'payments', hostRe: /(squareup\.com|squarecdn\.com)/, globalRe: /\bSqPaymentForm\b|window\.Square\b/ },
-  // CDNs / hosting infra
+
   { name: 'Cloudflare', category: 'cdn', hostRe: /(cloudflare\.com|cdnjs\.cloudflare\.com|cdn-cgi)/ },
   { name: 'Fastly', category: 'cdn', hostRe: /(fastly\.net|fastly\.com)/ },
   { name: 'Akamai', category: 'cdn', hostRe: /(akamai(?:hd|ized)?\.net|akamai\.com|akamaitechnologies\.com)/ },
@@ -132,27 +78,27 @@ const SERVICE_SIGNATURES = [
   { name: 'unpkg', category: 'cdn', hostRe: /unpkg\.com/ },
   { name: 'AWS CloudFront', category: 'cdn', hostRe: /cloudfront\.net/ },
   { name: 'Vercel', category: 'cdn', hostRe: /(vercel-(?:insights|analytics)\.com|vercel\.app|vercel\.com)/ },
-  // media
+
   { name: 'Cloudinary', category: 'media', hostRe: /(cloudinary\.com|res\.cloudinary\.com)/ },
   { name: 'Mux', category: 'media', hostRe: /(mux\.com|stream\.mux\.com|inferred\.litix\.io)/, globalRe: /\bmux\.player|hls\.js\b/ },
   { name: 'imgix', category: 'media', hostRe: /imgix\.net/ },
   { name: 'Vimeo', category: 'media', hostRe: /(vimeo\.com|vimeocdn\.com|player\.vimeo\.com)/ },
   { name: 'YouTube embed', category: 'media', hostRe: /(youtube\.com\/embed|youtube-nocookie\.com|ytimg\.com)/ },
-  // maps
+
   { name: 'Google Maps', category: 'maps', hostRe: /(maps\.googleapis\.com|maps\.gstatic\.com|maps\.google\.com)/, globalRe: /\bgoogle\.maps\.(Map|Marker)\b/ },
   { name: 'Mapbox', category: 'maps', hostRe: /(mapbox\.com|api\.mapbox\.com|tiles\.mapbox\.com)/, globalRe: /\bmapboxgl\b/ },
-  // chat / support
+
   { name: 'Intercom', category: 'support', hostRe: /(intercom\.io|intercomcdn\.com|widget\.intercom\.io)/, globalRe: /\bIntercom\(|intercomSettings\b/ },
   { name: 'Drift', category: 'support', hostRe: /(drift\.com|driftt\.com|js\.driftt\.com)/, globalRe: /\bdrift\.(load|on)\b/ },
   { name: 'Zendesk', category: 'support', hostRe: /(zendesk\.com|zdassets\.com|zopim\.com)/, globalRe: /\bzE\(|window\.zESettings\b/ },
   { name: 'Crisp', category: 'support', hostRe: /(crisp\.chat|client\.crisp\.chat)/, globalRe: /\$crisp\b|CRISP_WEBSITE_ID/ },
-  // ads
+
   { name: 'Google Ads / DoubleClick', category: 'ads', hostRe: /(googlesyndication\.com|doubleclick\.net|googleadservices\.com|adservice\.google\.com)/, globalRe: /\badsbygoogle\b/ },
   { name: 'Facebook Pixel', category: 'ads', hostRe: /(connect\.facebook\.net|facebook\.com\/tr)/, globalRe: /\bfbq\(|_fbq\b/ },
-  // fonts
+
   { name: 'Google Fonts', category: 'fonts', hostRe: /(fonts\.googleapis\.com|fonts\.gstatic\.com)/ },
   { name: 'Adobe Fonts (Typekit)', category: 'fonts', hostRe: /(use\.typekit\.net|typekit\.com|use\.typekit\.com)/, globalRe: /\bTypekit\b/ },
-  // tag managers / A-B / flags
+
   { name: 'Optimizely', category: 'experimentation', hostRe: /(optimizely\.com|cdn\.optimizely\.com)/, globalRe: /\boptimizely\b|window\.optimizely\b/ },
   { name: 'LaunchDarkly', category: 'experimentation', hostRe: /(launchdarkly\.com|clientstream\.launchdarkly\.com|app\.launchdarkly\.com)/, globalRe: /\bLDClient\b|launchdarkly/ },
   { name: 'Split.io', category: 'experimentation', hostRe: /split\.io/, globalRe: /\bSplitFactory\b/ },
@@ -183,8 +129,8 @@ function detectServices(scriptHosts, netHosts, inlineHtml) {
 
 // ----------------------------------------------------------------------------
 // 2) API operation catalog — infer a purpose from each operation's name/path/params.
-// ----------------------------------------------------------------------------
-// Map keyword -> purpose phrase. Ordered loosely most-specific first within the scan.
+
+
 const PURPOSE_KEYWORDS = [
   [/\b(login|signin|sign[-_]?in|authenticate|auth|session|token|oauth|sso|credential)\b/i, 'authentication / session'],
   [/\b(logout|signout|sign[-_]?out)\b/i, 'end session / logout'],
@@ -209,14 +155,14 @@ const PURPOSE_KEYWORDS = [
 ];
 
 function inferPurpose(name, method, path, varKeys) {
-  // Split camelCase / PascalCase so `CheckoutCreateMutation` → "Checkout Create Mutation" and the
-  // \bword\b keyword patterns can match the embedded words.
+
+
   const split = s => String(s || '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
   const hay = [split(name), split(path), (varKeys || []).map(split).join(' ')].filter(Boolean).join(' ');
   for (const [re, purpose] of PURPOSE_KEYWORDS) {
     if (re.test(hay)) return purpose;
   }
-  // Fall back on HTTP method semantics for REST without a telling name.
+
   const m = lc(method);
   if (m === 'post') return 'create / submit data';
   if (m === 'put' || m === 'patch') return 'update a record';
@@ -229,7 +175,7 @@ function buildApiCatalog(apiCalls, netRequests) {
   const catalog = [];
   const hosts = new Set();
 
-  // From the caller-provided, already-summarized apiCalls (the richest source).
+
   for (const c of apiCalls) {
     if (!c) continue;
     const path = c.path || pathOf(c.url || '');
@@ -260,7 +206,7 @@ function buildApiCatalog(apiCalls, netRequests) {
     }
   }
 
-  // Supplement from raw netData requests that look like API/XHR/fetch but weren't summarized above.
+
   const seenPaths = new Set(catalog.map(e => (e.host || '') + '|' + (e.path || e.name)));
   for (const r of netRequests) {
     if (!r || !r.url) continue;
@@ -270,7 +216,7 @@ function buildApiCatalog(apiCalls, netRequests) {
     if (!looksApi) continue;
     const host = hostOf(r.url);
     const path = pathOf(r.url);
-    // Skip plain static asset / media even if mislabeled.
+
     if (/\.(?:js|mjs|css|png|jpe?g|gif|webp|svg|woff2?|ttf|mp4|m4s|webm|ico)(?:[?#]|$)/i.test(r.url)) continue;
     const key = host + '|' + path;
     if (seenPaths.has(key)) continue;
@@ -287,11 +233,11 @@ function buildApiCatalog(apiCalls, netRequests) {
   return { catalog, hosts: [...hosts] };
 }
 
-// ----------------------------------------------------------------------------
-// 3) Data-model inference — entities + fields from GraphQL var keys, JSON bodies, og/JSON-LD content.
-// ----------------------------------------------------------------------------
+
+
+
 function inferDataModel(apiCatalog, netRequests, content) {
-  const entities = new Map(); // entity name -> { fields:Set, source }
+  const entities = new Map();
 
   const addEntity = (name, fields, source) => {
     const key = name.toLowerCase();
@@ -300,7 +246,7 @@ function inferDataModel(apiCatalog, netRequests, content) {
     for (const f of fields) if (f) e.fields.add(f);
   };
 
-  // From GraphQL operation variable keys: a key like `userID`/`postId` hints at an entity.
+
   for (const op of apiCatalog) {
     const keys = op.variableKeys || op.bodyParamKeys || [];
     for (const k of keys) {
@@ -312,7 +258,7 @@ function inferDataModel(apiCatalog, netRequests, content) {
     }
   }
 
-  // From JSON response bodies in netData: top-level object keys, and nested object field names.
+
   let bodiesScanned = 0;
   for (const r of netRequests) {
     if (bodiesScanned >= 12) break;
@@ -327,7 +273,7 @@ function inferDataModel(apiCatalog, netRequests, content) {
       if (!obj || typeof obj !== 'object' || depth > 3) return;
       if (Array.isArray(obj)) { if (obj.length) scan(obj[0], depth); return; }
       for (const [k, v] of Object.entries(obj)) {
-        // A nested object whose key looks like an entity (user, author, post, item, node...) → entity.
+
         if (v && typeof v === 'object' && !Array.isArray(v)) {
           if (/^(user|author|owner|post|item|node|product|order|account|profile|comment|media|page)s?$/i.test(k)) {
             const ent = k.charAt(0).toUpperCase() + k.slice(1).replace(/s$/, '');
@@ -358,9 +304,9 @@ function inferDataModel(apiCatalog, netRequests, content) {
   return [...entities.values()].map(e => ({ entity: e.entity, fields: [...e.fields], source: e.source }));
 }
 
-// ----------------------------------------------------------------------------
-// 4) Auth & session mechanics.
-// ----------------------------------------------------------------------------
+
+
+
 const TOKEN_HEADER_RE = /^(authorization|x-csrf-token|x-xsrf-token|x-csrftoken|csrf-token|x-auth-token|x-api-key|x-access-token|x-session-token|x-id-token|x-clerk-.*|x-supabase-.*|apikey)$/i;
 
 function analyzeAuth(headers, netRequests, services, cookies, loginWall) {
@@ -376,7 +322,7 @@ function analyzeAuth(headers, netRequests, services, cookies, loginWall) {
       if (/csrf|xsrf/.test(kl)) csrf = true;
     }
   }
-  // CSRF token may also live in a cookie or a <meta> — note cookie-based CSRF.
+
   if (cookies.some(c => /csrf|xsrf/i.test(c.name))) csrf = true;
 
   const notes = [];
@@ -394,9 +340,9 @@ function analyzeAuth(headers, netRequests, services, cookies, loginWall) {
   return { providers, cookies, tokenHeaders: [...tokenHeaders], csrf, loginWall, notes };
 }
 
-// ----------------------------------------------------------------------------
-// 5) Security posture — parse + EXPLAIN security-relevant headers.
-// ----------------------------------------------------------------------------
+
+
+
 function parseCsp(value) {
   const directives = {};
   for (const part of String(value).split(';')) {
@@ -480,9 +426,9 @@ function analyzeSecurity(headers) {
   return out;
 }
 
-// ----------------------------------------------------------------------------
-// 6) Data collection / forms — scan HTML for <form> and their inputs.
-// ----------------------------------------------------------------------------
+
+
+
 const SENSITIVE_FIELD_RE = /pass(?:word|wd|code)|email|e-?mail|credit|card|cvv|cvc|ssn|social.?security|phone|tel|address|dob|birth|account|routing|iban|secret|otp|pin\b/i;
 
 function scanForms(html) {
@@ -515,9 +461,9 @@ function scanForms(html) {
   return forms;
 }
 
-// ----------------------------------------------------------------------------
-// 7) Storage & cookies.
-// ----------------------------------------------------------------------------
+
+
+
 function analyzeStorage(cookies, inlineHtml) {
   const html = inlineHtml || '';
   const localStorage = /\blocalStorage\.(getItem|setItem|removeItem)\b|window\.localStorage\b/.test(html);
@@ -559,7 +505,7 @@ function inferFeatures(links, apiCatalog, content, services, forms) {
   if (services.some(s => s.category === 'analytics')) add('User behavior analytics tracking');
   if (services.some(s => s.category === 'ads')) add('Advertising / ad tracking');
 
-  // From page metadata content type.
+
   if (content && content.type) {
     const t = lc(content.type);
     if (/video/.test(t)) add('Video content / playback');
@@ -572,9 +518,9 @@ function inferFeatures(links, apiCatalog, content, services, forms) {
   return [...feats];
 }
 
-// ----------------------------------------------------------------------------
-// Markdown rendering helpers.
-// ----------------------------------------------------------------------------
+
+
+
 function renderLines(f) {
   const L = [];
   L.push('## Deep Behavioral Analysis');
@@ -707,7 +653,7 @@ export function webDeepDive(ctx) {
     const apiCalls = Array.isArray(ctx.apiCalls) ? ctx.apiCalls : [];
     const netData = (ctx.netData && typeof ctx.netData === 'object') ? ctx.netData : null;
     const netRequests = (netData && Array.isArray(netData.requests)) ? netData.requests : [];
-    // Inline HTML pool for signature matching: the fetched HTML plus any netData-captured HTML.
+
     const inlineHtml = html + (netData && typeof netData.html === 'string' ? '\n' + netData.html : '');
 
     const findings = {};

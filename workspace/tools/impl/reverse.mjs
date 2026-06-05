@@ -1,33 +1,22 @@
 #!/usr/bin/env node
-// reverse.mjs — analyze a target and write BOTH a Markdown report and a PDF to workspace/reverse/.
-// ETHICS: for the OWNER'S OWN or clearly authorized targets only.
-//
-// Cross-platform (macOS / Windows / Linux): uses Node's built-in fetch + pure-JS binary inspection
-// instead of /usr/bin/* tools, and ALWAYS renders a PDF with the bundled Playwright Chromium.
-//
-// Usage:
-//   node reverse.mjs web  <url>  [--name <slug>]
-//   node reverse.mjs app  <path> [--name <slug>]
-//   node reverse.mjs file <path> [--name <slug>]
-
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 import { analyzeSources, decodeInlineScripts, findSourceMapRef, parseSourceMap, traceTerms } from './reverse-code.mjs';
-import { appDeepDive } from './reverse-app-deep.mjs';     // Electron asar / PE / ELF deep dive
-import { webDeepDive } from './reverse-web-deep.mjs';      // third-party services, API catalog, data model, security
-import { explainEntitlement, explainFramework, explainMany } from './reverse-explain.mjs';   // plain-language glossary
-import { domainAnalysis } from './reverse-domain.mjs';     // category detection + note-taking mechanics + gap analysis
+import { appDeepDive } from './reverse-app-deep.mjs';
+import { webDeepDive } from './reverse-web-deep.mjs';
+import { explainEntitlement, explainFramework, explainMany } from './reverse-explain.mjs';
+import { domainAnalysis } from './reverse-domain.mjs';
 
 const __dirname   = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE   = path.resolve(__dirname, '../..');
 const REVERSE_DIR = path.join(WORKSPACE, 'reverse');
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-// The link-preview crawler UA: many sites (Instagram, TikTok, X) serve their PUBLIC Open Graph preview
-// (author, caption, thumbnail, video) to this UA for sharing/unfurling, even when a browser is redirected
-// to a login wall. This reads only the public preview the site publishes — not behind-auth data.
+
+
+
 const CRAWLER_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
 
 const ETHICS_NOTE = `> **Authorization required.** Use this tool only on targets you own or are
@@ -42,8 +31,8 @@ function slugify(s) {
     .slice(0, 60) || 'target';
 }
 
-// Shorten the long hashed bundle/source names (e.g. `OBdQiWa9…FrnIAv.js`) so the report stays readable
-// instead of printing a 90-char filename in every table row.
+
+
 function shortName(s) {
   const b = String(s || '');
   if (b.length <= 26) return b;
@@ -221,14 +210,14 @@ async function writePdf(markdown, pdfPath, title) {
 // Detect the stack from PRECISE signatures, not bare substrings. Libraries (jQuery/Bootstrap/Tailwind)
 // are matched against <script>/<link> URLs or specific globals — never `html.includes('bootstrap')`,
 // because big SPAs (Facebook/Instagram) ship tokens like `bootstrapData`/`requireLazy` that trip naive
-// substring checks into false positives. `scripts`/`links` are the extracted src/href URLs.
+
 function detectStack(html, headers, scripts = [], links = []) {
   const found = [];
   const h = html;
   const srcBlob = [...scripts, ...links].join('\n').toLowerCase();
   const inSrc = re => re.test(srcBlob);
 
-  // Frameworks — markers specific enough to trust.
+
   if (/data-reactroot|__reactcontainer|__reactfiber|react-dom(?:\.production)?\.min\.js/i.test(h) || inSrc(/react-dom|\breact[-.@]/)) found.push('React');
   if (/__NEXT_DATA__|\/_next\//.test(h)) found.push('Next.js');
   if (/__NUXT__|\/_nuxt\//.test(h)) found.push('Nuxt');
@@ -238,14 +227,14 @@ function detectStack(html, headers, scripts = [], links = []) {
   if (inSrc(/gatsby[-.]/) || /id=["']___gatsby["']/i.test(h)) found.push('Gatsby');
   if (/\bhx-(get|post|target|swap|trigger)=/i.test(h) || inSrc(/htmx(?:\.org|[-.])/)) found.push('htmx');
 
-  // Libraries — by SCRIPT/LINK URL or a precise global only.
+
   if (inSrc(/jquery[-.@]?[\d.]*(?:\.min|\.slim)?\.js/) || /jquery\.fn\.jquery|window\.jquery\b/i.test(h)) found.push('jQuery');
   if (inSrc(/bootstrap[-.@]?[\d.]*(?:\.bundle|\.min)?\.(?:css|js)/)) found.push('Bootstrap');
   if (inSrc(/cdn\.tailwindcss\.com|tailwind[-.][\w.]*\.css/)) found.push('Tailwind CSS');
   if (/[?&"']graphql\b|"\/api\/graphql"|\/graphql"/i.test(h)) found.push('GraphQL (referenced)');
   if (inSrc(/apollo/) || /__APOLLO_STATE__/.test(h)) found.push('Apollo');
 
-  // Server / infra from headers.
+
   const genM = html.match(/<meta[^>]+name=["']generator["'][^>]+content=["']([^"']+)["']/i);
   if (genM) found.push(`Generator: ${genM[1].trim()}`);
   if (headers['x-powered-by']) found.push(`Powered-by: ${headers['x-powered-by']}`);
@@ -287,10 +276,10 @@ function extractLinks(html) {
   return hrefs.slice(0, 40);
 }
 
-// ---- request classification: the central fix ----
-// The old tool dumped EVERY request into one list and let the OpenAPI/clone stages treat CDN video
-// byte-range fetches as distinct API "endpoints". Media delivery is not an API surface. We classify
-// each captured request so the report separates the genuine API calls from media and static assets.
+
+
+
+
 const CDN_HOST_RE  = /(fbcdn\.net|cdninstagram\.com|akamaihd\.net|akamaized\.net|cloudfront\.net|fastly\.net|gstatic\.com|ggpht\.com|googlevideo\.com|twimg\.com|licdn\.com|pinimg\.com|\bcdn\d*\.)/i;
 const MEDIA_EXT_RE = /\.(?:mp4|m4s|webm|mov|ts|mp3|m4a|aac|ogg|flac|jpe?g|png|gif|webp|avif|svg|ico|woff2?|ttf|otf|eot)(?:[?#]|$)/i;
 
@@ -309,12 +298,12 @@ function classifyRequest(req) {
   return 'other';
 }
 
-// Collapse byte-range chunks of the same media file to one key (host + path, query stripped).
+
 function mediaKey(u) {
   try { const url = new URL(u); return url.host + url.pathname; } catch { return u.split('?')[0]; }
 }
 
-// Parse an application/x-www-form-urlencoded body into a plain object.
+
 function parseForm(body) {
   const params = {};
   for (const pair of body.split('&')) {
@@ -324,14 +313,14 @@ function parseForm(body) {
       const k = decodeURIComponent(pair.slice(0, i).replace(/\+/g, ' '));
       const v = decodeURIComponent(pair.slice(i + 1).replace(/\+/g, ' '));
       params[k] = v;
-    } catch { /* skip malformed pair */ }
+    } catch {  }
   }
   return params;
 }
 
-// Extract the part that actually matters for reverse engineering a request: method, path, and — for
-// GraphQL/AJAX POSTs — the operation name, doc_id/query_hash, and the variable KEYS. This is exactly
-// what the old report omitted (it just emitted TODOs).
+
+
+
 function summarizeApiCall(req) {
   const out = { method: req.method, url: req.url, status: req.status, contentType: req.contentType };
   try { out.path = new URL(req.url).pathname; } catch { out.path = req.url; }
@@ -374,7 +363,7 @@ function summarizeApiCall(req) {
 // ---- content extraction: WHAT'S ACTUALLY INSIDE the page/reel ----
 // Pull the real content (author, caption, video, audio, thumbnail, stats) from the public sources the
 // page exposes to everyone: Open Graph tags, Twitter cards, and JSON-LD. This is "what's in the reel",
-// not the code/network. (Reads only what the page serves; respect ToS/copyright — for your own analysis.)
+
 function decodeEntities(s) {
   return String(s || '')
     .replace(/&nbsp;/g, ' ').replace(/&(?:mdash|ndash);/g, '—').replace(/&hellip;/g, '…').replace(/&(?:rsquo|lsquo);/g, "'").replace(/&(?:rdquo|ldquo);/g, '"')
@@ -409,10 +398,10 @@ function extractContent(html) {
     audio: og('audio'), author: null, caption: null, published: null,
     views: null, likes: null, comments: null, duration: null, hashtags: [],
   };
-  // FIRST: Instagram/TikTok-style og parsing on the ORIGINAL og fields (before JSON-LD, which on IG
-  // carries a generic name like "Reel" that must not clobber the rich og:title).
-  //   og:title       = "Name on Instagram: \"caption\""
-  //   og:description = "12K likes, 340 comments - handle on date: caption"
+
+
+
+
   const t = c.title || '', d = c.description || '';
   const mAuthor = t.match(/^(.+?)\s+on\s+(?:Instagram|TikTok|Threads)/i); if (mAuthor) c.author = mAuthor[1].trim();
   const mHandle = d.match(/-\s*([\w.]+)\s+on\s+/i); if (mHandle && !c.author) c.author = mHandle[1].trim();
@@ -462,7 +451,7 @@ function scanApiForContent(requests) {
   return Object.keys(out).length ? out : null;
 }
 
-// ---- web subcommand ----
+
 
 async function analyzeWeb(url, name) {
   const slug = name || slugify(url);
@@ -493,9 +482,9 @@ async function analyzeWeb(url, name) {
   }
 
   // ============================ CONTENT (what's inside) ============================
-  // The headline: the actual content of the page/reel — who made it, the caption, the media, the stats.
+
   const content = extractContent(html);
-  findings.content = content;   // same ref — later live-capture enrichment fills it in place
+  findings.content = content;
   const renderContent = (c, heading) => {
     const row = (label, val) => { if (val != null && String(val).trim()) lines.push(`- **${label}:** ${String(val).slice(0, 600)}`); };
     lines.push(heading);
@@ -782,7 +771,7 @@ async function analyzeWeb(url, name) {
         lines.push(`    ${mth}:`, `      summary: "${summary}"`);
         const params = (c.graphql && c.graphql.variables_keys) || c.bodyParamKeys || [];
         // Use the REQUEST content-type (not the response's) and only emit a body when we actually
-        // parsed params — an invented schema with the wrong media type is worse than none.
+
         if (params.length && (c.method !== 'GET' && c.method !== 'HEAD')) {
           lines.push('      requestBody:', '        content:', `          ${(c.reqContentType || 'application/x-www-form-urlencoded').split(';')[0]}:`,
             '            schema:', '              type: object', '              properties:');
@@ -797,8 +786,8 @@ async function analyzeWeb(url, name) {
   return { slug, kind: 'web', target: url, findings, report: lines.join('\n'), title: `Reverse Engineering — ${pageTitle}` };
 }
 
-// Keep only non-sensitive request headers that aid reverse engineering (operation names, app ids).
-// Deliberately drops cookies/authorization/csrf tokens so the report never captures the owner's creds.
+
+
 const KEEP_REQ_HEADERS = ['x-fb-friendly-name', 'x-graphql-operation-name', 'x-ig-app-id', 'x-requested-with', 'content-type', 'x-asbd-id'];
 function pickHeaders(h) {
   const out = {};
@@ -806,20 +795,20 @@ function pickHeaders(h) {
   return out;
 }
 
-// Playwright network capture — launches the bundled headless Chromium and records requests. We keep a
-// larger POST body (GraphQL `variables` are long) and the content-length/range so media chunks can be
-// collapsed and API payloads (doc_id, variables) extracted downstream.
+
+
+
 async function captureNetwork(url) {
   const { chromium } = await import('playwright');
   await ensureChromium(chromium);
   const requests = [];
-  // If the owner has signed in via `browser.login`, reuse that persistent profile so the capture is
-  // AUTHENTICATED (the real reel + its GraphQL/API responses load). Otherwise a fresh anonymous context.
+
+
   const PROFILE = path.join(WORKSPACE, 'browser-profile');
   const args = ['--no-sandbox', '--disable-dev-shm-usage'];
   let browser = null, ctx;
   if (existsSync(path.join(PROFILE, 'Default')) || existsSync(path.join(PROFILE, 'Cookies'))) {
-    try { ctx = await chromium.launchPersistentContext(PROFILE, { headless: true, userAgent: UA, args }); } catch { /* profile locked/busy — fall back */ }
+    try { ctx = await chromium.launchPersistentContext(PROFILE, { headless: true, userAgent: UA, args }); } catch {  }
   }
   if (!ctx) { browser = await chromium.launch({ headless: true, args }); ctx = await browser.newContext({ userAgent: UA }); }
   const page = await ctx.newPage();
@@ -828,8 +817,8 @@ async function captureNetwork(url) {
     postData: req.postDataBuffer()?.toString('utf8')?.slice(0, 8000) ?? null,
     reqHeaders: pickHeaders(req.headers()),
   }));
-  // Capture the actual bytes of the executed scripts (+ the document) so we can analyze the REAL bundle,
-  // not just its URL. Bounded so a huge page can't blow up memory.
+
+
   const bodyJobs = [];
   let bodied = 0;
   page.on('response', res => {
@@ -849,25 +838,25 @@ async function captureNetwork(url) {
     if (grab) {
       bodied++;
       bodyJobs.push((async () => {
-        try { const buf = await res.body(); if (buf && buf.length <= 4_000_000) m.body = buf.toString('utf8'); } catch { /* body unavailable (cached/opaque) */ }
+        try { const buf = await res.body(); if (buf && buf.length <= 4_000_000) m.body = buf.toString('utf8'); } catch {  }
       })());
     }
   });
   let domHtml = '', shot = null;
-  try { await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 }); } catch { /* timeout/nav error acceptable */ }
-  try { await Promise.allSettled(bodyJobs); } catch { /* best effort */ }
-  try { domHtml = await page.content(); } catch { /* page closed/navigated */ }
-  // Capture how the page actually LOOKS — embedded into the report so the design is visible, not just described.
-  try { await page.setViewportSize({ width: 1440, height: 900 }); const buf = await page.screenshot({ type: 'jpeg', quality: 70 }); if (buf) shot = `data:image/jpeg;base64,${buf.toString('base64')}`; } catch { /* screenshot optional */ }
+  try { await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 }); } catch {  }
+  try { await Promise.allSettled(bodyJobs); } catch {  }
+  try { domHtml = await page.content(); } catch {  }
+
+  try { await page.setViewportSize({ width: 1440, height: 900 }); const buf = await page.screenshot({ type: 'jpeg', quality: 70 }); if (buf) shot = `data:image/jpeg;base64,${buf.toString('base64')}`; } catch {  }
   try { await ctx.close(); } catch {}
   if (browser) { try { await browser.close(); } catch {} }
   return { requests, html: domHtml, shot };
 }
 
-// Fetch a product's marketing site (from package.json homepage) to capture how the app LOOKS and the
-// features it advertises — for desktop apps whose own UI can't be introspected statically (e.g. Obsidian
-// ships only a loader; its real UI + the graph view live elsewhere). Renders with Chromium for a real
-// screenshot + the JS-rendered feature copy; falls back to a plain fetch. Never throws.
+
+
+
+
 async function fetchProductSite(url) {
   const out = { url, description: null, features: [], headings: [], shot: null, error: null };
   if (!url) return out;
@@ -889,7 +878,7 @@ async function fetchProductSite(url) {
   }
   try {
     out.description = metaContent(html, 'og:description') || metaContent(html, 'description', 'name') || null;
-    // Headings = the marketing site's feature/section copy (this is where the graph view, canvas, etc. show up).
+
     const heads = [...html.matchAll(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/gi)].map(m => decodeEntities(m[1].replace(/<[^>]+>/g, '').trim())).filter(s => s && s.length <= 90);
     out.headings = [...new Set(heads)].slice(0, 24);
     // Feature-ish bullet/sentence fragments.
@@ -901,8 +890,8 @@ async function fetchProductSite(url) {
 
 // Live-app capture (macOS, opt-in via --live-app): launch the actual app, screenshot the running UI,
 // embed it in the report, and have the vision tool describe what's on screen — the only way to truly
-// "show the design" of a desktop app whose UI isn't statically introspectable. Best-effort, never throws.
-// Note: needs Screen Recording permission for the capturing process; a black image means it's not granted.
+
+
 async function captureLiveApp(appPath, label) {
   const out = { shot: null, description: null, error: null };
   if (process.platform !== 'darwin') { out.error = 'live capture is currently macOS-only'; return out; }
@@ -911,13 +900,13 @@ async function captureLiveApp(appPath, label) {
   const png = path.join(os.tmpdir(), `helm-live-${slug}.png`);
   const jpg = path.join(os.tmpdir(), `helm-live-${slug}.jpg`);
   try {
-    run('/usr/bin/open', ['-a', appPath]);                                   // launch
-    run('/usr/bin/osascript', ['-e', `tell application "${proc}" to activate`], { timeout: 6000 });   // bring to front
-    await new Promise(r => setTimeout(r, 5000));                             // let it render
-    // Capture ONLY the target app's own front window — never the whole screen. Full-screen capture would
-    // grab unrelated apps and leak private content, and could screenshot the wrong (foreground) app. If we
-    // can't read the window bounds (Accessibility not granted, or the app didn't launch / crashed), we bail
-    // with a clear message rather than capture something misleading.
+    run('/usr/bin/open', ['-a', appPath]);
+    run('/usr/bin/osascript', ['-e', `tell application "${proc}" to activate`], { timeout: 6000 });
+    await new Promise(r => setTimeout(r, 5000));
+
+
+
+
     let region = null;
     try {
       const b = run('/usr/bin/osascript', ['-e', `tell application "System Events" to tell process "${proc}" to get position & size of front window`], { timeout: 8000 });
@@ -931,12 +920,12 @@ async function captureLiveApp(appPath, label) {
     const cap = run('/usr/sbin/screencapture', ['-x', '-R', region, png], { timeout: 20_000 });
     if (!existsSync(png)) { out.error = 'screenshot failed' + (cap.stderr ? ': ' + cap.stderr.slice(0, 80) : ''); return out; }
     out.scope = 'app window';
-    // Downscale to keep the embedded image small; fall back to the PNG if sips is unavailable.
+
     run('/usr/bin/sips', ['-s', 'format', 'jpeg', '-Z', '1600', png, '--out', jpg], { timeout: 20_000 });
     const imgPath = existsSync(jpg) ? jpg : png;
     const buf = readFileSync(imgPath);
     out.shot = `data:${imgPath.endsWith('.jpg') ? 'image/jpeg' : 'image/png'};base64,${buf.toString('base64')}`;
-    // Describe the running UI with the vision tool (uses the engine; best-effort + bounded).
+
     try {
       const r = spawnSync(process.execPath, [path.join(WORKSPACE, 'tools/impl/image.read.mjs'),
         '--path', imgPath,
@@ -976,7 +965,7 @@ function identifyMagic(sig8, buf) {
   return '(unknown — see magic bytes and hexdump above)';
 }
 
-// Infer the app framework/runtime from the binary's strings (cross-platform).
+
 function inferFrameworks(strs) {
   const blob = strs.join('\n');
   const fwks = [];
@@ -994,7 +983,7 @@ function inferFrameworks(strs) {
   return [...new Set(fwks)];
 }
 
-// ---- app subcommand (macOS bundle inspection; generic binary analysis elsewhere) ----
+
 
 async function analyzeApp(appPath, name, opts = {}) {
   const slug = name || slugify(path.basename(appPath));
@@ -1006,7 +995,7 @@ async function analyzeApp(appPath, name, opts = {}) {
   ];
 
   if (process.platform === 'darwin') {
-    // ---- macOS-native bundle inspection (otool / plutil / codesign) ----
+
     const fileR = run('/usr/bin/file', [appPath]);
     findings.format = fileR.stdout.trim().split(':').slice(1).join(':').trim() || null;
     lines.push('## File Type', '```', fileR.stdout.trim() || '(file command returned no output)', '```', '');
@@ -1072,8 +1061,8 @@ async function analyzeApp(appPath, name, opts = {}) {
   }
 
   // Deep dive: crack open the app's internals (Electron app.asar package.json/deps/main, embedded
-  // frameworks + versions, architectures, code-signing, helpers, auto-update, capabilities; PE/ELF on
-  // other OSes). Never throws — returns {lines,findings} and merges into the report + synthesis.
+
+
   try {
     const deep = await appDeepDive(appPath);
     if (deep.lines && deep.lines.length) lines.push('', ...deep.lines);
@@ -1088,7 +1077,7 @@ async function analyzeApp(appPath, name, opts = {}) {
 
   // Domain-aware pass: detect what KIND of app this is (note-taking, code editor, …), explain how it
   // works, run a gap analysis, AND surface the design language + signature features (e.g. Obsidian's graph
-  // view — notes as orbs connected by link "strings"). Never throws.
+
   try {
     const dom = domainAnalysis(findings, 'app');
     if (dom.lines && dom.lines.length) lines.push('', ...dom.lines);
@@ -1096,8 +1085,8 @@ async function analyzeApp(appPath, name, opts = {}) {
   } catch {}
 
   // Product site & visual design: a desktop app's real UI usually can't be introspected statically (e.g.
-  // Obsidian ships only a loader), so we pull the product's marketing site for the advertised features +
-  // an embedded screenshot — the closest we can get to "show the actual design" without launching the app.
+
+
   try {
     const homepage = findings.app?.homepage || null;
     if (homepage) {
@@ -1131,7 +1120,7 @@ async function analyzeApp(appPath, name, opts = {}) {
   return { slug, kind: 'app', target: appPath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
 }
 
-// ---- file subcommand (pure-JS: magic ID + hexdump + strings; uses external `file` if available) ----
+
 
 async function analyzeFile(filePath, name) {
   const slug = name || slugify(path.basename(filePath));
@@ -1171,16 +1160,16 @@ async function analyzeFile(filePath, name) {
   return { slug, kind: 'file', target: filePath, findings, report: lines.join('\n'), title: `Reverse Engineering — ${label}` };
 }
 
-// ============================ SYNTHESIS ============================
-// A report must LEAD with an explanation, not a wall of raw data. From the structured findings each
-// analyzer collected, we synthesize a plain-language "Summary" + "How It Works" brief and splice it in
-// right after the Target block. Default is a deterministic, evidence-grounded synthesis (instant, never
-// invents). Set HELM_REVERSE_LLM=1 to have the local Claude engine write richer prose instead (it falls
-// back to the deterministic version if the engine is unavailable or returns nothing usable).
+
+
+
+
+
+
 
 const bullets = arr => arr.filter(Boolean).map(b => `- ${b}`).join('\n');
 
-// Label a catalogued API operation (GraphQL op/doc_id, or REST method+path).
+
 const opLabel = o => {
   if (!o) return 'operation';
   if (o.graphql) return o.graphql.operationName || o.graphql.name || (o.graphql.doc_id && `doc_id ${o.graphql.doc_id}`) || 'graphql op';
@@ -1198,7 +1187,7 @@ function buildWebSummary(f) {
   const isNext = stack.some(s => /Next\.js/i.test(s));
   const isReact = stack.some(s => /React/i.test(s));
   const isVue = stack.some(s => /Vue|Nuxt/i.test(s));
-  // Deep behavioral findings (from reverse-web-deep.mjs)
+
   const services = f.services || [];
   const features = f.features || [];
   const catalog = f.apiCatalog || [];
@@ -1256,7 +1245,7 @@ function buildWebSummary(f) {
   return parts.join('\n\n');
 }
 
-// Frameworks may be plain strings (shallow pass) or {name,version} objects (deep pass) — normalize.
+
 const fwName = x => (typeof x === 'string' ? x : (x && x.name) || '');
 const asString = x => (typeof x === 'string' ? x : (x && (x.name || x.type)) || '');
 
@@ -1292,7 +1281,7 @@ function buildAppSummary(f) {
   if (isElectron && elec.electronVersion) sum.push(`Built on Electron ${elec.electronVersion}.`);
   if (archs.length) sum.push(`Ships ${f.universal ? 'a universal binary' : 'a binary'} for ${archs.join(', ')}.`);
 
-  // What it does — from the package description, the document types it opens, and detected subsystems.
+
   const what = [];
   if (f.noteMechanics) {
     const nm = f.noteMechanics;
@@ -1363,7 +1352,7 @@ function resolveClaudeBin() {
   return 'claude';
 }
 
-// Opt-in (HELM_REVERSE_LLM=1): hand the collected findings to the Claude engine for richer prose.
+
 function llmSummary(result) {
   const prompt = `Write the executive brief for a reverse-engineering report on this ${result.kind} target: ${result.target}.
 Using ONLY the raw findings below, output GitHub Markdown with EXACTLY two sections and nothing else:
@@ -1391,19 +1380,19 @@ function buildReportSummary(result) {
   return deterministicSummary(result);
 }
 
-// Splice the summary in right after the "## Target" block so the report opens with the explanation.
+
 function insertSummary(report, summaryMd) {
   if (!summaryMd) return report;
   const lines = report.split('\n');
   const ti = lines.findIndex(l => /^##\s+Target\s*$/.test(l));
   if (ti < 0) return summaryMd + '\n\n' + report;
   let j = ti + 1;
-  while (j < lines.length && !/^##\s/.test(lines[j])) j++;   // walk to the next "## " heading
+  while (j < lines.length && !/^##\s/.test(lines[j])) j++;
   lines.splice(j, 0, '', summaryMd, '');
   return lines.join('\n');
 }
 
-// ---- main ----
+
 
 async function main() {
   const verb = process.argv[2];
@@ -1412,8 +1401,8 @@ async function main() {
   const get = k => { const i = rest.indexOf(`--${k}`); return i !== -1 ? rest[i + 1] : null; };
   const has = k => rest.includes(`--${k}`);
   const name = get('name');
-  // --live-app (alias --live): launch the real app and screenshot its running UI (macOS). The dispatcher
-  // passes booleans as `--live true`, so accept either the bare flag or a truthy value.
+
+
   const truthy = v => v == null || /^(1|true|yes|on)$/i.test(String(v));
   const liveApp = has('live-app') || (has('live') && truthy(get('live'))) || /^(1|true|yes|on)$/i.test(String(get('live-app') || ''));
 
@@ -1426,13 +1415,13 @@ async function main() {
   else if (verb === 'file') result = await analyzeFile(target, name);
   else { console.error(`unknown subcommand: ${verb}. Use web, app, or file.`); process.exit(1); }
 
-  // Lead with a synthesized plain-language brief (what it is + how it works), built from the findings.
+
   try { result.report = insertSummary(result.report, buildReportSummary(result)); } catch {}
 
   const mdPath = path.join(REVERSE_DIR, `${result.slug}-report.md`);
   writeFileSync(mdPath, result.report, 'utf8');
 
-  // ALWAYS render a PDF (the headline output). Markdown is kept alongside it.
+
   let pdfPath = path.join(REVERSE_DIR, `${result.slug}-report.pdf`), pdfError = null;
   try { await writePdf(result.report, pdfPath, result.title || result.slug); }
   catch (e) { pdfError = String(e.message || e); pdfPath = null; }
@@ -1440,7 +1429,7 @@ async function main() {
   console.log(JSON.stringify({ ok: true, pdf: pdfPath, report: mdPath, pdf_error: pdfError, slug: result.slug }));
 }
 
-// Pure helpers exported for unit tests (no side effects on import).
+
 export { detectStack, classifyRequest, mediaKey, parseForm, summarizeApiCall, extractScripts, extractLinks, extractContent };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

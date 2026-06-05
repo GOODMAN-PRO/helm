@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// Helm Mind — AI-first second brain over the HelmBrain vault.
-// Runs a verb (save/capture/find/synthesize/research/daily/recap/health) by invoking the Claude
-// engine with the MIND.md protocol + the relevant vault context, so the vault "rewrites itself".
-//
-// Usage:
-//   node workspace/tools/impl/mind.mjs <verb> "<input>"
-//   node workspace/tools/impl/mind.mjs find "what do I believe about pricing?"
-//   node workspace/tools/impl/mind.mjs --help | --dry-run save "we decided X"
-//
-// The vault path is machine-aware (Mac/Windows) and overridable with HELM_BRAIN.
 import { spawnSync } from 'node:child_process';
 import { resolveClaude } from '../../lib/engine.mjs';
 import { readFileSync, existsSync } from 'node:fs';
@@ -17,15 +7,15 @@ import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));   // workspace/tools/impl
-const ROOT = path.resolve(__dirname, '../../..');                // secondme/
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '../../..');
 loadEnv({ path: path.join(ROOT, '.env'), override: true });
 const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude';
 const MIND_MD = path.join(ROOT, 'workspace/mind/MIND.md');
 
 export function vaultPath() {
   if (process.env.HELM_BRAIN) return process.env.HELM_BRAIN;
-  return path.join(os.homedir(), 'HelmBrain');   // OS-aware: $HOME/HelmBrain (or %USERPROFILE%\HelmBrain)
+  return path.join(os.homedir(), 'HelmBrain');
 }
 
 export const VERBS = {

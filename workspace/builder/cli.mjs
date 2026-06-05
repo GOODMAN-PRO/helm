@@ -1,26 +1,10 @@
 #!/usr/bin/env node
-// cli.mjs — command-line entry to the Helm full-stack builder.
-//
-//   node workspace/builder/cli.mjs "<app or website idea>" [options]
-//
-// Options:
-//   --stack <id>        next-fullstack (default) | astro-site | vite-react-spa
-//   --out <dir>         output project directory (default: workspace/builder/out/<slug>-<ts>)
-//   --dry-run           plan only — print the agent pipeline without spawning agents or scaffolding
-//   --plan              alias for --dry-run
-//   --concurrency <n>   max agents running at once (default 3)
-//   --max-fix <n>       max build-fix rounds after the pipeline (default 2)
-//   --json              print the raw JSON result instead of the Markdown report
-//
-// It orchestrates 20+ specialist agents (PM → architect → DB → backend → auth → design → frontend →
-// integration → QA/security/a11y/perf/SEO → finalize) to produce a REAL, working, verified project.
-
 import { fileURLToPath } from 'node:url';
 import { buildApp } from './orchestrator.mjs';
 import { buildSolo } from './solo.mjs';
 
-// Accepts both direct CLI style (`"<brief>" --dry-run`) and the tool-dispatcher style
-// (`--brief "<text>" --stack <id> --dryRun true`), so `tools.mjs call builder.fullstack` works too.
+
+
 const truthy = v => v === undefined || /^(1|true|yes|on)$/i.test(String(v));
 function parseArgs(argv) {
   const out = { brief: '', stack: undefined, outDir: undefined, dryRun: false, concurrency: 3, maxFixRounds: undefined, json: false,
@@ -38,17 +22,17 @@ function parseArgs(argv) {
     else if (a === '--out' || a === '--outDir') out.outDir = argv[++i];
     else if (a === '--concurrency') out.concurrency = parseInt(argv[++i], 10) || 3;
     else if (a === '--max-fix' || a === '--maxFixRounds') out.maxFixRounds = parseInt(argv[++i], 10) || 2;
-    else if (a === '--tier') out.tier = argv[++i];                 // lean | standard | premium (default: auto)
+    else if (a === '--tier') out.tier = argv[++i];
     else if (a === '--lean') out.tier = 'lean';
     else if (a === '--premium') out.tier = 'premium';
     else if (a === '--max-agents' || a === '--maxAgents') out.maxAgents = parseInt(argv[++i], 10) || undefined;
     else if (a === '--include' || a === '--includeRoles') out.includeRoles = list(argv[++i]);
     else if (a === '--exclude' || a === '--excludeRoles') out.excludeRoles = list(argv[++i]);
-    else if (a === '--swarm') out.swarm = true;       // opt back into the old 40-agent pipeline
-    else if (a === '--solo') out.swarm = false;       // explicit single-agent (the default)
-    else if (a === '--model') out.model = argv[++i];  // build-agent model for solo (sonnet|opus)
-    else if (a === '--no-polish') out.polish = false; // skip the de-AI polish pass (faster)
-    else if (a === '--no-audit') out.audit = false;   // skip the auto-audit→fix loop (faster, less thorough)
+    else if (a === '--swarm') out.swarm = true;
+    else if (a === '--solo') out.swarm = false;
+    else if (a === '--model') out.model = argv[++i];
+    else if (a === '--no-polish') out.polish = false;
+    else if (a === '--no-audit') out.audit = false;
     else if (a === '--audit-rounds' || a === '--maxAuditRounds') out.maxAuditRounds = parseInt(argv[++i], 10) || undefined;
     else rest.push(a);
   }
@@ -63,7 +47,7 @@ async function main() {
     process.exit(1);
   }
   const startedAt = Date.now();
-  // DEFAULT = solo (one cohesive agent + research playbook + build-until-green loop). --swarm for the old.
+
   const result = opts.swarm
     ? await buildApp({
         brief: opts.brief, stack: opts.stack, outDir: opts.outDir, dryRun: opts.dryRun,

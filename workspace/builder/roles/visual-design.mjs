@@ -1,12 +1,8 @@
-// visual-design.mjs — two roles that define and implement the design system.
-// Slot: roles/visual-design.mjs → consumed by the roles aggregator (roles.mjs).
-// CONTRACT: §1 Role schema, §2 BuildContext.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// Shared rich system prompts
-// ---------------------------------------------------------------------------
+
+
+
 
 const VISUAL_DESIGNER_SYSTEM = `\
 You are a principal visual designer with 15+ years shipping award-winning digital products.
@@ -51,9 +47,9 @@ You implement design tokens with zero drift from the spec. Your standards:
 Produce fully working, wired styles — if shadcn needs a components.json, write it; if
 globals.css needs @font-face, write it. Complete means complete.`;
 
-// ---------------------------------------------------------------------------
-// Role definitions
-// ---------------------------------------------------------------------------
+
+
+
 
 export const roles = [
   {
@@ -67,7 +63,7 @@ export const roles = [
     system: VISUAL_DESIGNER_SYSTEM,
 
     task(ctx) {
-      // Pull in prior artifacts (UX flows, PRD) so the designer has full context.
+
       const digest = ctx.artifactsDigest();
       const stackNote = ctx.stack?.notes ?? ctx.stack?.summary ?? '(stack not yet resolved)';
 
@@ -166,7 +162,7 @@ care about the product.`;
     system: DESIGN_SYSTEM_ENGINEER_SYSTEM,
 
     task(ctx) {
-      // The designer role saves design-system as an artifact. Pull it in.
+
       const designSystem = ctx.getArtifact('design-system') ?? ctx.artifactsDigest();
       const stackNote = ctx.stack?.notes ?? ctx.stack?.summary ?? '';
 
@@ -270,12 +266,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
   }
 
-  // 3. Correct ids
+
   const ids = roles.map(r => r.id);
   if (!ids.includes('ui-visual-designer'))   fail('missing role id: ui-visual-designer');
   if (!ids.includes('design-system-engineer')) fail('missing role id: design-system-engineer');
 
-  // 4. phase/model/deps/produces per spec
+
   const [vd, dse] = roles;
   if (vd.phase !== 'design')          fail(`ui-visual-designer phase: expected 'design', got '${vd.phase}'`);
   if (vd.model !== 'opus')            fail(`ui-visual-designer model: expected 'opus', got '${vd.model}'`);
@@ -286,7 +282,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (dse.model !== 'sonnet')         fail(`design-system-engineer model: expected 'sonnet', got '${dse.model}'`);
   if (!dse.deps.includes('ui-visual-designer')) fail('design-system-engineer deps must include ui-visual-designer');
 
-  // 5. task(fakeCtx) returns a non-empty string for both roles
+
   const fakeCtx = {
     brief: 'a fintech dashboard',
     stack: { summary: 'Next.js+Tailwind', notes: 'Tailwind, shadcn/ui' },
@@ -305,7 +301,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (typeof result !== 'string' || result.trim().length === 0) {
       fail(`role ${role.id} task() returned empty or non-string`);
     }
-    // Sanity: task output should reference the brief
+
     if (!result.includes('fintech')) {
       fail(`role ${role.id} task() does not interpolate ctx.brief`);
     }

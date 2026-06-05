@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// Screen watcher daemon.
-// Runs screencapture every N seconds, computes a perceptual hash, and records
-// significant frame changes to events.db.  OCR is opt-in (--ocr flag).
-// OFF BY DEFAULT — started manually or via launchd after owner enables it.
-//
-// Usage:
-//   node watcher.mjs [--interval 60] [--threshold 10] [--ocr] [--once]
-//
-// --interval  seconds between captures (default 60)
-// --threshold hamming distance above which a frame is "different" (default 10)
-// --ocr       run OCR via ocr-helper binary; skip if binary missing
-// --once      capture one frame and exit (useful for testing)
-
 import { execSync, execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync, truncateSync, unlinkSync, renameSync } from 'node:fs';
 import path from 'node:path';
@@ -27,13 +14,13 @@ const DB_PATH     = path.join(__dirname, 'events.db');
 const OCR_BINARY  = path.resolve(__dirname, '../../..', 'bin', 'ocr-helper');
 const RING_MAX    = 200;
 
-// Truncate logs at startup if they exceed 5 MB to prevent unbounded growth.
+
 const LOG_CAP = 5 * 1024 * 1024;
 for (const lf of [path.join(__dirname, 'watcher.log'), path.join(__dirname, 'watcher.err')]) {
   try { if (statSync(lf).size > LOG_CAP) truncateSync(lf, 0); } catch {}
 }
 
-// Parse flags
+
 const args = process.argv.slice(2);
 const flag = (name, def) => {
   const i = args.indexOf('--' + name);
@@ -45,7 +32,7 @@ const THRESHOLD = parseInt(flag('threshold', '10'), 10);
 const USE_OCR   = flag('ocr', false);
 const ONCE      = flag('once', false);
 
-// DB init (idempotent)
+
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
   CREATE TABLE IF NOT EXISTS events (
@@ -63,14 +50,14 @@ const insertEvent = db.prepare(
 );
 const deleteEvent = db.prepare('DELETE FROM events WHERE png_path = ?');
 
-// Perceptual hash: downscale to 8x8 grayscale, threshold by mean.
-// Returns a 64-char binary string of '0'/'1'.
+
+
 async function phash(pngPath) {
   const raw = await sharp(pngPath)
     .resize(8, 8, { fit: 'fill' })
     .grayscale()
     .raw()
-    .toBuffer();                // 64 bytes, one per pixel
+    .toBuffer();
 
   const mean = raw.reduce((s, v) => s + v, 0) / raw.length;
   return Array.from(raw).map(v => (v >= mean ? '1' : '0')).join('');
@@ -87,17 +74,17 @@ function hamming(a, b) {
 function enforceRing() {
   const files = readdirSync(FRAMES_DIR)
     .filter(f => f.endsWith('.png'))
-    .map(f => ({ f, mtime: parseInt(f.split('-')[0], 10) }))  // was +new Date(str) → NaN
+    .map(f => ({ f, mtime: parseInt(f.split('-')[0], 10) }))
     .sort((a, b) => a.mtime - b.mtime);
   while (files.length > RING_MAX) {
     const oldest = files.shift();
     const fpath = path.join(FRAMES_DIR, oldest.f);
     try { unlinkSync(fpath); } catch {}
-    try { deleteEvent.run(fpath); } catch {}  // keep DB in sync
+    try { deleteEvent.run(fpath); } catch {}
   }
 }
 
-// Run OCR via the swift binary if available.
+
 function runOcr(pngPath) {
   if (!existsSync(OCR_BINARY)) return null;
   try {
@@ -116,7 +103,7 @@ async function tick() {
   const dest   = path.join(FRAMES_DIR, fname);
   const tmp    = path.join(os.tmpdir(), `helm-screen-${ts}.png`);
 
-  // Capture (cross-platform: macOS/Windows/Linux)
+
   {
     const r = captureScreen(tmp, { timeout: 10000 });
     if (!r.ok) {
@@ -125,7 +112,7 @@ async function tick() {
     }
   }
 
-  // Hash
+
   let hash;
   try {
     hash = await phash(tmp);
@@ -135,27 +122,27 @@ async function tick() {
     return;
   }
 
-  // Compare
+
   const dist = lastHash ? hamming(hash, lastHash) : THRESHOLD + 1;
   if (dist <= THRESHOLD && lastHash !== null) {
-    // Frame too similar — discard
+
     try { unlinkSync(tmp); } catch {}
     return;
   }
 
-  // Move to frames ring (renameSync is cross-platform; `mv` doesn't exist on Windows)
+
   try {
     renameSync(tmp, dest);
   } catch {
-    // rename failed (e.g. cross-device); just continue with tmp path recorded
+
   }
   const storedPath = existsSync(dest) ? dest : tmp;
 
-  // OCR (optional)
+
   let ocrText = null;
   if (USE_OCR) ocrText = runOcr(storedPath);
 
-  // Persist
+
   insertEvent.run(ts, hash, storedPath, ocrText);
   lastHash = hash;
 

@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// workspace/tools/impl/gui_task.mjs
-// guiStep(action, description, maxRetries=3)
-//   Run an action (async fn), screenshot, ask claude -p "did <description> succeed?",
-//   retry on NO with failure classification: WRONG_ELEMENT | NOT_FOUND | PAGE_NOT_LOADED | AUTH_WALL
-//
-// CLI (for the tool registry):
-//   gui_task.mjs --cmd "<shell>" --description "<expected>" [--retries <n>]
-
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolveClaude } from '../../lib/engine.mjs';
@@ -18,7 +10,7 @@ import { captureScreen } from './capture-screen.mjs';
 const FAILURE_CLASSES = ['WRONG_ELEMENT', 'NOT_FOUND', 'PAGE_NOT_LOADED', 'AUTH_WALL'];
 
 function screenshot(imgPath) {
-  const r = captureScreen(imgPath);   // cross-platform (macOS/Windows/Linux)
+  const r = captureScreen(imgPath);
   if (!r.ok || !existsSync(imgPath) || statSync(imgPath).size < 100) {
     throw new Error(
       (r.error || 'screen capture failed') +
@@ -54,7 +46,7 @@ function verifyWithClaude(description, imgPath) {
     throw new Error(`claude verify call failed (exit ${r.status}): ${(r.stderr ?? '').slice(0, 300)}`);
   }
   let out = r.stdout.trim();
-  try { out = JSON.parse(out).result ?? out; } catch { /* raw text is fine */ }
+  try { out = JSON.parse(out).result ?? out; } catch {  }
   const jsonMatch = out.match(/\{[^{}]+\}/);
   if (!jsonMatch) throw new Error(`no JSON in claude response: ${out.slice(0, 300)}`);
   let result;
@@ -119,7 +111,7 @@ async function main() {
 
   const result = await guiStep(
     () => {
-      // shell:true uses the OS default shell (/bin/sh on POSIX, cmd.exe on Windows) — '/bin/sh' doesn't exist on Windows.
+
       const r = spawnSync(cmd, { shell: true, encoding: 'utf8', stdio: ['ignore', 'inherit', 'inherit'] });
       if (r.error) throw new Error(`action exec failed: ${r.error.message}`);
       if (r.status !== 0) throw new Error(`action exited ${r.status}`);

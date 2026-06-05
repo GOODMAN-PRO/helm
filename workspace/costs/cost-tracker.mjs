@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// Usage tracker for Helm claude runs.
-// Helm runs on the Claude Max subscription (no API key, no billing per token).
-// We track notional token usage (est from char counts) for informational purposes only.
-// Storage: workspace/costs/costs.db (SQLite).
-
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -29,12 +24,12 @@ function openDb() {
   return _db;
 }
 
-// Estimate tokens: rough 4 chars/token heuristic (model-agnostic, notional only).
+
 function estTokens(promptChars, outputChars) {
   return Math.round(((promptChars || 0) + (outputChars || 0)) / 4);
 }
 
-// Append one claude run to the cost log.
+
 export function appendCost(model, promptChars, outputChars) {
   openDb().prepare(
     `INSERT INTO costs (ts, model, prompt_chars, output_chars, est_tokens)
@@ -48,8 +43,8 @@ export function appendCost(model, promptChars, outputChars) {
   );
 }
 
-// Return per-model summary of runs since `since` (Date, ISO string, or ms timestamp).
-// If omitted, returns all-time summary.
+
+
 export function getCostSummary(since) {
   let sinceTs;
   if (since instanceof Date) sinceTs = since.toISOString();

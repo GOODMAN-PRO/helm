@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// helm-notify — send a concise DONE DM when a scheduled job exits.
-// Usage: helm-notify --task <name> --duration <seconds> --files <count> --summary <text>
-// All flags are optional. Exits 0 always so a failed DM never breaks the calling job.
-// Called by scheduled jobs (or their wrappers) on exit.
-
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -47,5 +42,5 @@ try {
 } catch (e) {
   process.stderr.write('helm-notify: ' + (e.message || String(e)) + '\n');
 }
-// Always exit 0 — a failed DM must never fail the calling job.
+
 process.exit(0);

@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Take a screenshot then use Claude's vision to describe the screen or locate a UI element.
-// Verbs:
-//   describe  => { ok: true, description: string }
-//   find      => { ok: true, x: number, y: number, px: number, py: number, scale: number }
-//
-// Retina display: screencapture -x captures at pixel resolution; divide by --scale (default 2)
-// to get point coordinates that work with bin/guicontrol.
-
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
@@ -15,12 +7,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { captureScreen } from './capture-screen.mjs';
 
-// Retina Macs capture at 2x pixel density; other platforms are 1:1. (Click coords only matter on
-// macOS, where the cursor can actually be driven.)
+
+
 const SCALE_DEFAULT = process.platform === 'darwin' ? 2 : 1;
 
 function screenshot(imgPath) {
-  // Cross-platform capture (macOS/Windows/Linux) so describe/verify work on every machine.
+
   const r = captureScreen(imgPath);
   if (!r.ok) throw new Error(r.error || 'screen capture failed');
   if (!existsSync(imgPath) || statSync(imgPath).size < 100) {
@@ -48,7 +40,7 @@ function askClaude(prompt, imagePath) {
   );
   if (r.status !== 0) throw new Error((r.stderr || '').slice(0, 400) || 'claude exited non-zero');
   let out = r.stdout.trim();
-  try { out = JSON.parse(out).result ?? out; } catch { /* raw text is fine */ }
+  try { out = JSON.parse(out).result ?? out; } catch {  }
   return out;
 }
 
@@ -58,11 +50,11 @@ async function main() {
 
   const verb = rawArgs[0];
   const outArg = get('out');
-  // Use a per-invocation temp path when --out is not specified to avoid concurrent-call collisions.
+
   const tmpFile = outArg ? null : join(tmpdir(), `helm-vision-${process.pid}.png`);
   const imgPath = outArg || tmpFile;
-  // Bug fix: evaluate Number() before || so an invalid --scale string falls back safely instead of
-  // propagating NaN into coordinate arithmetic. Number("abc"||2)=NaN; Number("abc")||2=2.
+
+
   const scale = Number(get('scale')) || SCALE_DEFAULT;
 
   try {
@@ -82,7 +74,7 @@ async function main() {
         `Please use your Read tool to read the image at the path below. Find the UI element: "${query}". Reply with ONLY a raw JSON object with the pixel coordinates of its center: {"x": <number>, "y": <number>}. No explanation, no markdown — just the JSON object.`,
         imgPath
       );
-      // Parse the JSON from the response (may have surrounding whitespace or backticks)
+
       const jsonMatch = response.match(/\{[^{}]+\}/);
       if (!jsonMatch) throw new Error(`no JSON object in claude response: ${response.slice(0, 300)}`);
       let coords;
@@ -117,9 +109,9 @@ async function main() {
       process.exit(1);
     }
   } finally {
-    // Clean up only the auto-generated temp file; leave user-specified --out files intact.
+
     if (tmpFile && existsSync(tmpFile)) {
-      try { unlinkSync(tmpFile); } catch { /* best-effort */ }
+      try { unlinkSync(tmpFile); } catch {  }
     }
   }
 }

@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// Notification poller daemon.
-// Every 30s, checks: Messages unread count, Calendar next event, Mail unread count.
-// Records changes in events.db.
-//
-// Usage:
-//   node poller.mjs [--interval 30] [--once]
-//
-// Privacy: reads local macOS data only. Nothing leaves the machine.
-// Permissions required:
-//   - Messages: Full Disk Access (to read ~/Library/Messages/chat.db)
-//   - Calendar: Automation > Calendar.app
-//   - Mail: Automation > Mail.app
-
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH   = path.join(__dirname, 'events.db');
 const CHAT_DB   = `${process.env.HOME}/Library/Messages/chat.db`;
 
-// Truncate logs at startup if they exceed 5 MB to prevent unbounded growth.
+
 const LOG_CAP = 5 * 1024 * 1024;
 for (const lf of [path.join(__dirname, 'poller.log'), path.join(__dirname, 'poller.err')]) {
   try { if (statSync(lf).size > LOG_CAP) truncateSync(lf, 0); } catch {}
@@ -33,13 +20,13 @@ const iFlag    = args.indexOf('--interval');
 const INTERVAL = iFlag !== -1 ? parseInt(args[iFlag + 1], 10) * 1000 : 30000;
 const ONCE     = args.includes('--once');
 
-// One-time warning tracker (don't spam stderr on every tick)
+
 const warned = new Set();
 function warnOnce(key, msg) {
   if (!warned.has(key)) { warned.add(key); process.stderr.write(`[notify] ${msg}\n`); }
 }
 
-// DB init (idempotent)
+
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
   CREATE TABLE IF NOT EXISTS events (
@@ -57,10 +44,10 @@ const insertEvent = db.prepare(
   'INSERT INTO events (ts, source, kind, summary, payload_json) VALUES (?,?,?,?,?)'
 );
 
-// ---- Messages ----
-// Reuses the snapshot approach from imessage.js: open chat.db read-only via cp.
-// node:sqlite can't open WAL databases shared by another process safely, so we
-// copy first (same pattern used elsewhere in Helm).
+
+
+
+
 function getMessagesUnread() {
   if (!existsSync(CHAT_DB)) {
     warnOnce('chat-db', 'chat.db not found — Messages never opened or Full Disk Access missing');
@@ -85,9 +72,9 @@ function getMessagesUnread() {
   return result;
 }
 
-// ---- Calendar ----
-// Range filter uses _and: a single object with two `startDate` keys collapses to one in JS,
-// which silently returns everything before `end` (incl. years of past holidays).
+
+
+
 const JXA_CAL = `
   const now = new Date();
   const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -122,7 +109,7 @@ function getCalendarNext() {
   }
 }
 
-// ---- Mail ----
+
 const JXA_MAIL = `
   const mail = Application('Mail');
   mail.includeStandardAdditions = true;
@@ -144,7 +131,7 @@ function getMailUnread() {
   }
 }
 
-// Track previous values to detect changes
+
 let prev = { messages: null, calendar: null, mail: null };
 
 function tick() {

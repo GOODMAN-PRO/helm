@@ -1,5 +1,3 @@
-// helm-core skill — Helm operational status and metadata
-
 export const description = 'Get Helm core status: uptime, model, permission mode, version';
 
 export async function execute(args = '') {

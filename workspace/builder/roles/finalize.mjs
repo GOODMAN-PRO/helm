@@ -1,14 +1,10 @@
 #!/usr/bin/env node
-// finalize.mjs — four roles that harden, document, and ship-ready the generated project.
-// Phases: quality (seo-specialist, code-reviewer) and finalize (devops-engineer, technical-writer).
-// Every role demands production-quality, fully-wired, NO-STUB output.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
-  // ──────────────────────────────────────────────────────────────────────────
-  // 1. SEO Specialist — quality
-  // ──────────────────────────────────────────────────────────────────────────
+
+
+
   {
     id:       'seo-specialist',
     title:    'SEO Specialist',
@@ -100,9 +96,9 @@ real, accurate text derived from the app brief.`;
     },
   },
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 2. Code Reviewer (anti-stub critic) — quality
-  // ──────────────────────────────────────────────────────────────────────────
+
+
+
   {
     id:       'code-reviewer',
     title:    'Code Reviewer (anti-stub critic)',
@@ -211,9 +207,9 @@ Be exhaustive. A defect you miss ships. Check every file.`;
     },
   },
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 3. DevOps Engineer — finalize
-  // ──────────────────────────────────────────────────────────────────────────
+
+
+
   {
     id:       'devops-engineer',
     title:    'DevOps Engineer',
@@ -311,9 +307,9 @@ files). Test your Dockerfile mentally against the actual project output structur
     },
   },
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 4. Technical Writer — finalize
-  // ──────────────────────────────────────────────────────────────────────────
+
+
+
   {
     id:       'technical-writer',
     title:    'Technical Writer',
@@ -436,8 +432,8 @@ within 10 minutes of cloning the repo.`;
   },
 ];
 
-// ── self-test ─────────────────────────────────────────────────────────────────
-// Run: node workspace/builder/roles/finalize.mjs
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const VALID_PHASES = new Set([
     'discovery','architecture','design','scaffold','data',
@@ -487,7 +483,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(`${tag}: task(fakeCtx) is non-empty`,     out.length > 0);
   }
 
-  // Specific ids match spec
+
   const ids = roles.map(r => r.id);
   assert('role ids are correct', JSON.stringify(ids) === JSON.stringify([
     'seo-specialist',
@@ -496,25 +492,25 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     'technical-writer',
   ]));
 
-  // Phase assignments
+
   assert('seo-specialist phase is quality',      roles[0].phase === 'quality');
   assert('code-reviewer phase is quality',       roles[1].phase === 'quality');
   assert('devops-engineer phase is finalize',    roles[2].phase === 'finalize');
   assert('technical-writer phase is finalize',   roles[3].phase === 'finalize');
 
-  // Model assignments
+
   assert('seo-specialist model is sonnet',  roles[0].model === 'sonnet');
   assert('code-reviewer model is opus',     roles[1].model === 'opus');
   assert('devops-engineer model is sonnet', roles[2].model === 'sonnet');
   assert('technical-writer model is sonnet',roles[3].model === 'sonnet');
 
-  // Dep assertions
+
   assert('seo-specialist deps on feature-engineer',    roles[0].deps.includes('feature-engineer'));
   assert('code-reviewer deps on integration-engineer', roles[1].deps.includes('integration-engineer'));
   assert('devops-engineer deps on integration-engineer', roles[2].deps.includes('integration-engineer'));
   assert('technical-writer deps on integration-engineer', roles[3].deps.includes('integration-engineer'));
 
-  // produces shape
+
   assert('seo-specialist produces seo-report',  roles[0].produces.includes('seo-report'));
   assert('code-reviewer produces review-report', roles[1].produces.includes('review-report'));
   assert('devops-engineer produces []',          roles[2].produces.length === 0);

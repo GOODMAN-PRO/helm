@@ -1,6 +1,3 @@
-// scroll-animation-engineer.mjs — Scroll Animation Engineer role: installs GSAP + Lenis,
-// sets up smooth scroll globally, implements scroll-driven choreography across all built pages.
-// Award-calibre bar (apple.com / Awwwards): pinning, parallax, scrubbed timelines, reveals.
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -164,7 +161,7 @@ Stack notes for reference: ${ctx.stack.notes}`;
   },
 ];
 
-// Self-test — run only when this file is executed directly.
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let passed = true;
 
@@ -177,7 +174,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const [role] = roles;
 
-  // Role shape checks
+
   check('roles is a non-empty array', Array.isArray(roles) && roles.length === 1);
   check('id is scroll-animation-engineer', role.id === 'scroll-animation-engineer');
   check('title is Scroll Animation Engineer', role.title === 'Scroll Animation Engineer');
@@ -189,7 +186,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   check('system is a rich string (>200 chars)', typeof role.system === 'string' && role.system.length > 200);
   check('task is a function', typeof role.task === 'function');
 
-  // task(fakeCtx) checks
+
   const fakeCtx = {
     brief: 'x',
     stack: {

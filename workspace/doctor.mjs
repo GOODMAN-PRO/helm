@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// helm doctor — one command that checks every common Helm setup failure and tells you how to fix it.
-//
-//   helm doctor            human-readable report (ok / warnings / problems), exit 1 if any problem
-//   helm doctor --json     machine-readable JSON for scripts
-//
-// Deliberately dependency-free and node:sqlite-free at import time, so it runs on ANY Node (and can
-// therefore REPORT a too-old Node instead of crashing the way the real brain would).
-
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
@@ -18,10 +10,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IS_WIN = process.platform === 'win32';
 const JSON_OUT = process.argv.includes('--json');
 
-// Keep the report clean: silence Node's benign ExperimentalWarning (node:sqlite) and DEP0190
-// (shell:true) notices this diagnostic itself triggers. Node routes both through process.emitWarning,
-// so overriding it is the only reliable in-process suppressor (a 'warning' listener does NOT stop the
-// default stderr print).
+
+
+
+
 process.emitWarning = () => {};
 
 const results = [];
@@ -30,7 +22,7 @@ const ok = (n, m) => add('ok', n, m);
 const warn = (n, m, fix) => add('warn', n, m, fix);
 const fail = (n, m, fix) => add('fail', n, m, fix);
 
-// ---- small helpers (no external deps) ----
+
 function parseEnv(raw) {
   const o = {};
   for (const line of raw.split(/\r?\n/)) {
@@ -64,7 +56,7 @@ async function httpGet(url, headers = {}, timeoutMs = 6000) {
   } finally { clearTimeout(t); }
 }
 
-// Mirror of index.js resolveClaude(), trimmed to "find a runnable claude" for diagnosis only.
+
 function resolveClaudeLite(CLAUDE_BIN) {
   const bin = CLAUDE_BIN || 'claude';
   if (!IS_WIN) {
@@ -127,15 +119,15 @@ async function checkOpenAIEndpoint(base, key, model) {
 }
 
 async function main() {
-  // ---- Node ----
+
   if (nodeOk()) ok('node', `Node ${process.versions.node} (need >= ${MIN_NODE.join('.')})`);
   else fail('node', `Node ${process.versions.node} is too old`, `Helm needs Node ${MIN_NODE.join('.')}+. winget install OpenJS.NodeJS.LTS (Windows) / nvm install --lts, then reopen the terminal.`);
 
-  // ---- node:sqlite (the real reason old Node fails) ----
+
   try { await import('node:sqlite'); ok('sqlite', 'node:sqlite is available'); }
   catch { fail('sqlite', 'node:sqlite is missing on this Node', `This is why memory/sessions crash. Update Node to ${MIN_NODE.join('.')}+.`); }
 
-  // ---- dependencies ----
+
   const nm = path.join(ROOT, 'node_modules');
   if (!existsSync(nm)) fail('deps', 'node_modules is missing (dependencies not installed)', `Run:  npm install   (in ${ROOT})`);
   else {
@@ -145,7 +137,7 @@ async function main() {
     else ok('deps', 'core dependencies installed');
   }
 
-  // ---- .env ----
+
   const envPath = path.join(ROOT, '.env');
   let env = {};
   if (!existsSync(envPath)) {
@@ -158,7 +150,7 @@ async function main() {
   }
   const get = k => (env[k] !== undefined ? env[k] : process.env[k]);
 
-  // ---- Discord token + owner id ----
+
   const tok = get('DISCORD_TOKEN');
   if (!tok || /paste-your|here$/i.test(tok)) fail('discord-token', 'DISCORD_TOKEN not set', 'Create a bot at discord.com/developers > Bot > Reset Token, copy it, run helm setup.');
   else if (!/^[\w-]{20,}\.[\w-]{5,}\.[\w-]{20,}$/.test(tok)) warn('discord-token', "DISCORD_TOKEN doesn't look like a bot token (expect 3 dot-separated parts)", 'Make sure you copied the BOT token (not the client secret or application id).');
@@ -169,7 +161,7 @@ async function main() {
   else if (!/^\d{17,20}$/.test(owner)) warn('owner-id', `OWNER_ID="${owner}" isn't a numeric Discord ID (17-20 digits)`, 'Copy your numeric user ID, not your username.');
   else ok('owner-id', 'OWNER_ID looks valid');
 
-  // ---- engine (Claude Code) — required in ALL modes; free models run THROUGH it ----
+
   const claude = resolveClaudeLite(get('CLAUDE_BIN'));
   if (!claude.found) {
     fail('engine', "Claude Code (Helm's engine) not found", 'npm install -g @anthropic-ai/claude-code  — a free/local model still needs it as the engine. Or set CLAUDE_BIN to its full path in .env.');
@@ -179,7 +171,7 @@ async function main() {
     else fail('engine', `Claude Code at ${claude.cmd} won't run`, `${(v.stderr || v.error?.message || ('exit ' + v.status)).toString().trim().slice(0, 140)} — reinstall: npm install -g @anthropic-ai/claude-code`);
   }
 
-  // ---- auth / model mode ----
+
   const mode = (get('AUTH_MODE') || 'subscription').toLowerCase();
   if (mode === 'apikey') {
     const k = get('ANTHROPIC_API_KEY');
@@ -192,7 +184,7 @@ async function main() {
       await checkOpenAIEndpoint(base, key, model);
       const pp = parseInt(get('PROXY_PORT') || '8787', 10);
       if (await portOpen(pp)) {
-        // If Helm's brain is up, that port is its OWN proxy — expected, not a conflict.
+
         const brainUp = await portOpen(parseInt(get('HELM_CLI_PORT') || '4625', 10));
         if (brainUp) ok('proxy-port', `proxy port ${pp} in use by the running Helm (its own proxy) — fine`);
         else warn('proxy-port', `proxy port ${pp} is held by another process (Helm isn't running)`, `Stop whatever holds port ${pp}, or set PROXY_PORT to a free port in .env.`);
@@ -223,7 +215,7 @@ async function main() {
     ok('auth', 'subscription mode (Claude Pro/Max). If you hit auth errors, run `claude` once to log in.');
   }
 
-  // ---- MCP health checks ----
+
   try {
     const { runHealthChecks } = await import('./mcp/check.mjs');
     const mcpResults = await runHealthChecks({ silent: true });
@@ -240,17 +232,17 @@ async function main() {
     warn('mcp-check', `could not run MCP health checks: ${e.message}`);
   }
 
-  // ---- npm available (needed for self-upgrade + installing the engine) ----
+
   const nr = spawnSync(IS_WIN ? 'npm.cmd' : 'npm', ['-v'], { encoding: 'utf8', shell: IS_WIN, timeout: 15000 });
   if (nr.status === 0) ok('npm', `npm ${(nr.stdout || '').trim()}`);
   else warn('npm', 'npm not found on PATH', 'Reinstall Node (it bundles npm) and reopen your terminal.');
 
-  // ---- already running? ----
+
   const bridge = parseInt(get('HELM_CLI_PORT') || '4625', 10);
   if (await portOpen(bridge)) warn('running', 'a Helm brain is already running (bridge port is up)', "Fine if intended — but one Discord token = one running brain. Don't start a second copy.");
   else ok('running', 'no brain currently running (it will start on demand)');
 
-  // ---- output ----
+
   const fails = results.filter(r => r.level === 'fail');
   const warns = results.filter(r => r.level === 'warn');
   const oks = results.filter(r => r.level === 'ok');

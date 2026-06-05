@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Creates (or migrates) jobs.db in workspace/scheduler/.
-// Safe to re-run — all statements use IF NOT EXISTS / IF NOT EXISTS.
-
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';

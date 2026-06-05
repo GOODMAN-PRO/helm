@@ -1,8 +1,3 @@
-// fullstack-build skill — build a REAL, premium website with ONE cohesive agent guided by a research-
-// distilled design playbook (apple/awwwards/stripe/linear craft), then a build-until-green loop that
-// guarantees it compiles. This replaced the 40-agent swarm, which produced incoherent sites and failed
-// under rate limits. Use it whenever the owner asks to "build me a website / landing / web app".
-
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { buildSolo } from '../builder/solo.mjs';
@@ -48,7 +43,7 @@ export async function execute(argsStr = '') {
     return 'Usage: fullstack-build "<what to build>" [--stack showcase-site] [--model sonnet|opus] [--dry-run] [--swarm]\n' +
       'Default: ONE cohesive agent builds a premium, apple/stripe-grade site from a research design playbook, then a build-until-green loop guarantees it compiles. Add --dry-run to preview instantly.';
   }
-  if (swarm) {   // opt-in legacy multi-agent path
+  if (swarm) {
     const r = await buildApp({ brief, stack, outDir, dryRun, tier, onProgress: e => { if (e && e.role) console.error(`[fullstack-build:swarm] [${e.phase}] ${e.role} — ${e.status}`); } });
     return `${dryRun ? 'Planned' : (r.ok ? 'Built' : 'Build had issues for')} (swarm): "${brief}".\nProject: ${r.projectDir}\n\n${r.report || ''}`.trim();
   }

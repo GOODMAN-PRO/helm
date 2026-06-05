@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// Mic recorder: on-demand only.
-// Uses sox if installed, else ffmpeg, else returns install note.
-// Hard cap: 300 seconds per call.
-//
-// Usage: node record.mjs [--seconds 30]
-// Returns JSON: { path: "/tmp/helm-mic-<ts>.wav" } or { error, hint }
-
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
@@ -37,11 +30,11 @@ if (!sox && !ffmpeg) {
 
 let result;
 if (sox) {
-  // rec is part of sox; captures from default mic
+
   result = spawnSync('rec', ['-q', '-r', '16000', '-c', '1', dest, 'trim', '0', String(seconds)],
     { encoding: 'utf8', timeout: (seconds + 15) * 1000 });
 } else {
-  // ffmpeg: capture from default audio input device
+
   result = spawnSync(ffmpeg, [
     '-f', 'avfoundation',
     '-i', ':0',

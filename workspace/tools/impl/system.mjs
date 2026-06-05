@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// System monitoring + control for Helm (Windows-first via CIM; non-Windows fallback where trivial).
-//   system.mjs stats                           -> cpu%, mem, disks, uptime, os, hostname
-//   system.mjs top [--by cpu|mem] [--n 10]    -> top processes by cpu or mem
-//   system.mjs ps [--name <substr>]            -> all/filtered process list
-//   system.mjs net                             -> active TCP connections (capped ~50)
-//   system.mjs disk                            -> drive free/total
-//   system.mjs kill --pid <n>                 -> terminate by PID
-//   system.mjs kill --name <substr>            -> terminate all matching by name
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 
@@ -14,9 +6,9 @@ const args = process.argv.slice(2);
 const verb = args[0];
 const get  = (k) => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Run a PowerShell script encoded as UTF-16LE base64. Returns spawnSync result. */
+
+
 const runPs = (script) => {
   const b64 = Buffer.from(script, 'utf16le').toString('base64');
   return spawnSync(
@@ -26,20 +18,20 @@ const runPs = (script) => {
   );
 };
 
-/** Find first line from stdout that starts with '{' or '[' and parse it as JSON. */
+
 const parseJson = (stdout) => {
   const line = (stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('{') || l.startsWith('['));
   if (!line) return null;
   try { return JSON.parse(line); } catch { return null; }
 };
 
-/** Emit one JSON object and exit 0. Always the ONLY stdout line. */
+
 const out = (obj) => { console.log(JSON.stringify(obj)); process.exit(0); };
 
-/** Emit error JSON and exit 1. */
+
 const fail = (msg) => { console.log(JSON.stringify({ ok: false, error: String(msg) })); process.exit(1); };
 
-// ── Process-name safety guard for kill ───────────────────────────────────────
+
 const CORE_NAMES = new Set([
   'system', 'idle', 'csrss', 'wininit', 'services', 'lsass', 'winlogon', 'smss',
   'system idle process',
@@ -52,14 +44,14 @@ const isSafe = (name, pid) => {
   return true;
 };
 
-// ── verb: stats ───────────────────────────────────────────────────────────────
+
 if (verb === 'stats') {
   if (process.platform === 'win32') {
-    // CPU: use Get-CimInstance Win32_Processor (LoadPercentage).
-    // Average across all logical processors for a single machine-level number.
-    // Mem: Win32_OperatingSystem (FreePhysicalMemory, TotalVisibleMemorySize) in KB.
-    // Disk: Win32_LogicalDisk DriveType=3 (local fixed).
-    // Uptime: OS.LastBootUpTime.
+
+
+
+
+
     const script = `
 $ErrorActionPreference = 'SilentlyContinue'
 $cpus    = @(Get-CimInstance Win32_Processor)
@@ -115,17 +107,17 @@ Write-Output ($result | ConvertTo-Json -Compress -Depth 4)
   }
 }
 
-// ── verb: top ────────────────────────────────────────────────────────────────
+
 else if (verb === 'top') {
   const by = (get('by') || 'cpu').toLowerCase();
   const n  = Math.max(1, Math.min(200, parseInt(get('n') || '10', 10)));
   if (by !== 'cpu' && by !== 'mem') fail('top --by must be cpu or mem');
 
   if (process.platform === 'win32') {
-    // Get-Process gives WorkingSet (bytes) and CPU (cumulative seconds).
-    // For a live snapshot of CPU% we'd need two samples + delta; instead we
-    // expose the "CPU seconds used" figure and label it accordingly.
-    // WorkingSet64 / 1MB gives resident mem in MB.
+
+
+
+
     const sortProp = by === 'mem' ? 'WorkingSet64' : 'CPU';
     const script = `
 $ErrorActionPreference = 'SilentlyContinue'
@@ -161,7 +153,7 @@ Write-Output ($out | ConvertTo-Json -Compress -Depth 2)
   }
 }
 
-// ── verb: ps ─────────────────────────────────────────────────────────────────
+
 else if (verb === 'ps') {
   const nameFilter = get('name') || null;
 
@@ -225,7 +217,7 @@ Write-Output ($out | ConvertTo-Json -Compress -Depth 2)
   }
 }
 
-// ── verb: disk ───────────────────────────────────────────────────────────────
+
 else if (verb === 'disk') {
   if (process.platform === 'win32') {
     const script = `
@@ -248,7 +240,7 @@ Write-Output ($disks | ConvertTo-Json -Compress -Depth 2)
   }
 }
 
-// ── verb: kill ───────────────────────────────────────────────────────────────
+
 else if (verb === 'kill') {
   const pidArg  = get('pid');
   const nameArg = get('name');
@@ -258,7 +250,7 @@ else if (verb === 'kill') {
   }
 
   if (process.platform !== 'win32') {
-    // Non-Windows fallback: use kill signal. Safety check still applies.
+
     const { execSync } = await import('node:child_process').then(m => m);
     if (pidArg) {
       const pid = parseInt(pidArg, 10);
@@ -271,13 +263,13 @@ else if (verb === 'kill') {
     }
   }
 
-  // Windows path
+
   if (pidArg !== null) {
     const pid = parseInt(pidArg, 10);
     if (!Number.isFinite(pid)) fail('kill: --pid must be an integer');
     if (CORE_PIDS.has(pid)) fail(`kill: refusing to kill protected PID ${pid} (system-critical)`);
 
-    // Look up the process name first to check core list
+
     const lookupScript = `
 $ErrorActionPreference = 'SilentlyContinue'
 $p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
@@ -300,7 +292,7 @@ Write-Output '{"done":true}'
     out({ ok: true, platform: 'win32', killed: [{ pid, name: ldata.name }] });
 
   } else {
-    // Kill by name substring — find matching, filter safe ones, terminate all
+
     const esc = nameArg.replace(/'/g, "''");
     const findScript = `
 $ErrorActionPreference = 'SilentlyContinue'
@@ -318,7 +310,7 @@ Write-Output ($procs | ConvertTo-Json -Compress -Depth 2)
     const blocked = candidates.filter(p => !isSafe(p.name, p.pid));
     if (safe.length === 0) fail(`kill: all ${candidates.length} matched process(es) are system-critical — refusing`);
 
-    // Kill each safe process
+
     const pidList = safe.map(p => p.pid).join(',');
     const killScript = `
 $ErrorActionPreference = 'SilentlyContinue'
@@ -339,7 +331,7 @@ Write-Output '{"done":true}'
   }
 }
 
-// ── Unknown verb ─────────────────────────────────────────────────────────────
+
 else {
   console.log(JSON.stringify({
     ok: false,

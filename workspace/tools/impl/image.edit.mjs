@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-// image.edit.mjs — image editing for Helm via Windows System.Drawing (PowerShell -EncodedCommand).
-//
-// Verbs:
-//   info     --path <img>
-//   resize   --src <img> --out <img> [--width W] [--height H] [--keep-aspect true]
-//   crop     --src <img> --out <img> --x N --y N --w N --h N
-//   rotate   --src <img> --out <img> --deg 90|180|270
-//   flip     --src <img> --out <img> --dir h|v
-//   convert  --src <img> --out <img>
-//   grayscale --src <img> --out <img>
-//   annotate --src <img> --out <img> --text "..." [--x N] [--y N] [--size N] [--color white]
-//
-// All verbs print exactly ONE JSON object to stdout and exit 0 on success.
-
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -20,14 +6,14 @@ import path from 'node:path';
 const args = process.argv.slice(2);
 const verb = args[0];
 
-// Flag parser — returns the string after --key, or null.
+
 const get = (k) => {
   const i = args.indexOf(`--${k}`);
   return i !== -1 && args[i + 1] !== undefined ? args[i + 1] : null;
 };
 
-// Run a PowerShell script via -EncodedCommand (UTF-16 LE base64).
-// Stdout is returned as-is; caller parses JSON from it.
+
+
 function runPs(script, timeoutMs = 30000) {
   const b64 = Buffer.from(script, 'utf16le').toString('base64');
   return spawnSync(
@@ -37,8 +23,8 @@ function runPs(script, timeoutMs = 30000) {
   );
 }
 
-// Extract the first JSON object line from PowerShell stdout.
-// Add-Type / compilation noise goes to stderr; real output is on stdout.
+
+
 function parseJsonLine(stdout) {
   const line = (stdout || '')
     .split('\n')
@@ -50,11 +36,11 @@ function parseJsonLine(stdout) {
 
 function die(msg) {
   console.log(JSON.stringify({ ok: false, error: msg }));
-  process.exit(0); // always exit 0 per hard rule
+  process.exit(0);
 }
 
-// Map a file extension to a System.Drawing.Imaging.ImageFormat name.
-// Returns null for unknown extensions (caller decides).
+
+
 function extToFormat(ext) {
   const m = {
     '.png':  'Png',
@@ -68,18 +54,18 @@ function extToFormat(ext) {
   return m[ext.toLowerCase()] || null;
 }
 
-// Escape single quotes for embedding into a PowerShell single-quoted string context.
-// We embed paths inside double-quoted PS strings so we escape $ and " instead.
-// Actually we pass paths via PS variables set at the top of each script — no quoting issues.
 
-// Build a PowerShell header that loads System.Drawing and sets $ProgressPreference.
+
+
+
+
 const PS_HEADER = `
 $ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 `;
 
-// ─── VERB: info ──────────────────────────────────────────────────────────────
+
 if (verb === 'info') {
   const imgPath = get('path');
   if (!imgPath) die('--path required');
@@ -129,7 +115,7 @@ Write-Output ($obj | ConvertTo-Json -Compress)
   const absOut = path.resolve(out).replace(/\\/g, '\\\\');
   const outFmt  = extToFormat(path.extname(out)) || 'Png';
 
-  // Compute target dimensions in PowerShell (handles keep-aspect logic).
+
   const widthLine  = widthArg  ? `$reqW = ${parseInt(widthArg, 10)}`  : '$reqW = 0';
   const heightLine = heightArg ? `$reqH = ${parseInt(heightArg, 10)}` : '$reqH = 0';
   const keepLine   = keepAspect ? '$keepAspect = $true' : '$keepAspect = $false';
@@ -472,8 +458,8 @@ Write-Output ($obj | ConvertTo-Json -Compress)
   const absOut = path.resolve(out).replace(/\\/g, '\\\\');
   const outFmt  = extToFormat(path.extname(out)) || 'Png';
 
-  // Escape the text for embedding into a PowerShell double-quoted string.
-  // Replace " with `" and $ with `$.
+
+
   const psText = text.replace(/`/g, '``').replace(/"/g, '`"').replace(/\$/g, '`$');
 
   // Map color name to System.Drawing.Color — support a handful of common names + hex.

@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-// List visible windows or focus one by title substring.
-//   window.mjs list                     -> { windows: [{pid, app, title}] }
-//   window.mjs focus --title "Chrome"   -> brings the first matching window to the front
-//   window.mjs state                    -> { ok, title, pid, app, rect:{x,y,w,h}, maximized, minimized }
-//   window.mjs move  --title <s> --x <n> --y <n>
-//   window.mjs resize --title <s> --w <n> --h <n>
-//   window.mjs rect  --title <s> --x <n> --y <n> --w <n> --h <n>
-//   window.mjs snap  --title <s> --side <left|right|top|bottom|max|min|restore|center>
-//   window.mjs close --title <s>
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
@@ -18,8 +9,8 @@ const runPs = (script) => {
   return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', b64], { encoding: 'utf8', timeout: 15000 });
 };
 
-// Parse a JSON line from PowerShell stdout. Finds the first line that starts with '{'.
-// Add-Type may emit CLIXML progress to stderr; actual output lands on stdout cleanly.
+
+
 const parseJsonLine = (stdout) => {
   const line = (stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('{'));
   if (!line) return null;
@@ -112,13 +103,13 @@ Write-Output ($obj | ConvertTo-Json -Compress)
   if (verb === 'resize' && (wArg === null || hArg === null)) { console.error('resize needs --w and --h'); process.exit(1); }
   if (verb === 'rect'   && (xArg === null || yArg === null || wArg === null || hArg === null)) { console.error('rect needs --x --y --w --h'); process.exit(1); }
 
-  // Emit lines to use existing coords when a dimension is not specified.
+
   const nxLine = xArg !== null ? `$nx = ${parseInt(xArg)}` : '$nx = $cx';
   const nyLine = yArg !== null ? `$ny = ${parseInt(yArg)}` : '$ny = $cy';
   const nwLine = wArg !== null ? `$nw = ${parseInt(wArg)}` : '$nw = $cw';
   const nhLine = hArg !== null ? `$nh = ${parseInt(hArg)}` : '$nh = $ch';
 
-  // Build the PowerShell script. For move/resize we keep the existing dimension by reading GetWindowRect first.
+
   const script = `
 $ProgressPreference = 'SilentlyContinue'
 Add-Type @"

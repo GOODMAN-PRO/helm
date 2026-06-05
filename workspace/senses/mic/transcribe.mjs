@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Transcribe a WAV file using whisper.cpp.
-// On-demand only. If whisper.cpp is not installed, returns { error, hint }.
-//
-// Usage: node transcribe.mjs --file /tmp/helm-mic-<ts>.wav [--model base.en]
-// Returns JSON: { text: "..." } or { error, hint }
-
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
@@ -21,7 +15,7 @@ function which(bin) {
   return r.status === 0 ? r.stdout.trim() : null;
 }
 
-// whisper.cpp installs its main binary as 'whisper-cpp' or 'whisper' or 'main' (brew formula)
+
 const whisperBin = which('whisper-cpp') || which('whisper') || which('main');
 
 if (!whisperBin) {
@@ -44,9 +38,9 @@ if (!existsSync(filePath)) {
   process.exit(1);
 }
 
-// whisper-cpp -f <file> -m <model> -nt (no timestamps) -l en
-// Model path: brew puts models in /usr/local/share/whisper-cpp/models/ or similar.
-// Try to auto-locate model; fall back to 'base.en' and let whisper fail with a helpful message.
+
+
+
 const modelArg = args.indexOf('--model') !== -1 ? args[args.indexOf('--model') + 1] : 'base.en';
 
 const r = spawnSync(whisperBin, ['-f', filePath, '-m', modelArg, '-nt', '-l', 'en'],

@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Tool: screen.recent [--limit N]
-// Returns last N screen-change events from events.db.
-
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

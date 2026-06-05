@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// workspace/mcp/check.mjs — MCP server health checks.
-//
-// Called at bot startup (fire-and-forget). Iterates servers.json, probes each
-// enabled server that declares healthCheck: "initialize" by sending a JSON-RPC
-// initialize request over stdio and waiting for a valid response.
-//
-// The bot ALWAYS starts regardless of check results — this is diagnostic only.
-//
-// Usage:
-//   node workspace/mcp/check.mjs          # print UP/DOWN table
-//   import { runHealthChecks } from ...   # programmatic (silent: false by default)
-//
-// Schema fields read from servers.json:
-//   enabled     {boolean}  false = skip (server won't be loaded by the bot)
-//   healthCheck {string|false}  "initialize" = probe; false/missing = skip
-
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -22,9 +6,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, 'servers.json');
-const HELM_ROOT = path.resolve(__dirname, '../..'); // install root, for __HELM_ROOT__ expansion
+const HELM_ROOT = path.resolve(__dirname, '../..');
 
-// JSON-RPC initialize request per MCP spec (2024-11-05)
+
 const INIT_REQUEST =
   JSON.stringify({
     jsonrpc: '2.0',
@@ -44,8 +28,8 @@ function probeServer(name, entry) {
 
     let child;
     try {
-      // On Windows, `npx` is npx.cmd — Node can't spawn it without a shell (ENOENT). Use a shell there
-      // so cmd resolves the .cmd via PATHEXT, matching how Claude Code launches these servers.
+
+
       child = spawn(entry.command, entry.args || [], {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: process.platform === 'win32',
@@ -55,7 +39,7 @@ function probeServer(name, entry) {
       return settle({ name, status: 'DOWN', error: String(e.message || e) });
     }
 
-    // 5-second timeout — long enough for npx cache hit, short enough to not block startup
+
     const timer = setTimeout(() => {
       try { child.kill('SIGKILL'); } catch {}
       settle({ name, status: 'DOWN', error: 'timeout (5s)' });
@@ -76,7 +60,7 @@ function probeServer(name, entry) {
             settle({ name, status: 'UP' });
             return;
           }
-        } catch { /* not valid JSON-RPC — keep reading */ }
+        } catch {  }
       }
     });
 
@@ -87,27 +71,22 @@ function probeServer(name, entry) {
 
     child.on('exit', code => {
       clearTimeout(timer);
-      // Only settle as DOWN if not already settled UP
+
       settle({ name, status: 'DOWN', error: `exited ${code}` });
     });
 
-    // EPIPE if the server exits before reading stdin — emitted async on the stream, so a
-    // surrounding try/catch can't catch it. Without this listener it's an uncaught exception
-    // that would crash the (fire-and-forget) bot at startup.
+
+
+
     child.stdin?.on('error', () => {});
     try {
       child.stdin?.write(INIT_REQUEST);
       child.stdin?.end();
-    } catch { /* stdin may already be closed */ }
+    } catch {  }
   });
 }
 
-/**
- * Run health checks against all servers in servers.json.
- * @param {object} [opts]
- * @param {boolean} [opts.silent=false]  suppress console output
- * @returns {Promise<Array<{name:string, status:'UP'|'DOWN'|'SKIP', error?:string}>>}
- */
+
 export async function runHealthChecks({ silent = false } = {}) {
   let config;
   try {
@@ -122,7 +101,7 @@ export async function runHealthChecks({ silent = false } = {}) {
     if (entry.enabled === false || !entry.healthCheck) {
       return Promise.resolve({ name, status: 'SKIP' });
     }
-    // Expand the install-root token so server paths are correct on any machine (Mac/Windows).
+
     const expanded = Array.isArray(entry.args)
       ? { ...entry, args: entry.args.map(a => typeof a === 'string' ? a.split('__HELM_ROOT__').join(HELM_ROOT) : a) }
       : entry;
@@ -144,7 +123,7 @@ export async function runHealthChecks({ silent = false } = {}) {
   return results;
 }
 
-// Direct execution: node workspace/mcp/check.mjs
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   runHealthChecks().then(() => process.exit(0)).catch(() => process.exit(0));
 }

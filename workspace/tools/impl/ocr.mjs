@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-// Helm OCR — locate visible text on screen using Windows.Media.Ocr (WinRT, built-in on Win10/11).
-// Subcommands:
-//   ocr.mjs read [--out <png>]             → screenshot + OCR; returns text, lines, words with coords
-//   ocr.mjs find --text <substr> [--nth N] → find word/phrase; returns best center coords for gui.click
-//
-// Coordinates are ABSOLUTE physical screen pixels (virtual-desktop origin).
-//
-// ── How PS 5.1 WinRT-async is solved ──────────────────────────────────────────
-// PowerShell 5.1 runs on .NET Framework 4.x. WinRT objects arrive as System.__ComObject, so the
-// AsTask() extension from System.Runtime.WindowsRuntime cannot QI them to the typed
-// IAsyncOperation<T> interface. Status-polling also fails because the Status property is not
-// projected. Compiling a typed C# source file (via csc.exe, built into Windows) resolves all WinRT
-// types at compile time through the Windows SDK UnionMetadata Windows.winmd, making AsTask() and
-// GetAwaiter().GetResult() work correctly. The compiled exe is cached in %TEMP% and reused.
-
 import { spawnSync }   from 'node:child_process';
 import { existsSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import os   from 'node:os';
@@ -25,13 +10,13 @@ import { screenBounds }                   from './win-input.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ─── Arg parsing (mirrors window.mjs) ────────────────────────────────────────
+
 const args = process.argv.slice(2);
 const verb = args[0];
 const get  = (k) => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 
-// ─── C# source for the WinRT OCR bridge ──────────────────────────────────────
-// Written as an array of lines to avoid JS string-escaping confusion.
+
+
 function getBridgeSource() {
   return [
     'using System;',
@@ -132,7 +117,7 @@ function getBridgeSource() {
   ].join('\n');
 }
 
-// ─── Locate build tools ───────────────────────────────────────────────────────
+
 function findCsc() {
   const candidates = [
     'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe',
@@ -142,8 +127,8 @@ function findCsc() {
 }
 
 function findWinmd() {
-  // Prefer the Windows SDK UnionMetadata — broadest WinRT type coverage.
-  // Only consider version-numbered subdirs (e.g. "10.0.26100.0") — skip "Facade" (stub-only).
+
+
   const sdkBases = [
     'C:\\Program Files (x86)\\Windows Kits\\10\\UnionMetadata',
     'C:\\Program Files\\Windows Kits\\10\\UnionMetadata',
@@ -153,10 +138,10 @@ function findWinmd() {
     let dirs;
     try {
       dirs = readdirSync(base, { withFileTypes: true })
-        .filter(d => d.isDirectory() && /^\d/.test(d.name)) // version dirs start with a digit
+        .filter(d => d.isDirectory() && /^\d/.test(d.name))
         .map(d => d.name)
         .sort()
-        .reverse(); // highest version first
+        .reverse();
     } catch { continue; }
     for (const d of dirs) {
       const candidate = path.join(base, d, 'Windows.winmd');
@@ -182,14 +167,14 @@ function findSystemRuntimeDll() {
   return candidates.find(p => existsSync(p)) || null;
 }
 
-// ─── Compile bridge exe ───────────────────────────────────────────────────────
+
 const BRIDGE_EXE    = path.join(os.tmpdir(), 'helm-ocr-bridge.exe');
 const BRIDGE_CS     = path.join(os.tmpdir(), 'helm-ocr-bridge.cs');
 const BRIDGE_STAMP  = path.join(os.tmpdir(), 'helm-ocr-bridge.stamp');
-const BRIDGE_VER    = '4'; // bump to force recompile
+const BRIDGE_VER    = '4';
 
 function ensureBridge() {
-  // Return cached result if stamp matches
+
   if (existsSync(BRIDGE_EXE) && existsSync(BRIDGE_STAMP)) {
     try { if (readFileSync(BRIDGE_STAMP, 'utf8').trim() === BRIDGE_VER) return { ok: true }; } catch {}
   }
@@ -226,7 +211,7 @@ function ensureBridge() {
   return { ok: true };
 }
 
-// ─── Run bridge exe ───────────────────────────────────────────────────────────
+
 function runBridge(imagePath) {
   const compile = ensureBridge();
   if (!compile.ok) return { raw: null, compileError: compile.error };
@@ -239,7 +224,7 @@ function runBridge(imagePath) {
   try { return { raw: JSON.parse(jsonLine), compileError: null }; } catch { return { raw: null, compileError: null }; }
 }
 
-// ─── Tesseract fallback ───────────────────────────────────────────────────────
+
 function tesseractOcr(imagePath) {
   const r = spawnSync('tesseract', [imagePath, 'stdout', 'tsv'], { encoding: 'utf8', timeout: 30_000 });
   if ((r.error && r.error.code === 'ENOENT') || r.status !== 0) return null;
@@ -315,7 +300,7 @@ function applyOffset(raw, bounds) {
   };
 }
 
-// ─── Core OCR pipeline ────────────────────────────────────────────────────────
+
 function runOcr(outPath) {
   const cap = captureScreen(outPath);
   if (!cap.ok) return { ok: false, error: 'screenshot failed: ' + cap.error };
@@ -323,7 +308,7 @@ function runOcr(outPath) {
   const bounds = screenBounds();
   const offset  = bounds.ok ? bounds : { left: 0, top: 0 };
 
-  // 1. WinRT bridge (Windows only)
+
   let raw = null;
   let compileError = null;
   if (process.platform === 'win32') {
@@ -332,7 +317,7 @@ function runOcr(outPath) {
     compileError = br.compileError;
   }
 
-  // 2. Tesseract fallback
+
   if (!raw) raw = tesseractOcr(outPath);
 
   if (!raw) {
@@ -343,13 +328,13 @@ function runOcr(outPath) {
   return applyOffset(raw, offset);
 }
 
-// ─── Subcommand: read ─────────────────────────────────────────────────────────
+
 function cmdRead() {
   const outPath = get('out') || defaultShotPath('helm-ocr');
   console.log(JSON.stringify(runOcr(outPath)));
 }
 
-// ─── Subcommand: find ─────────────────────────────────────────────────────────
+
 function cmdFind() {
   const needle = get('text');
   if (!needle) { console.error('find needs --text <substring>'); process.exit(1); }
@@ -362,14 +347,14 @@ function cmdFind() {
   const lower   = needle.toLowerCase();
   const scored  = [];
 
-  // Word-level matches (most precise)
+
   for (const w of (ocr.words || [])) {
     if (w.text.toLowerCase().includes(lower)) {
       scored.push({ text: w.text, center: w.center, rect: { x: w.x, y: w.y, w: w.w, h: w.h }, _t: 'word' });
     }
   }
 
-  // Line-level matches — narrow to tightest word span that contains the needle
+
   for (const l of (ocr.lines || [])) {
     if (!l.text.toLowerCase().includes(lower)) continue;
     const lw = l.words || [];
@@ -402,7 +387,7 @@ function cmdFind() {
     return;
   }
 
-  // Sort: prefer word > span > line, then shorter text
+
   const prio = { word: 0, span: 1, line: 2 };
   scored.sort((a, b) => {
     const dp = (prio[a._t] || 0) - (prio[b._t] || 0);
@@ -414,7 +399,7 @@ function cmdFind() {
   console.log(JSON.stringify({ ok: true, found: true, best, matches: clean }));
 }
 
-// ─── Entry point ──────────────────────────────────────────────────────────────
+
 if (verb === 'read') {
   cmdRead();
 } else if (verb === 'find') {

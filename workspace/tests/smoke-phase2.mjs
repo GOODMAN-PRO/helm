@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Helm Phase 2 smoke tests. Exits 0 on all green, 1 on any failure.
-// Run: node workspace/tests/smoke-phase2.mjs
-// Does NOT open real websites or send real messages — schema/import checks only.
-
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
@@ -18,7 +14,7 @@ let passed = 0, failed = 0;
 function ok(label)          { console.log(`  PASS  ${label}`); passed++; }
 function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); failed++; }
 
-// ---- 1. Registry has all Phase 2 tools ----
+
 {
   const label = 'registry.json contains all Phase 2 tool entries';
   try {
@@ -38,7 +34,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 2. All Phase 2 impl files exist ----
+
 {
   const label = 'All Phase 2 impl scripts exist on disk';
   try {
@@ -51,7 +47,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 3. playwright package is importable ----
+
 {
   const label = 'playwright package is installed and importable';
   try {
@@ -62,7 +58,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 4. Chromium binary exists ----
+
 {
   const label = 'Playwright Chromium binary is installed';
   try {
@@ -71,7 +67,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
       `import('playwright').then(m => m.chromium.executablePath()).then(p => { require('fs').statSync(p); console.log(p); }).catch(e => { process.stderr.write(e.message); process.exit(1); })`,
     ], { encoding: 'utf8', timeout: 15_000, shell: false });
 
-    // Alternative: check the playwright cache dir
+
     const cacheBase = path.join(os.homedir(), 'Library/Caches/ms-playwright');
     if (!existsSync(cacheBase)) throw new Error('ms-playwright cache dir not found — run: npx playwright install chromium');
     const { readdirSync } = await import('node:fs');
@@ -82,7 +78,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 5. tools list returns >= 23 entries (10 original + 13 new) ----
+
 {
   const label = 'tools list returns >= 23 total tools after Phase 2';
   try {
@@ -95,7 +91,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 6. confirm gate enforced — imessage.send_to exits 2 without --force ----
+
 {
   const label = 'tools dispatcher exits 2 for confirm:true tool without --force';
   try {
@@ -109,7 +105,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 7. finder.search schema: exits 1 on missing --query ----
+
 {
   const label = 'finder.mjs search exits 1 when --query missing';
   try {
@@ -120,7 +116,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 8. web.mjs schema: exits 1 on missing --url ----
+
 {
   const label = 'web.mjs fetch exits 1 when --url missing';
   try {
@@ -131,7 +127,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 9. calendar.mjs schema: exits 1 on missing --title ----
+
 {
   const label = 'calendar.mjs add exits 1 when required args missing';
   try {
@@ -142,11 +138,11 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 10. browser.mjs: exits 1 on missing URL (no state file) ----
+
 {
   const label = 'browser.mjs read exits 1 when no active session';
   try {
-    // Ensure state file is absent for this test
+
     const stateFile = path.join(WORKSPACE, 'browser-state.json');
     const { unlinkSync, existsSync: exists } = await import('node:fs');
     if (exists(stateFile)) unlinkSync(stateFile);
@@ -158,7 +154,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 11. mdfind is available (finder.search backend) ----
+
 {
   const label = 'mdfind binary exists at /usr/bin/mdfind';
   try {
@@ -167,7 +163,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- 12. confirm gate also fires for calendar.add ----
+
 {
   const label = 'tools dispatcher exits 2 for calendar.add without --force';
   try {
@@ -180,7 +176,7 @@ function fail(label, reason) { console.error(`  FAIL  ${label}: ${reason}`); fai
   } catch (e) { fail(label, e.message); }
 }
 
-// ---- summary ----
+
 console.log('');
 console.log(`Phase 2 smoke: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

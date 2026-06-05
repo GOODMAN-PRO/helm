@@ -1,37 +1,21 @@
 #!/usr/bin/env node
-// select.mjs — adaptive, token-efficient role selection.
-//
-// The builder has 40 specialist roles, but most jobs don't need all of them. Running every agent on a
-// simple internal tool wastes tokens and time. This picks the smallest role set that does the job well,
-// purely from the stack + brief signals + a tier — NO extra LLM call. The result is dependency-closed
-// (deps of selected roles are pulled in) and dep-pruned (deps pointing at dropped roles are removed) so
-// the scheduler stays valid.
-//
-//   selectRoles(allRoles, ctx, opts) -> { roles, tier, needs, skipped }
-//
-// Tiers (auto-detected, override with opts.tier):
-//   lean     — core build only (no separate QA/security/SEO/devops, no animation suite)
-//   standard — core + QA (a11y/perf/test) + tasteful motion; backend only if the brief needs data/accounts
-//   premium  — everything, incl. the full creative-direction + animation/3D suite + security + devops
-//             (auto-selected for animated / award-grade / showcase briefs)
-
 import { fileURLToPath } from 'node:url';
 
 const BACKEND_ROLES = ['database-architect', 'database-engineer', 'api-designer', 'backend-engineer', 'auth-engineer'];
 const ANIM_FULL = ['creative-director', 'motion-designer', 'art-director', 'scroll-animation-engineer',
   'hero-showcase-engineer', 'page-transition-engineer', 'kinetic-typography-engineer', 'cursor-effects-engineer',
   'webgl-3d-engineer', 'parallax-depth-engineer', 'loading-experience-engineer', 'visual-polish-critic'];
-const ANIM_LEAN = ['interaction-engineer', 'responsive-motion-engineer']; // tasteful motion for ordinary apps
-// Core roles every real build wants regardless of tier.
+const ANIM_LEAN = ['interaction-engineer', 'responsive-motion-engineer'];
+
 const CORE = ['product-manager', 'solutions-architect', 'ui-visual-designer', 'design-system-engineer',
   'project-scaffolder', 'frontend-architect', 'component-engineer', 'feature-engineer',
   'integration-engineer', 'code-reviewer', 'technical-writer'];
-// Added at standard+.
+
 const STANDARD_EXTRA = ['requirements-analyst', 'ux-designer', 'accessibility-specialist', 'performance-engineer', 'test-engineer'];
-// Added at premium only.
+
 const PREMIUM_EXTRA = ['security-auditor', 'devops-engineer', 'animation-performance-engineer'];
 
-// Decide what the build needs from the brief + resolved stack. Pure string heuristics, no tokens.
+
 export function detectNeeds(brief = '', stack = {}) {
   const b = String(brief || '').toLowerCase();
   const stackId = stack?.id || '';
@@ -44,7 +28,7 @@ export function detectNeeds(brief = '', stack = {}) {
   return { stackId, isStatic, needsBackend, wantsAnimation, wantsSeo };
 }
 
-// Pick the tier when not forced.
+
 export function autoTier(needs) {
   if (needs.wantsAnimation) return 'premium';
   return 'standard';
@@ -71,26 +55,26 @@ export function selectRoles(allRoles = [], ctx = {}, opts = {}) {
     } else if (needs.wantsAnimation) {
       ANIM_LEAN.forEach(add);
     }
-    // lean tier: trim optional quality roles even if pulled by other rules
+
     if (tier === 'lean') ['security-auditor', 'seo-specialist', 'devops-engineer', 'test-engineer', 'performance-engineer', 'accessibility-specialist'].forEach(id => include.delete(id));
 
-    // explicit overrides
+
     for (const id of (opts.includeRoles || [])) add(id);
     for (const id of (opts.excludeRoles || [])) include.delete(id);
 
-    // NOTE: we deliberately do NOT pull a role's deps back in. Deps express ordering ("run after"), not
-    // hard requirements — e.g. feature-engineer lists backend-engineer as a dep, but a static site has no
-    // backend, so we drop that dep (below) rather than resurrecting the backend agents. This is what makes
-    // selection actually lean. The dep-pruning step keeps the scheduler valid.
 
-    // optional hard cap on agent count (keep earliest phases first)
+
+
+
+
+
     let chosenIds = allRoles.filter(r => include.has(r.id)).map(r => r.id);
     if (Number.isFinite(opts.maxAgents) && opts.maxAgents > 0 && chosenIds.length > opts.maxAgents) {
       chosenIds = chosenIds.slice(0, opts.maxAgents);
     }
     const chosen = new Set(chosenIds);
 
-    // build the selected list, pruning deps to the selected set so the scheduler can't deadlock
+
     const roles = allRoles
       .filter(r => chosen.has(r.id))
       .map(r => ({ ...r, deps: (r.deps || []).filter(d => chosen.has(d)) }));
@@ -98,7 +82,7 @@ export function selectRoles(allRoles = [], ctx = {}, opts = {}) {
     const skipped = allRoles.filter(r => !chosen.has(r.id)).map(r => r.id);
     return { roles, tier, needs, skipped };
   } catch {
-    // Any failure → run everything (safe default), never throw.
+
     return { roles: allRoles, tier: 'premium', needs: {}, skipped: [] };
   }
 }

@@ -1,20 +1,16 @@
 #!/usr/bin/env node
-// Helm templates — export your Helm's *flavor* as a shareable file others can import.
-// A template captures the safe-to-share config that defines how a Helm looks and behaves:
-// persona/style, gateways, model, permission mode, and free MCP tools. It NEVER includes
-// secrets, tokens, the owner's identity, private memory, or the vault.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const DIR = path.dirname(fileURLToPath(import.meta.url));   // workspace/templates
-const ROOT = path.resolve(DIR, '../..');                    // secondme/
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(DIR, '../..');
 const TPL_EXT = '.helmtemplate.json';
 const PERSONA_FILE = path.join(ROOT, 'workspace', 'persona.local.md');
 const SERVERS = path.join(ROOT, 'workspace', 'mcp', 'servers.json');
 const ENV = path.join(ROOT, '.env');
 const ROOT_TOKEN = '__HELM_ROOT__';
-const FREE_SERVERS = ['filesystem', 'fetch', 'playwright'];   // no-credential, safe to share
+const FREE_SERVERS = ['filesystem', 'fetch', 'playwright'];
 
 function readEnvVal(key) { try { const m = readFileSync(ENV, 'utf8').match(new RegExp('^' + key + '=(.*)$', 'm')); return m ? m[1].trim() : ''; } catch { return ''; } }
 function readServers() { try { return JSON.parse(readFileSync(SERVERS, 'utf8')); } catch { return { mcpServers: {} }; } }
@@ -24,12 +20,12 @@ export function exportTemplate(name, description = '') {
   const servers = readServers().mcpServers || {};
   const safe = {}; const optional = [];
   for (const [k, v] of Object.entries(servers)) {
-    if (!FREE_SERVERS.includes(k)) { optional.push(k); continue; }   // credential-gated -> just name it
+    if (!FREE_SERVERS.includes(k)) { optional.push(k); continue; }
     const copy = JSON.parse(JSON.stringify(v));
-    // Tokenize the install root so the template is portable. servers.json may carry a path
-    // from a DIFFERENT machine than the one exporting (e.g. a Mac path on Windows), so match
-    // the local ROOT first, then tokenize any remaining absolute path (it can only be the
-    // install root for these free servers) — a shared template must never leak an absolute path.
+
+
+
+
     const isAbs = s => /^([A-Za-z]:[\\/]|\/)/.test(s);
     copy.args = (copy.args || []).map(a => {
       if (typeof a !== 'string') return a;
@@ -73,7 +69,7 @@ export function importTemplate(file) {
     for (const [k, v] of Object.entries(tpl.mcpServers)) {
       const copy = JSON.parse(JSON.stringify(v));
       copy.args = (copy.args || []).map(a => typeof a === 'string' ? a.split(ROOT_TOKEN).join(ROOT) : a);
-      // merge so existing local fields (healthCheck, enabled) survive; only command/args are updated
+
       cur.mcpServers[k] = { ...(cur.mcpServers[k] || {}), ...copy };
     }
     writeFileSync(SERVERS, JSON.stringify(cur, null, 2));

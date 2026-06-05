@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-// keyprobe — shows the EXACT bytes your terminal sends for each key, under the same input modes the
-// Helm terminal uses (bracketed paste + modifyOtherKeys=2). This is how we find what Shift+Enter
-// actually emits on your terminal so it can be wired up precisely.
-//
-//   node workspace/diag/keyprobe.mjs
-//
-// Press the keys it asks for; it prints the bytes and also appends them to workspace/diag/keyprobe.out
-// so they can be read back afterwards. Press q (or Ctrl+C) to finish.
-
 import { writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -19,7 +10,7 @@ writeFileSync(outFile, `keyprobe ${new Date().toISOString()}\n` + `terminal: ${p
 
 const stdin = process.stdin;
 const ESC = '\x1b';
-process.stdout.write(`${ESC}[?2004h${ESC}[>4;2m`);   // EXACT modes the Helm terminal enables
+process.stdout.write(`${ESC}[?2004h${ESC}[>4;2m`);
 
 function show(buf) {
   let s = '';
@@ -45,7 +36,7 @@ process.stdout.write(`keyprobe — recording what your terminal sends. Saved to:
 prompt();
 
 stdin.on('data', chunk => {
-  if (chunk.length === 1 && (chunk[0] === 0x71 || chunk[0] === 0x03)) return quit();   // q or Ctrl-C
+  if (chunk.length === 1 && (chunk[0] === 0x71 || chunk[0] === 0x03)) return quit();
   const { s, hex } = show(chunk);
   const label = i < order.length ? order[i] : `extra-${i}`;
   appendFileSync(outFile, `${label.padEnd(12)} | ${hex.padEnd(30)} | ${s}\n`);
@@ -55,7 +46,7 @@ stdin.on('data', chunk => {
 });
 
 function quit() {
-  process.stdout.write(`${ESC}[>4;0m${ESC}[?2004l`);   // reset the modes
+  process.stdout.write(`${ESC}[>4;0m${ESC}[?2004l`);
   try { if (stdin.isTTY) stdin.setRawMode(false); } catch {}
   process.stdout.write(`\r\nsaved -> ${outFile}\r\n`);
   process.exit(0);

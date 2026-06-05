@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Move the mouse WITHOUT clicking — to absolute x,y, a named anchor (top-right, center, ...),
-// or a percentage of the screen (xpct/ypct, 0-100). Anchors/percentages auto-resolve the screen size,
-// so Helm can "move to the top right corner" without knowing the resolution.
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +9,7 @@ const get = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 
 let x = get('x'), y = get('y');
 const at = get('at'), xpct = get('xpct'), ypct = get('ypct');
 
-// Resolve a relative target (anchor or percentage) against the real screen size.
+
 if (x == null || y == null) {
   if (process.platform !== 'win32') { console.error('named/percent targets need Windows; on macOS pass --x and --y'); process.exit(1); }
   const b = screenBounds();

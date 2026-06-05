@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-// workspace/sessions/compact.mjs
-// Anchored session summarization + swarm handoff schema.
-//
-// Exports:
-//   HANDOFF_SCHEMA  — template object; swarm workers fill this and write handoff.json
-//   pruneFileReads(text, keepTurns=3) — strips numbered file-read blocks from old context
-//   maybeCompact(context, opts)       — summarizes session into session_anchor.json at ~60% budget
-//
-// CLI:
-//   node workspace/sessions/compact.mjs [--input <file>] [--session-dir <dir>]
-//                                       [--budget <n>] [--force]
-//   Reads stdin when --input is omitted.
-//   Exits 0 = anchored, 2 = below threshold (not an error), 1 = failure.
-
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -26,12 +12,12 @@ loadEnv({ path: path.join(ROOT, '.env'), override: true });
 const CLAUDE = process.env.CLAUDE_BIN || 'claude';
 const MODEL  = process.env.COMPACT_MODEL || 'haiku';
 const DEFAULT_BUDGET    = parseInt(process.env.TOKEN_BUDGET || '100000', 10);
-const COMPACT_THRESHOLD = 0.6; // trigger at 60% of budget
-const LINES_PER_TURN    = 150; // approximate lines produced per agent turn
-const FILE_BLOCK_MIN    = 15;  // min consecutive numbered lines to treat as a file read
+const COMPACT_THRESHOLD = 0.6;
+const LINES_PER_TURN    = 150;
+const FILE_BLOCK_MIN    = 15;
 
-// Schema for swarm worker handoffs. Workers write handoff.json using this shape;
-// the orchestrator reads it instead of parsing raw stdout.
+
+
 export const HANDOFF_SCHEMA = {
   worker_id:      '',   // string: swarm task id / agent identity
   task:           '',   // string: one-line description of what was attempted
@@ -42,7 +28,7 @@ export const HANDOFF_SCHEMA = {
   confidence:     1.0,  // number 0-1: agent's self-assessed confidence in the result
 };
 
-// Approximate token count: ~1 token per 4 characters.
+
 function estimateTokens(text) {
   return Math.ceil((text || '').length / 4);
 }
@@ -56,7 +42,7 @@ export function pruneFileReads(text, keepTurns = 3) {
   const allLines = text.split('\n');
   if (allLines.length <= keepLines) return text;
 
-  // Only the "old" portion (before the last keepLines lines) is subject to pruning.
+
   const cutIdx = allLines.length - keepLines;
   const oldLines  = allLines.slice(0, cutIdx);
   const recentLines = allLines.slice(cutIdx);
@@ -66,12 +52,12 @@ export function pruneFileReads(text, keepTurns = 3) {
   while (i < oldLines.length) {
     const line = oldLines[i];
     if (/^\d+\t/.test(line)) {
-      // Collect the full run of numbered lines.
+
       let j = i;
       while (j < oldLines.length && /^\d+\t/.test(oldLines[j])) j++;
       const blockLen = j - i;
       if (blockLen >= FILE_BLOCK_MIN) {
-        // Extract a file path from the 3 lines preceding the block.
+
         let filePath = 'file';
         for (let k = Math.max(0, i - 3); k < i; k++) {
           const m = oldLines[k].match(/([^\s]+\.(?:mjs|js|ts|json|md|txt|sh|py|yaml|yml|toml))/);
@@ -89,9 +75,9 @@ export function pruneFileReads(text, keepTurns = 3) {
   return out.join('\n') + '\n' + recentLines.join('\n');
 }
 
-// Summarize accumulated session context into a compact anchor JSON.
-// Writes session_anchor.json to sessionDir.
-// Returns { anchored: boolean, anchor: object|null, reason: string }.
+
+
+
 export async function maybeCompact(context, { sessionDir = '.', budget = DEFAULT_BUDGET, force = false } = {}) {
   const used  = estimateTokens(context);
   const ratio = used / budget;
@@ -145,7 +131,7 @@ export async function maybeCompact(context, { sessionDir = '.', budget = DEFAULT
   return { anchored: true, anchor, reason: `anchored at ${(ratio * 100).toFixed(1)}% budget used` };
 }
 
-// CLI entry point — only executes when run as the main script.
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   const arg  = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };
@@ -159,7 +145,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (inputFile) {
     context = readFileSync(inputFile, 'utf8');
   } else {
-    try { context = readFileSync(0, 'utf8'); } catch {}   // fd 0 = stdin; cross-platform ('/dev/stdin' is POSIX-only)
+    try { context = readFileSync(0, 'utf8'); } catch {}
   }
 
   if (!context.trim()) {

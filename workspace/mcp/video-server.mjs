@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,
@@ -13,7 +12,7 @@ import os from "os";
 
 const CACHE_DIR = path.join(os.homedir(), ".helm-video-cache");
 
-// Ensure cache dir exists
+
 await fs.mkdir(CACHE_DIR, { recursive: true });
 
 const server = new Server(
@@ -21,7 +20,7 @@ const server = new Server(
   { capabilities: { tools: {} } }
 );
 
-// Tool definitions
+
 const tools = [
   {
     name: "video.download",
@@ -97,7 +96,7 @@ const tools = [
   },
 ];
 
-// Helper: run shell command
+
 function run(cmd, args = []) {
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
@@ -112,7 +111,7 @@ function run(cmd, args = []) {
   });
 }
 
-// Tool: download video
+
 async function downloadVideo(url) {
   const filename = `video-${Date.now()}.mp4`;
   const outputPath = path.join(CACHE_DIR, filename);
@@ -131,7 +130,7 @@ async function downloadVideo(url) {
   }
 }
 
-// Tool: extract frames
+
 async function extractFrames(videoPath, numFrames = 8) {
   const basename = path.basename(videoPath, path.extname(videoPath));
   const frameDir = path.join(CACHE_DIR, `frames-${basename}-${Date.now()}`);
@@ -159,16 +158,16 @@ async function extractFrames(videoPath, numFrames = 8) {
   }
 }
 
-// Tool: transcribe audio
+
 async function transcribeAudio(videoPath, language = "en") {
   const basename = path.basename(videoPath, path.extname(videoPath));
   const audioPath = path.join(CACHE_DIR, `audio-${basename}-${Date.now()}.mp3`);
 
   try {
-    // Extract audio
+
     await run("ffmpeg", ["-i", videoPath, "-q:a", "9", "-n", audioPath]);
 
-    // Transcribe using whisper (assuming whisper CLI is available)
+
     let cmd = ["whisper", audioPath, "--output_format", "txt", "--output_dir", CACHE_DIR];
     if (language) cmd.push("--language", language);
 
@@ -182,7 +181,7 @@ async function transcribeAudio(videoPath, language = "en") {
   }
 }
 
-// Handle tool calls
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request;
 
@@ -234,12 +233,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-// List tools
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools };
 });
 
-// Start server
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
 console.error("Video MCP server running...");

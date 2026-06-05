@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// flow.mjs — Helm automation engine: chain tools + shell with variables, interpolation, conditionals.
-//
-// Verbs:
-//   flow.mjs list
-//   flow.mjs show   --name <n>
-//   flow.mjs save   --name <n> --json '<steps>'
-//   flow.mjs run    --name <n> [--vars '<json>']
-//   flow.mjs delete --name <n>
-//
-// Step schema:
-//   {
-//     id?:     string,         // optional label
-//     tool?:   string,         // registry tool name → runs via tools.mjs call
-//     args?:   object|string,  // args for tool (interpolated before call)
-//     exec?:   string,         // shell command string (interpolated before run)
-//     saveAs?: string,         // store step output into vars[saveAs]
-//     when?:   string,         // safe condition string, e.g. "vars.win.ok == true"
-//   }
-//
-// Interpolation: {{varName}} or {{varName.field.sub}} resolved from vars map.
-// Safe condition eval: allows only vars refs, literals, comparisons, boolean ops.
-
 import { readFileSync, writeFileSync, readdirSync, unlinkSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -28,32 +6,32 @@ import path from 'node:path';
 import { existsSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// ROOT = helm install root (parent of workspace)
+
 const ROOT      = path.resolve(__dirname, '..', '..', '..');
-// WORKSPACE
+
 const WORKSPACE = path.resolve(__dirname, '..', '..');
 const FLOWS_DIR = path.join(WORKSPACE, 'flows');
 const TOOLS_MJS = path.join(WORKSPACE, 'tools', 'tools.mjs');
 
-// Ensure flows directory exists
+
 if (!existsSync(FLOWS_DIR)) {
   mkdirSync(FLOWS_DIR, { recursive: true });
 }
 
-// ---------------------------------------------------------------------------
-// Arg parsing helpers (matches style of window.mjs)
-// ---------------------------------------------------------------------------
+
+
+
 const argv = process.argv.slice(2);
 const verb = argv[0];
 
-// getFlag: returns the value after --k.
-// For flags that may contain JSON with spaces (--json, --vars), we collect all
-// tokens after --k until the next --flag token and join them with a space, so
-// the caller can pass JSON without shell-quoting it into a single arg.
+
+
+
+
 const getFlag = (k) => {
   const i = argv.indexOf(`--${k}`);
   if (i === -1) return null;
-  // Collect tokens from i+1 until the next --flag (or end)
+
   const parts = [];
   for (let j = i + 1; j < argv.length; j++) {
     if (argv[j].startsWith('--')) break;
@@ -64,14 +42,14 @@ const getFlag = (k) => {
 
 function die(msg) {
   console.log(JSON.stringify({ ok: false, error: String(msg) }));
-  process.exit(0); // always exit 0 per hard rules
+  process.exit(0);
 }
 
-// ---------------------------------------------------------------------------
-// Flow persistence
-// ---------------------------------------------------------------------------
+
+
+
 function flowPath(name) {
-  // Sanitize name to safe filename chars
+
   const safe = name.replace(/[^a-zA-Z0-9_\-]/g, '_');
   return path.join(FLOWS_DIR, `${safe}.json`);
 }
@@ -109,16 +87,16 @@ function listFlows() {
     .filter(Boolean);
 }
 
-// ---------------------------------------------------------------------------
-// Interpolation: replace {{a.b.c}} tokens in a string using vars object
-// ---------------------------------------------------------------------------
+
+
+
 function interpolate(str, vars) {
   if (typeof str !== 'string') return str;
   return str.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
     const parts = path.trim().split('.');
     let val = vars;
     for (const part of parts) {
-      if (val == null || typeof val !== 'object') return match; // leave as-is if not found
+      if (val == null || typeof val !== 'object') return match;
       val = val[part];
     }
     if (val === undefined || val === null) return match;
@@ -127,7 +105,7 @@ function interpolate(str, vars) {
   });
 }
 
-// Recursively interpolate all string values in an object/array
+
 function interpolateDeep(obj, vars) {
   if (typeof obj === 'string') return interpolate(obj, vars);
   if (Array.isArray(obj)) return obj.map(v => interpolateDeep(v, vars));
@@ -139,32 +117,32 @@ function interpolateDeep(obj, vars) {
   return obj;
 }
 
-// ---------------------------------------------------------------------------
-// Safe condition evaluator
-//
-// Allowed tokens (regex allowlist):
-//   - vars.path.sub references          → becomes a JS property chain
-//   - string literals: "..." or '...'
-//   - number literals: 0-9, -, .
-//   - boolean literals: true, false, null, undefined
-//   - comparisons: ==, !=, ===, !==, <=, >=, <, >
-//   - logical: &&, ||, !
-//   - grouping: ( )
-//   - whitespace
-//
-// Anything outside this set causes an immediate false (safe failure).
-// Implemented via new Function with a single `vars` binding so only vars can be referenced.
-// ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const SAFE_TOKEN_RE = /^[\s\d.+\-*"'`a-zA-Z_$()[\]{}:,!<>=&|?;]+$/;
 const ALLOWED_RE    = /^(?:[\s\d.]*|"[^"]*"|'[^']*'|true|false|null|undefined|vars(?:\.[a-zA-Z_$][\w$]*)*|==|!=|===|!==|<=|>=|<|>|&&|\|\||!|\(|\)|\s)*$/;
 
 function evalCondition(condStr, vars) {
-  if (!condStr || typeof condStr !== 'string') return true; // no condition = always run
+  if (!condStr || typeof condStr !== 'string') return true;
   const trimmed = condStr.trim();
   if (!trimmed) return true;
 
-  // Allowlist check: only known-safe tokens
-  // Build a simplified check: strip all allowed patterns and see if anything dangerous remains
+
+
   const stripped = trimmed
     .replace(/\s+/g, ' ')
     .replace(/"[^"]*"/g, '""')    // remove string contents
@@ -176,29 +154,29 @@ function evalCondition(condStr, vars) {
     // Fall back to literal boolean parsing
     if (trimmed === 'true')  return true;
     if (trimmed === 'false') return false;
-    return false; // reject unknown expressions for safety
+    return false;
   }
 
   try {
-    // Build function with only `vars` in scope — no globals
-    // The condition is wrapped so `vars` is the only accessible name.
+
+
     const fn = new Function('vars', `"use strict"; return Boolean(${trimmed});`);
     return fn(vars);
   } catch {
-    return false; // evaluation error → skip step
+    return false;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Execute a single step: returns { raw, parsed, error }
-// raw   = stdout string (or error text)
-// parsed = JSON-parsed raw (or null if not JSON)
-// ---------------------------------------------------------------------------
+
+
+
+
+
 function runStep(step, vars) {
-  // Interpolate exec/args
+
   let result = { stepId: step.id || null, skipped: false, raw: null, parsed: null, error: null };
 
-  // Condition check
+
   if (step.when !== undefined) {
     const cond = evalCondition(interpolate(step.when, vars), vars);
     if (!cond) {
@@ -209,7 +187,7 @@ function runStep(step, vars) {
   }
 
   if (step.tool) {
-    // Run via tools.mjs dispatcher
+
     const toolName = interpolate(step.tool, vars);
     let argsObj = step.args || {};
     if (typeof argsObj === 'string') {
@@ -267,9 +245,9 @@ function runStep(step, vars) {
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Verbs
-// ---------------------------------------------------------------------------
+
+
+
 
 if (verb === 'list') {
   const flows = listFlows();
@@ -303,7 +281,7 @@ if (verb === 'save') {
     die(`bad --json: ${e.message}`);
   }
   if (!Array.isArray(steps)) die('steps must be a JSON array');
-  // Validate each step has at least tool or exec
+
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     if (!s.tool && !s.exec) die(`step ${i}: must have tool or exec`);
@@ -342,7 +320,7 @@ if (verb === 'run') {
       stepResult = { stepId: step.id || null, skipped: false, raw: null, parsed: null, error: String(e) };
     }
 
-    // saveAs: store parsed JSON or raw text into vars
+
     if (!stepResult.skipped && step.saveAs) {
       vars[step.saveAs] = stepResult.parsed !== null ? stepResult.parsed : stepResult.raw;
     }
@@ -378,5 +356,5 @@ if (verb === 'delete') {
   process.exit(0);
 }
 
-// Unknown verb
+
 die(`unknown verb: ${verb || '(none)'}. verbs: list | show | save | run | delete`);

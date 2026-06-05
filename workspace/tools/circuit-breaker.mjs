@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Circuit breaker for Helm tool calls.
-// States: closed (normal) -> open (blocked, 5 consecutive failures) -> half-open (probe after 60s)
-// State persisted in workspace/tools/circuit-state.db (SQLite).
-
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -13,7 +9,7 @@ export const DB_PATH = path.join(__dirname, 'circuit-state.db');
 mkdirSync(__dirname, { recursive: true });
 
 const FAIL_THRESHOLD = 5;
-const HALF_OPEN_AFTER_MS = 60_000; // 60s
+const HALF_OPEN_AFTER_MS = 60_000;
 
 let _db = null;
 function openDb() {
@@ -50,7 +46,7 @@ export class CircuitBreaker {
     this.name = name;
   }
 
-  // Returns current effective state, auto-transitioning open -> half-open after timeout.
+
   currentState() {
     const row = getRow(this.name);
     if (row.state === 'open' && row.opened_at &&
@@ -75,7 +71,7 @@ export class CircuitBreaker {
     }
   }
 
-  // Returns an Error string if the circuit is open (caller should exit), or null if allowed.
+
   guard() {
     const s = this.currentState();
     if (s === 'open') {

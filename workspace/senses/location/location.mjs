@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Location: on-demand only. Uses CoreLocationCLI if installed.
-// Does NOT install anything. Does NOT run continuously.
-//
-// Usage: node location.mjs
-// Returns JSON on stdout: { lat, lon, accuracy, ts } or { installed: false, hint: "..." }
-
 import { spawnSync } from 'node:child_process';
 
 function which(bin) {
@@ -22,7 +16,7 @@ if (!cliBin) {
   process.exit(0);
 }
 
-// CoreLocationCLI -json outputs { latitude, longitude, accuracy, timestamp }
+
 const r = spawnSync(cliBin, ['-json', '-once'], { encoding: 'utf8', timeout: 15000 });
 if (r.status !== 0 || !r.stdout.trim()) {
   console.log(JSON.stringify({

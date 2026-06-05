@@ -1,14 +1,8 @@
-// interaction-engineer.mjs — Micro-Interaction Engineer role.
-// Adds polished Framer Motion micro-interactions to every component and page:
-// hover/press springs, magnetic CTAs, animated nav, gesture feedback, staggered
-// reveals, toast/dialog enter-exit, and input focus motion.
-// CONTRACT: §1 Role schema, §2 BuildContext, §8 Award-grade web standard.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// System prompt — expert persona
-// ---------------------------------------------------------------------------
+
+
+
 
 const SYSTEM = `\
 You are a principal micro-interaction engineer whose entire craft is making UIs feel alive, tactile,
@@ -81,9 +75,9 @@ All code must:
 - Wire into the EXISTING component files — do not create parallel "animated" copies.
 - Leave no TODO, no stub, no placeholder, no console.log.`;
 
-// ---------------------------------------------------------------------------
-// Role definition
-// ---------------------------------------------------------------------------
+
+
+
 
 export const roles = [
   {
@@ -97,7 +91,7 @@ export const roles = [
     system: SYSTEM,
 
     task(ctx) {
-      // Pull motion-system artifact so this role stays in sync with design tokens.
+
       const motionSystem = ctx.getArtifact?.('motion-system') ?? null;
       const digest = ctx.artifactsDigest();
       const stackNotes = ctx.stack?.notes ?? ctx.stack?.summary ?? '(stack notes unavailable)';
@@ -137,8 +131,8 @@ After installing, verify the project still type-checks: \`npx tsc --noEmit\`.
 Create \`src/lib/motion.ts\` (or \`src/utils/motion.ts\` — match the existing utils directory):
 
 \`\`\`ts
-// Shared motion variants and spring configs derived from the design system tokens.
-// Import from here — never hardcode easing/duration values in components.
+
+
 
 import { useReducedMotion } from 'framer-motion';
 
@@ -155,7 +149,7 @@ export const easings = {
 
 export const durations = { fast: 0.1, normal: 0.2, slow: 0.35, slower: 0.5 };
 
-// Fade-up reveal: for whileInView staggered sections.
+
 export const fadeUp = {
   hidden  : { opacity: 0, y: 24 },
   visible : (reducedMotion: boolean) =>
@@ -163,7 +157,7 @@ export const fadeUp = {
                   : { opacity: 1, y: 0, transition: { ...springs.gentle } },
 };
 
-// Stagger container: wrap a grid/list to stagger children.
+
 export const staggerContainer = (reducedMotion: boolean) => ({
   hidden  : {},
   visible : {
@@ -173,7 +167,7 @@ export const staggerContainer = (reducedMotion: boolean) => ({
   },
 });
 
-// Hook: returns motion-safe variants (instant if prefers-reduced-motion).
+
 export function useMotionSafe() {
   const reduced = useReducedMotion();
   return {
@@ -216,8 +210,8 @@ prominent Button usage in the page files under \`src/app/\`).
 
 Create a \`MagneticButton\` wrapper at \`src/components/ui/magnetic-button.tsx\`:
 \`\`\`tsx
-// Wraps any button/child element with a bounded magnetic cursor-follow effect.
-// Uses useMotionValue + useSpring; falls back to a plain wrapper on reduced motion.
+
+
 \`\`\`
 
 Implement:

@@ -1,11 +1,8 @@
 #!/usr/bin/env node
-// Send an iMessage to any handle on behalf of Helm.
-// confirm: true in registry — dispatcher enforces owner approval before calling.
-
 import { spawnSync } from 'node:child_process';
 import { macOnlyOrExit } from './mac-only.mjs';
 
-macOnlyOrExit('imessage.send_to');   // iMessage is macOS/iOS-only
+macOnlyOrExit('imessage.send_to');
 const args   = process.argv.slice(2);
 const get    = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 const handle = get('handle');

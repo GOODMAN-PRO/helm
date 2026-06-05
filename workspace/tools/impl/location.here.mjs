@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Tool: location.here
-// Returns current location or { installed: false } if CoreLocationCLI missing.
-
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

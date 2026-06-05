@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Launch an app, open a file/folder, or open a URL. Windows: Start-Process. macOS: open.
-//   app.open --target notepad            (launch an app by name)
-//   app.open --target "C:\path\file.txt" (open a file with its default app)
-//   app.open --target https://x.com      (open a URL in the default browser)
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);

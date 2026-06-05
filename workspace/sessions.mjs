@@ -1,7 +1,3 @@
-// Shared session store for Discord + iMessage adapters.
-// Both adapters key sessions by the canonical owner key ('owner')
-// so they share one Claude conversation thread.
-
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -11,8 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH   = path.join(__dirname, 'sessions.db');
 
 const db = new DatabaseSync(DB_PATH);
-// Without a busy timeout the second writer gets an immediate SQLITE_BUSY when
-// the Discord and iMessage processes both call setSession concurrently.
+
+
 db.exec(`PRAGMA busy_timeout = 5000`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
@@ -23,22 +19,22 @@ db.exec(`
   );
 `);
 
-// One-time migration from legacy JSON files (idempotent — uses INSERT OR IGNORE).
+
 function migrateJson(jsonPath, adapter) {
   if (!existsSync(jsonPath)) return;
   try {
     const map = JSON.parse(readFileSync(jsonPath, 'utf8'));
-    // Take the most recent session (last value) as the owner session seed.
+
     const entries = Object.values(map).filter(Boolean);
     if (entries.length === 0) return;
     const sid = entries[entries.length - 1];
     db.prepare(
       `INSERT OR IGNORE INTO sessions (key, session_id, adapter) VALUES ('owner', ?, ?)`
     ).run(sid, adapter);
-  } catch { /* corrupt json — skip */ }
+  } catch {  }
 }
 
-// Only run migrations once (when the sessions table is empty).
+
 const count = db.prepare(`SELECT COUNT(*) as n FROM sessions`).get();
 if (count.n === 0) {
   migrateJson(path.join(__dirname, '.sessions.json'), 'discord');

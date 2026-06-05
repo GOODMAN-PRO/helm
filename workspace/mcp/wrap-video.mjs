@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-
 import { spawn } from "child_process";
 import { execSync } from "child_process";
 import os from "os";
 
-// Ensure Python user bin and ~/bin are on PATH
+
 const extraPaths = [
   `${os.homedir()}/bin`,
   `${os.homedir()}/Library/Python/3.9/bin`,
@@ -13,7 +12,7 @@ const extraPaths = [
 ].join(":");
 process.env.PATH = `${extraPaths}:${process.env.PATH}`;
 
-// Check for required dependencies
+
 const deps = ["yt-dlp", "ffmpeg", "whisper"];
 const missing = [];
 
@@ -35,7 +34,7 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-// Spawn the video server
+
 const server = spawn("node", [
   new URL("./video-server.mjs", import.meta.url).pathname,
 ]);

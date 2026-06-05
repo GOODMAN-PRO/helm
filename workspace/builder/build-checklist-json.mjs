@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// build-checklist-json.mjs — deterministically merge the nine checklist/*.md "Machine-readable items"
-// JSON blocks into one normalized workspace/builder/checklist-items.json. Severity normalized to
-// critical|major|minor; `check` (AUTO/VISUAL) mapped to `mode` (auto|visual); deduped by id.
-
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -18,7 +14,7 @@ const normMode = (m, item) => {
   return v.startsWith('a') ? 'auto' : 'visual';
 };
 
-// Pull every ```json fenced block that follows a "Machine-readable" heading (or the last fenced json block).
+
 function extractItems(src) {
   const idx = src.indexOf('Machine-readable');
   const region = idx >= 0 ? src.slice(idx) : src;
@@ -26,7 +22,7 @@ function extractItems(src) {
   const re = /```json\s*([\s\S]*?)```/g;
   let m;
   while ((m = re.exec(region))) {
-    try { const arr = JSON.parse(m[1]); if (Array.isArray(arr)) out.push(...arr); } catch (e) { /* skip malformed */ }
+    try { const arr = JSON.parse(m[1]); if (Array.isArray(arr)) out.push(...arr); } catch (e) {  }
   }
   return out;
 }
@@ -58,5 +54,5 @@ console.log(`merged ${merged.length} items (${raw} raw, ${raw - merged.length} d
 console.log(`  severity: ${counts.critical || 0} critical · ${counts.major || 0} major · ${counts.minor || 0} minor`);
 console.log(`  mode: ${counts.auto || 0} auto · ${counts.visual || 0} visual`);
 console.log(`  → ${OUT}`);
-JSON.parse(readFileSync(OUT, 'utf8'));   // assert valid
+JSON.parse(readFileSync(OUT, 'utf8'));
 console.log('  ✓ valid JSON');

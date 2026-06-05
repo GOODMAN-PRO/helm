@@ -1,15 +1,3 @@
-// reverse-code.mjs — static CODE analysis for the `reverse web` command.
-//
-// This is the part that makes the report actual reverse engineering instead of a network dump: it
-// parses the JavaScript the site SERVES TO THE BROWSER (already public to anyone who loads the page),
-// enumerates functions with an AST, builds a call graph, detects the module system, recovers original
-// file structure from source maps when present, and does best-effort data-flow from a captured request's
-// parameters back to the functions that reference them.
-//
-// SCOPE / ETHICS: it READS and EXPLAINS publicly-served code. It does NOT defeat anti-bot, forge signed
-// requests, or circumvent access controls — it identifies where such logic lives so an AUTHORIZED owner
-// can understand their own (or an authorized) target. Use only on targets you own or may analyze.
-
 import * as acorn from 'acorn';
 import * as acornLoose from 'acorn-loose';
 import * as walk from 'acorn-walk';
@@ -18,19 +6,19 @@ import { createHash } from 'node:crypto';
 const FUNC_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 const sha1 = s => createHash('sha1').update(s).digest('hex').slice(0, 12);
 
-// Tolerant parse: strict script → module → acorn-loose (never throws). Real bundles use every feature
-// and are often truncated/obfuscated, so we degrade instead of failing the whole analysis.
+
+
 function parse(code) {
   const opts = { ecmaVersion: 'latest', allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true, allowHashBang: true };
   try { return { ast: acorn.parse(code, { ...opts, sourceType: 'script' }), loose: false }; }
-  catch { /* try module */ }
+  catch {  }
   try { return { ast: acorn.parse(code, { ...opts, sourceType: 'module' }), loose: false }; }
-  catch { /* fall back to loose */ }
+  catch {  }
   try { return { ast: acornLoose.parse(code, { ecmaVersion: 'latest' }), loose: true }; }
   catch { return { ast: null, loose: true }; }
 }
 
-// Name a function: its own id, else infer from the binding it's attached to.
+
 function inferName(node, ancestors) {
   if (node.id && node.id.name) return node.id.name;
   const parent = ancestors[ancestors.length - 2];
@@ -54,7 +42,7 @@ function calleeName(callee) {
   return null;
 }
 
-// Detect the module/loader system from telltale tokens (cheap, high-signal).
+
 function detectModuleSystem(code) {
   const sys = [];
   if (/\b__d\(|requireLazy\(|\bBootloader\b/.test(code)) sys.push('Meta Haste (__d / requireLazy)');
@@ -95,12 +83,12 @@ export function analyzeBundle(code, name = 'inline') {
     };
     byNode.set(node, f); funcs.push(f);
   };
-  // PASS 1 — register every function first. (acorn-walk's ancestor visitor fires AFTER recursing into
-  // children, so a function isn't in `byNode` yet while its own body is being walked — hence two passes.)
+
+
   try {
     walk.ancestor(ast, { FunctionDeclaration: onFunc, FunctionExpression: onFunc, ArrowFunctionExpression: onFunc });
-  } catch { /* partial AST */ }
-  // PASS 2 — attribute each call to its nearest enclosing function (now all functions are registered).
+  } catch {  }
+
   try {
     walk.ancestor(ast, {
       CallExpression(node, _st, ancestors) {
@@ -110,9 +98,9 @@ export function analyzeBundle(code, name = 'inline') {
         if (owner && cn) { const f = byNode.get(owner); if (f && f.calls.size < 200) f.calls.add(cn); }
       },
     });
-  } catch { /* partial AST */ }
+  } catch {  }
 
-  // How many functions call each named function (a proxy for "importance").
+
   const callerCount = {};
   for (const f of funcs) for (const c of f.calls) callerCount[c] = (callerCount[c] || 0) + 1;
 
@@ -121,16 +109,16 @@ export function analyzeBundle(code, name = 'inline') {
     f.snippet = src.slice(0, 160).replace(/\s+/g, ' ').trim();
     f.flags = [];
     if (/\bfetch\s*\(|XMLHttpRequest|\.graphql\b|\bdoc_id\b|sendBeacon|\.ajax\(|new WebSocket/.test(src)) f.flags.push('network');
-    // REAL crypto only — actual primitives, not the presence of a param name (that was tautological:
-    // we search for `lsd` then flag the function "crypto" because it contains `lsd`).
+
+
     if (/crypto\.subtle|subtle\.digest|\bbtoa\(|\batob\(|\bhmac\b|sha-?(1|256|512)|createHash|\bsign\s*\(|\bsignature\b|encrypt|decrypt/i.test(src)) f.flags.push('crypto');
-    // Separate, honest signal: this function TOUCHES the signed/request params (where they're assembled).
+
     if (/jazoest|__dyn\b|__csr\b|\blsd\b|__hsdp|__sjsp|__comet_req|__spin_|fb_dtsg/.test(src)) f.flags.push('req-params');
     if (/addEventListener|\bon[A-Z]\w+\s*[:=]|handle[A-Z]\w+|Listener\b/.test(src) || (f.name && /^(on[A-Z]|handle[A-Z])|Listener$/.test(f.name))) f.flags.push('handler');
     if (/JSON\.parse|JSON\.stringify|localStorage|sessionStorage|document\.cookie/.test(src)) f.flags.push('state/io');
     f.callers = f.name ? (callerCount[f.name] || 0) : 0;
-    // IMPORTANCE, not popularity: behavior dominates; fan-in and size are small tiebreakers (capped) so
-    // a 360-caller logging utility can't outrank the function that builds a signed request.
+
+
     const sig = f.flags;
     f.score = (sig.includes('crypto') ? 55 : 0)
       + (sig.includes('network') ? 45 : 0)
@@ -145,33 +133,33 @@ export function analyzeBundle(code, name = 'inline') {
   return result;
 }
 
-// Decode inline <script> blocks from HTML; dedupe identical blobs (the requireLazy stub repeated 25×
-// collapses to one), and base64-decode blocks that are clearly an encoded payload.
+
+
 export function decodeInlineScripts(html) {
   const blocks = [];
   for (const m of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
     let body = m[1].trim();
     if (!body || body.length < 16) continue;
-    // JSON/LD or config blobs aren't code — skip type=application/json
+
     if (/type=["']application\/(ld\+)?json["']/i.test(m[0])) continue;
     // Looks like a pure base64 payload → decode (this is what FB inlines and evals).
     if (/^[A-Za-z0-9+/=\s]{24,}$/.test(body) && body.replace(/\s+/g, '').length % 4 === 0) {
-      try { const dec = Buffer.from(body.replace(/\s+/g, ''), 'base64').toString('utf8'); if (/[;(){}=]/.test(dec)) body = dec; } catch { /* keep raw */ }
+      try { const dec = Buffer.from(body.replace(/\s+/g, ''), 'base64').toString('utf8'); if (/[;(){}=]/.test(dec)) body = dec; } catch {  }
     }
     blocks.push(body);
   }
-  // dedupe by content hash
+
   const seen = new Map();
   for (const b of blocks) { const h = sha1(b); if (!seen.has(h)) seen.set(h, { code: b, count: 1 }); else seen.get(h).count++; }
   return [...seen.values()];
 }
 
-// Find a sourceMappingURL ref in a bundle (inline data: or external URL).
+
 export function findSourceMapRef(code) {
   const m = code.match(/[#@]\s*sourceMappingURL=([^\s'"]+)\s*$/m);
   return m ? m[1] : null;
 }
-// Parse a source-map JSON: recover original file list + symbol names (+ original source if embedded).
+
 export function parseSourceMap(json) {
   let map; try { map = typeof json === 'string' ? JSON.parse(json) : json; } catch { return null; }
   const sources = Array.isArray(map.sources) ? map.sources : [];
@@ -185,9 +173,9 @@ export function parseSourceMap(json) {
   };
 }
 
-// Best-effort data-flow: given parameter names / doc_ids captured from a live request, find the
-// functions across all bundles that REFERENCE them. Honest: this shows where the value is touched, not
-// a proof of construction — but it points you straight at the relevant code.
+
+
+
 export function traceTerms(bundles, terms) {
   const hits = [];
   const uniq = [...new Set(terms.filter(t => t && String(t).length >= 3))].slice(0, 40);
@@ -221,7 +209,7 @@ export function analyzeSources(sources, { maxBytesPerBundle = 4_000_000, maxFunc
     const code = (s.code || '').slice(0, maxBytesPerBundle);
     if (code.length < 16) continue;
     const r = analyzeBundle(code, s.name || 'inline');
-    r.code = code;                 // kept for traceTerms; caller drops before serializing
+    r.code = code;
     r.dupCount = s.count || 1;
     results.push(r);
   }

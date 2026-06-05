@@ -1,14 +1,8 @@
 #!/usr/bin/env node
-// Calendar tool — shared impl for calendar.list and calendar.add.
-// Uses JXA (osascript -l JavaScript) to talk to Calendar.app.
-// No icalBuddy dependency: falls back gracefully if Calendar is not accessible.
-// Usage: calendar.mjs list [--days 7]
-//        calendar.mjs add  --title <t> --start <ISO> --end <ISO>
-
 import { spawnSync } from 'node:child_process';
 import { macOnlyOrExit } from './mac-only.mjs';
 
-macOnlyOrExit('calendar');   // Apple Calendar via AppleScript is macOS-only
+macOnlyOrExit('calendar');
 const verb    = process.argv[2];
 const rawArgs = process.argv.slice(3);
 const get     = k => { const i = rawArgs.indexOf(`--${k}`); return i !== -1 ? rawArgs[i + 1] : null; };
@@ -54,7 +48,7 @@ if (verb === 'list') {
 
   try {
     const out = runJxa(jxa);
-    // osascript may wrap output in quotes
+
     const cleaned = out.replace(/^"|"$/g, '').replace(/\\"/g, '"');
     const events  = JSON.parse(cleaned.startsWith('[') ? cleaned : out);
     console.log(JSON.stringify({ ok: true, days, count: events.length, events }));

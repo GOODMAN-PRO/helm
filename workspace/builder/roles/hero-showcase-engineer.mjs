@@ -1,13 +1,8 @@
-// hero-showcase-engineer.mjs — specialist for apple.com-grade hero + product showcase sections.
-// Scroll-scrubbed reveals, image-sequence/video scrubbing, pinned scenes, kinetic type,
-// layered parallax. Runs after scroll-animation-engineer so GSAP/Lenis/ScrollTrigger are wired.
-// CONTRACT: §1 Role schema, §2 BuildContext, §8 Award-grade web standard.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// System prompt — rich expert persona
-// ---------------------------------------------------------------------------
+
+
+
 
 const SYSTEM = `\
 You are a world-class Hero & Showcase Engineer who builds the signature "wow" moments that make
@@ -51,9 +46,9 @@ You write complete, production-ready Next.js components (App Router, 'use client
 components wire themselves end-to-end — GSAP timelines, preloaders, fallbacks, Tailwind styles,
 TypeScript types — with zero stubs and zero TODO comments.`;
 
-// ---------------------------------------------------------------------------
-// Role definition
-// ---------------------------------------------------------------------------
+
+
+
 
 export const roles = [
   {
@@ -228,7 +223,7 @@ hydration adds the animation layer progressively.
   \`lenis?.destroy()\` if the component created the Lenis instance.
 - **Image quality**: use Next.js \`<Image>\` (\`next/image\`) for all images with explicit
   \`width\`, \`height\`, and \`priority\` on the hero image. If using Unsplash placeholder URLs,
-  ensure they are valid direct image endpoints (e.g. \`https://images.unsplash.com/photo-...\`).
+  ensure they are valid direct image endpoints (e.g. \`https:
 - **No broken imports**: import GSAP as \`import gsap from 'gsap'\` and
   \`import { ScrollTrigger } from 'gsap/ScrollTrigger'\`. Register at module entry:
   \`if (typeof window !== 'undefined') gsap.registerPlugin(ScrollTrigger)\`.
@@ -305,11 +300,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (typeof result !== 'string' || result.trim().length === 0) {
       fail('task(fakeCtx) returned empty or non-string');
     }
-    // Must interpolate ctx.brief somewhere in the output
+
     if (typeof result === 'string' && !result.includes('flagship smartphone launch page')) {
       fail('task(fakeCtx) does not reference ctx.brief');
     }
-    // Must reference GSAP
+
     if (typeof result === 'string' && !result.toLowerCase().includes('gsap')) {
       fail('task output does not mention GSAP');
     }

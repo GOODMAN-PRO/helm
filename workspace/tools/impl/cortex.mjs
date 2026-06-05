@@ -1,30 +1,8 @@
 #!/usr/bin/env node
-// cortex — Helm's bridge to the local CORTEX app (AI-first memory layer / networked notes brain).
-// CORTEX is an Express server on http://127.0.0.1:7002 (workspace/cortex/server.mjs). This tool lets
-// Helm capture, search, recall (by meaning), and inspect the knowledge base from one CLI verb.
-//
-// Usage:
-//   node cortex.mjs capture  --text "..." [--tags a,b,c]
-//   node cortex.mjs new      --title "..." [--content "..."] [--tags a,b]
-//   node cortex.mjs search   --q "..."        (keyword / FTS5)
-//   node cortex.mjs recall   --q "..."        (semantic, by meaning)
-//   node cortex.mjs recent   [--limit N]
-//   node cortex.mjs get      --id "..."
-//   node cortex.mjs related  --id "..."
-//   node cortex.mjs ask      --q "..."
-//   node cortex.mjs projects
-//   node cortex.mjs tasks
-//   node cortex.mjs layers
-//
-// Conventions (match the other Helm tools): flags are `--key value`; a flag with no value (or one
-// immediately followed by another --flag) is boolean true; `--tags a,b,c` becomes an array. Prints
-// EXACTLY ONE compact JSON object to stdout for every code path and exits 0 (never crashes) — on a
-// network failure it returns {ok:false,error:"CORTEX not running ..."} so Helm can react gracefully.
-
 const BASE = 'http://127.0.0.1:7002';
 const TIMEOUT_MS = 20_000;
 
-// ---- arg parsing: `--flag value`, bare/`--flag --next` => true, repeated flags collected ----
+
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
@@ -34,10 +12,10 @@ function parseArgs(argv) {
     const next = argv[i + 1];
     let val;
     if (next === undefined || next.startsWith('--')) {
-      val = true;            // boolean flag (no following value)
+      val = true;
     } else {
       val = next;
-      i++;                   // consume the value
+      i++;
     }
     if (key in out) {
       out[key] = Array.isArray(out[key]) ? [...out[key], val] : [out[key], val];
@@ -51,7 +29,7 @@ function parseArgs(argv) {
 const print = obj => { process.stdout.write(JSON.stringify(obj) + '\n'); };
 const fail  = msg => { print({ ok: false, error: msg }); process.exit(0); };
 
-// Split `--tags a,b,c` (or a repeated flag) into a clean string array; undefined stays undefined.
+
 function toTags(v) {
   if (v === undefined) return undefined;
   const parts = (Array.isArray(v) ? v : [v])
@@ -61,7 +39,7 @@ function toTags(v) {
   return parts;
 }
 
-// Require a string flag (boolean-true / missing both rejected) — returns the value or never returns.
+
 function reqStr(args, key, verb) {
   const v = args[key];
   if (v === undefined || v === true || v === '') fail(`${verb} requires --${key} "..."`);
@@ -173,7 +151,7 @@ async function run() {
     case 'ask': {
       const q = reqStr(args, 'q', 'ask');
       const data = await api('POST', '/api/ai/ask', { query: q });
-      // Server already returns {ok, query, sources, context, instruction}; surface the useful bits.
+
       return print({
         ok: true,
         query: q,
@@ -203,8 +181,8 @@ async function run() {
 }
 
 run().catch(err => {
-  // Network/timeout failures get the friendly "start it" message; everything else its own message.
-  // Either way: exactly one JSON object, exit 0 (Helm tools print JSON, they don't crash).
+
+
   if (err && err.network) fail(err.message);
   fail(String((err && err.message) || err));
 });

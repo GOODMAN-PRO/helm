@@ -1,12 +1,3 @@
-// Cross-platform screen capture for Helm.
-// macOS  -> /usr/sbin/screencapture (built in)
-// Windows -> PowerShell + System.Drawing (built in; captures the whole virtual desktop)
-// Linux  -> first of scrot / ImageMagick `import` / gnome-screenshot that is installed
-//
-// Why this exists: Helm's brain can run on either machine in the fleet (`use windows`). The old
-// capture path shelled out to the macOS-only `screencapture`, so a "screenshot" taken while the
-// brain was on Windows had no local tool and failed. This makes capture work on the machine the
-// brain is actually running on.
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync, unlinkSync, copyFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -16,22 +7,22 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sleepMs = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} };
 
-// Default output file in the OS temp dir (works on every platform — /tmp doesn't exist on Windows).
+
 export function defaultShotPath(prefix = 'helm-screen') {
   return path.join(os.tmpdir(), `${prefix}.png`);
 }
 
-// Roots an --out path is allowed to resolve under (prevents clobbering arbitrary files).
+
 export function safeRoots(workspace) {
   const roots = [os.tmpdir(), workspace];
-  if (process.platform === 'darwin') roots.push('/tmp', '/private/tmp');  // common Mac convention
+  if (process.platform === 'darwin') roots.push('/tmp', '/private/tmp');
   return roots;
 }
 
-// PowerShell script (run via -EncodedCommand so paths/quotes never need escaping) that grabs the
-// full virtual screen — all monitors — and saves it as PNG. When hideTerminals is true (default), it
-// first minimizes terminal/console windows (so Helm's own terminal doesn't block the shot), captures,
-// then restores them — non-destructive to the owner's session.
+
+
+
+
 function windowsPsScript(outPath, hideTerminals = true) {
   const safePath = outPath.replace(/'/g, "''");   // single-quote escape for PowerShell literal
   const head = [
@@ -78,16 +69,16 @@ function winDirect(out, timeout) {
 // Fallback for a non-interactive session (SSH / Session 0): CopyFromScreen can't reach the desktop
 // directly, but a scheduled task launched with `schtasks /Run` executes in the user's INTERACTIVE
 // session and CAN capture. We register a one-shot "HelmShot" task that runs this same tool in
-// --direct mode to a fixed file, trigger it, then read the file back.
+
 function winViaTask(out, timeout) {
-  const shot = path.join(os.tmpdir(), 'helm-shot-task.png');   // same user → same tmpdir as the task
-  // Run the capture as a HIDDEN PowerShell (no console window) so the screenshot doesn't capture a
-  // terminal popping up. Pure PowerShell — no node child — so nothing flashes on screen.
+  const shot = path.join(os.tmpdir(), 'helm-shot-task.png');
+
+
   const ps1 = path.join(os.tmpdir(), 'helm-shot.ps1');
   try { writeFileSync(ps1, windowsPsScript(shot)); } catch (e) { return { ok: false, error: 'cannot write capture script: ' + e.message }; }
   const tr = `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${ps1}"`;
-  // (Re)register idempotently. /IT = run in the logged-on user's session; /SC ONCE + placeholder
-  // time means it only runs on /Run.
+
+
   spawnSync('schtasks', ['/Create', '/TN', 'HelmShot', '/TR', tr, '/SC', 'ONCE', '/ST', '00:00', '/RL', 'LIMITED', '/IT', '/F'], { encoding: 'utf8', timeout: 15_000 });
   try { unlinkSync(shot); } catch {}
   const run = spawnSync('schtasks', ['/Run', '/TN', 'HelmShot'], { encoding: 'utf8', timeout: 15_000 });
@@ -110,16 +101,16 @@ export function captureScreen(out, { timeout = 15_000, direct = false } = {}) {
   if (process.platform === 'win32') {
     const r = winDirect(out, timeout);
     if (r.ok || direct) return r;
-    // Non-interactive session → capture via a scheduled task running in the interactive desktop.
+
     if (r.interactive) return winViaTask(out, timeout);
     return { ok: false, error: r.error };
   }
-  // Linux: try the common CLI screenshot tools in order; ENOENT means "not installed", keep trying.
+
   const candidates = [
     ['scrot', o => ['-o', o]],
-    ['import', o => ['-window', 'root', o]],         // ImageMagick
+    ['import', o => ['-window', 'root', o]],
     ['gnome-screenshot', o => ['-f', o]],
-    ['spectacle', o => ['-b', '-n', '-o', o]],        // KDE
+    ['spectacle', o => ['-b', '-n', '-o', o]],
   ];
   let lastErr = '';
   for (const [cmd, mkArgs] of candidates) {

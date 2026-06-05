@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// doc.mjs — document / PDF toolkit for Helm.
-//
-// Verbs:
-//   info     --path <pdf>                      → {pages, title, author, ...}
-//   extract  --path <pdf> [--out <txt>]         → extracted text
-//   merge    --out <pdf> --inputs "a.pdf,b.pdf" → merged PDF
-//   split    --path <pdf> --out <dir>           → one PDF per page
-//   topdf    --path <txt|md|html> [--out <pdf>] → render to PDF via Playwright
-//
-// Backend detection (no installs — uses whatever is already present):
-//   Poppler CLIs: pdftotext / pdfinfo / pdfunite / pdfseparate (on Windows PATH via `where`)
-//   Python + pypdf (python -c "import pypdf")
-//   Playwright Chromium (shared with reverse.mjs — already bundled in helm)
-//
-// Always prints ONE JSON object to stdout; exits 0.
-
 import { spawnSync }                                  from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync,
          existsSync, mkdtempSync, readdirSync,
@@ -26,12 +10,12 @@ import os                                             from 'node:os';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE = path.resolve(__dirname, '../..');
 
-// ── arg parsing ─────────────────────────────────────────────────────────────
+
 const args = process.argv.slice(2);
 const verb = args[0];
 const get  = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] ?? null : null; };
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+
 function run(cmd, cliArgs, opts = {}) {
   const r = spawnSync(cmd, cliArgs, { encoding: 'utf8', timeout: 60_000, ...opts });
   return { stdout: r.stdout || '', stderr: r.stderr || '', status: r.status ?? -1, error: r.error };
@@ -63,37 +47,37 @@ function detectBackends() {
     playwright:  false,
   };
 
-  // Poppler tools
+
   b.pdftotext   = which('pdftotext');
   b.pdfinfo     = which('pdfinfo');
   b.pdfunite    = which('pdfunite');
   b.pdfseparate = which('pdfseparate');
 
-  // Python + pypdf
+
   for (const py of ['python', 'python3', 'py']) {
     const p = which(py);
     if (!p) continue;
     const r = spawnSync(p, ['-c', 'import pypdf; print(pypdf.__version__)'],
       { encoding: 'utf8', timeout: 8_000 });
     if (r.status === 0 && r.stdout.trim()) { b.python = p; b.pypdf = true; break; }
-    // Python exists but no pypdf — keep looking for another interpreter
+
     if (!b.python) b.python = p;
   }
 
-  // Playwright Chromium: detect synchronously via require() from helm's node_modules.
+
   try {
     const pw = _require('playwright');
     if (pw && pw.chromium && existsSync(pw.chromium.executablePath())) {
       b.playwright = true;
     }
-  } catch { /* playwright not available */ }
+  } catch {  }
 
   return b;
 }
 
 const backends = detectBackends();
 
-// Summarise detected backends for reporting.
+
 function backendsReport() {
   const parts = [];
   if (backends.pdftotext)   parts.push(`pdftotext(${backends.pdftotext})`);
@@ -106,7 +90,7 @@ function backendsReport() {
   return parts.length ? parts : ['(none detected)'];
 }
 
-// ── no-backend error ─────────────────────────────────────────────────────────
+
 function noBackend(verb2, needs) {
   return {
     ok: false,
@@ -121,12 +105,12 @@ function out(obj) {
   console.log(JSON.stringify({ ...obj, backends: backendsReport() }));
 }
 
-// ── Python inline script runner ──────────────────────────────────────────────
+
 function pyRun(script, extraArgs = []) {
   return run(backends.python, ['-c', script, ...extraArgs]);
 }
 
-// ── Markdown / plain-text → styled HTML (shared with reverse.mjs pattern) ────
+
 function wrapHtml(content, ext, title = 'Document') {
   const esc = s => String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -156,7 +140,7 @@ function wrapHtml(content, ext, title = 'Document') {
     a{color:#0366d6;text-decoration:none;word-break:break-all}`;
 
   if (ext === '.html' || ext === '.htm') {
-    // Already HTML — inject our style into <head> if possible, else wrap.
+
     if (/<html[\s>]/i.test(content)) return content;
     return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>` +
            `<style>${css}</style></head><body>${content}</body></html>`;
@@ -166,13 +150,13 @@ function wrapHtml(content, ext, title = 'Document') {
     return mdToHtml(content, title, css);
   }
 
-  // Plain text — wrap in <pre>
+
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>` +
          `<style>${css} body{padding:20px}</style></head><body>` +
          `<pre>${esc(content)}</pre></body></html>`;
 }
 
-// Minimal Markdown → HTML (same approach as reverse.mjs mdToHtml).
+
 function mdToHtml(md, title, css) {
   const esc = s => String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -631,5 +615,5 @@ async function main() {
 
 main().catch(e => {
   console.log(JSON.stringify({ ok: false, error: String(e.message || e) }));
-  process.exit(0);  // always exit 0 per contract
+  process.exit(0);
 });

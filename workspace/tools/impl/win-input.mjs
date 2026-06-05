@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Windows mouse/keyboard control for Helm — the Windows counterpart to bin/guicontrol (macOS).
-//
-// Injecting input only works from a process attached to the INTERACTIVE desktop. An SSH-driven
-// process (use windows) runs in a non-interactive session, so SetCursorPos/SendKeys silently no-op.
-// So, like screenshots, we route input through a one-shot scheduled task ("HelmInput") that runs in
-// the logged-on user's session. Flow: write the action to a fixed JSON file, trigger HelmInput, which
-// runs `win-input.mjs --task-run`, reads the file, performs the action, and writes a .done marker we
-// read back. Run locally on Windows it still works (the task runs in the same interactive session).
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync } from 'node:fs';
 import os from 'node:os';
@@ -18,7 +10,7 @@ const ACTION_FILE = path.join(os.tmpdir(), 'helm-input.json');
 const DONE_FILE   = path.join(os.tmpdir(), 'helm-input.done');
 const sleepMs = ms => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {} };
 
-// SendKeys escaping: special chars must be wrapped in braces to be sent literally.
+
 function escSendKeys(t) {
   return String(t).replace(/[+^%~(){}\[\]]/g, c => (c === '{' ? '{{}' : c === '}' ? '{}}' : `{${c}}`));
 }
@@ -28,7 +20,7 @@ const KEYMAP = {
   up: '{UP}', down: '{DOWN}', left: '{LEFT}', right: '{RIGHT}', home: '{HOME}', end: '{END}',
   pageup: '{PGUP}', pagedown: '{PGDN}', f1: '{F1}', f2: '{F2}', f3: '{F3}', f4: '{F4}', f5: '{F5}',
 };
-// Virtual-key codes for hotkey combos (keybd_event). Letters A-Z and digits 0-9 are computed in vkFor.
+
 const VK = {
   ctrl: 0x11, control: 0x11, alt: 0x12, shift: 0x10, win: 0x5B, cmd: 0x5B, meta: 0x5B, super: 0x5B,
   enter: 0x0D, return: 0x0D, esc: 0x1B, escape: 0x1B, tab: 0x09, space: 0x20, backspace: 0x08,
@@ -39,12 +31,12 @@ const VK = {
 function vkFor(tok) {
   tok = String(tok).toLowerCase();
   if (VK[tok] != null) return VK[tok];
-  if (/^[a-z]$/.test(tok)) return tok.toUpperCase().charCodeAt(0); // A-Z = 0x41-0x5A
-  if (/^[0-9]$/.test(tok)) return tok.charCodeAt(0);               // 0-9 = 0x30-0x39
+  if (/^[a-z]$/.test(tok)) return tok.toUpperCase().charCodeAt(0);
+  if (/^[0-9]$/.test(tok)) return tok.charCodeAt(0);
   return null;
 }
 
-// Build the PowerShell that performs one action in THIS session, then prints the cursor position.
+
 function psFor(action) {
   const head = [
     "$ErrorActionPreference='Stop'",
@@ -68,21 +60,21 @@ function psFor(action) {
     else if (verb === 'rightclick') body.push('[HelmIn]::mouse_event(8,0,0,0,0);[HelmIn]::mouse_event(16,0,0,0,0)');
     else if (verb === 'doubleclick') body.push('[HelmIn]::mouse_event(2,0,0,0,0);[HelmIn]::mouse_event(4,0,0,0,0);Start-Sleep -Milliseconds 60;[HelmIn]::mouse_event(2,0,0,0,0);[HelmIn]::mouse_event(4,0,0,0,0)');
   } else if (verb === 'scroll') {
-    // amount: notches; positive = up/right, negative = down/left. Each notch = 120.
+
     const n = Math.round(Number(amount) || 0);
-    const data = n >= 0 ? n * 120 : (0x100000000 + n * 120); // signed wheel delta packed as uint
-    const flag = horizontal ? '0x01000' : '0x0800';          // MOUSEEVENTF_HWHEEL / MOUSEEVENTF_WHEEL
+    const data = n >= 0 ? n * 120 : (0x100000000 + n * 120);
+    const flag = horizontal ? '0x01000' : '0x0800';
     if (x != null && y != null) body.push(`[HelmIn]::SetCursorPos(${x | 0},${y | 0}); Start-Sleep -Milliseconds 30`);
     body.push(`[HelmIn]::mouse_event(${flag},0,0,${data},0)`);
   } else if (verb === 'drag') {
     const sx = x | 0, sy = y | 0, ex = x2 | 0, ey = y2 | 0, steps = 14;
     body.push(`[HelmIn]::SetCursorPos(${sx},${sy}); Start-Sleep -Milliseconds 50`);
-    body.push('[HelmIn]::mouse_event(2,0,0,0,0); Start-Sleep -Milliseconds 60'); // left down
+    body.push('[HelmIn]::mouse_event(2,0,0,0,0); Start-Sleep -Milliseconds 60');
     for (let i = 1; i <= steps; i++) {
       const ix = Math.round(sx + (ex - sx) * i / steps), iy = Math.round(sy + (ey - sy) * i / steps);
       body.push(`[HelmIn]::SetCursorPos(${ix},${iy}); Start-Sleep -Milliseconds 12`);
     }
-    body.push('Start-Sleep -Milliseconds 40; [HelmIn]::mouse_event(4,0,0,0,0)');  // left up
+    body.push('Start-Sleep -Milliseconds 40; [HelmIn]::mouse_event(4,0,0,0,0)');
   } else if (verb === 'hotkey') {
     const vks = String(combo).split('+').map((s) => vkFor(s.trim()));
     if (!vks.length || vks.some((v) => v == null)) body.push(`Write-Error 'bad hotkey: ${String(combo).replace(/[^a-zA-Z0-9+ ]/g, '')}'`);
@@ -103,7 +95,7 @@ function psFor(action) {
   return [...head, ...body, ...tail].join('\n');
 }
 
-// Perform the action in THIS process's session (works only if interactive).
+
 export function doInput(action) {
   const b64 = Buffer.from(psFor(action), 'utf16le').toString('base64');
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', b64], { encoding: 'utf8', timeout: 15_000 });
@@ -113,22 +105,22 @@ export function doInput(action) {
   return { ok: true, cursor: m ? { x: +m[1], y: +m[2] } : null };
 }
 
-// Run the action via the HelmInput scheduled task so it executes in the interactive desktop session
-// (required when driven over SSH). Returns { ok, error?, cursor? }.
+
+
 export function winInput(action, { timeout = 20_000 } = {}) {
-  // Fast path: when we're already in an interactive desktop session (the normal local case — the bot
-  // started via the Startup launcher / `helm` / Start-Process in the logged-on session), inject input
-  // directly in-process. It's instant and reliable; the scheduled-task path below has high, variable
-  // latency and was timing out (~20s) for keyboard combos. Only fall back to HelmInput when the direct
-  // call genuinely fails (headless / SSH / Session 0, where it can't reach the desktop).
+
+
+
+
+
   try {
     const direct = doInput(action);
     if (direct && direct.ok) return direct;
   } catch {}
   try { writeFileSync(ACTION_FILE, JSON.stringify(action)); } catch (e) { return { ok: false, error: 'cannot write action file: ' + e.message }; }
   try { unlinkSync(DONE_FILE); } catch {}
-  // Launch node HIDDEN (no console window) so input never flashes a terminal or steals focus from the
-  // window we're typing into. A hidden PowerShell starts node with -WindowStyle Hidden and waits.
+
+
   const ps1 = path.join(os.tmpdir(), 'helm-input-run.ps1');
   const esc = s => s.replace(/'/g, "''");
   try { writeFileSync(ps1, `Start-Process -WindowStyle Hidden -Wait -FilePath '${esc(process.execPath)}' -ArgumentList '"${esc(__filename)}" --task-run'`); }
@@ -173,7 +165,7 @@ export function resolveAnchor(at, b, inset = 1) {
   return map[String(at).toLowerCase().replace(/\s+/g, '-')] || null;
 }
 
-// --task-run: executed by the HelmInput scheduled task inside the interactive session.
+
 if (process.argv.includes('--task-run')) {
   let action = {};
   try { action = JSON.parse(readFileSync(ACTION_FILE, 'utf8')); } catch {}

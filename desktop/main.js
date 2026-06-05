@@ -30,7 +30,7 @@ function createWindow() {
   win.on('close', (e) => { if (!quitting && process.platform === 'darwin') { e.preventDefault(); win.hide(); } });
 }
 
-// ---------------- brain bridge (persistent) ----------------
+
 function toRenderer(ch, data) { if (win && !win.isDestroyed()) win.webContents.send(ch, data); }
 
 function connectBrain() {
@@ -68,7 +68,7 @@ ipcMain.handle('pick-files', async () => {
   } catch { return []; }
 });
 
-// ---------------- tray + global hotkey + menu ----------------
+
 const TRAY_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAt0lEQVR4nGNgGAWjYBSMglEwCkbBKBgFo2AUjIJRMApGwSgYBaNgFIyCUTAKRsEoGAWjYBSMglEwCkbBKBgFo2AUjIJRMApGwSgYBaNgFIyCUTAKRsEoGAWjYBSMglEwCkbBKBgFo2AUjIJRMApGwSgYBaNgFIyCUTAKRsEoGAWjYBSMglEwCkbBKBgFo2AUjIJRMApGwSgYBaNgFIyCUTAKRsEoGAWjYBSMglEwCkbBKBgFo2AUjIJRMAoAr1wD/dT8r6sAAAAASUVORK5CYII=';
 function createTray() {
   try {

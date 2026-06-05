@@ -1,24 +1,12 @@
 #!/usr/bin/env node
-// Helm audio tool — all verbs in one file.
-//
-// Verbs:
-//   voices                                                    -> installed SAPI voices
-//   say   --text "<...>" [--out <wav>] [--voice <substr>] [--rate N]  -> TTS to WAV
-//   info  --path <audio>                                      -> ffprobe metadata
-//   convert --src <a> --out <b>                               -> ffmpeg format convert
-//   trim  --src <a> --out <b> --start <sec> --dur <sec>       -> ffmpeg trim
-//   transcribe --path <audio>                                 -> whisper (if present)
-//
-// Prints ONE JSON object to stdout; exits 0.
-
 import { spawnSync } from 'node:child_process';
 import { existsSync }  from 'node:fs';
 import os   from 'node:os';
 import path from 'node:path';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+
+
+
 
 const args = process.argv.slice(2);
 const verb = args[0];
@@ -27,7 +15,7 @@ const get  = (k) => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i
 function out(obj) { console.log(JSON.stringify(obj)); process.exit(0); }
 function fail(msg) { console.log(JSON.stringify({ ok: false, error: msg })); process.exit(0); }
 
-// Run a PowerShell script via -EncodedCommand (avoids all quoting issues).
+
 function runPs(script, timeoutMs = 30_000) {
   const b64 = Buffer.from(script, 'utf16le').toString('base64');
   return spawnSync('powershell.exe',
@@ -35,24 +23,24 @@ function runPs(script, timeoutMs = 30_000) {
     { encoding: 'utf8', timeout: timeoutMs });
 }
 
-// Find the first line of stdout that looks like JSON.
+
 function parseJsonLine(stdout) {
   const line = (stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('{') || l.startsWith('['));
   if (!line) return null;
   try { return JSON.parse(line); } catch { return null; }
 }
 
-// Locate ffmpeg / ffprobe: try PATH first, then the known WinGet install.
+
 const WINGET_BIN =
   'C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\' +
   'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin';
 
 function findBin(name) {
-  // Try PATH
+
   const r = spawnSync(process.platform === 'win32' ? 'where' : 'which',
     [name], { encoding: 'utf8', timeout: 5_000 });
   if (r.status === 0 && r.stdout.trim()) return r.stdout.trim().split(/\r?\n/)[0].trim();
-  // Fallback: WinGet install
+
   const fallback = path.join(WINGET_BIN, name + (process.platform === 'win32' ? '.exe' : ''));
   if (existsSync(fallback)) return fallback;
   return null;
@@ -61,9 +49,9 @@ function findBin(name) {
 const FFMPEG  = findBin('ffmpeg');
 const FFPROBE = findBin('ffprobe');
 
-// ---------------------------------------------------------------------------
-// Verb: voices
-// ---------------------------------------------------------------------------
+
+
+
 if (verb === 'voices') {
   const script = `
 $ProgressPreference = 'SilentlyContinue'
@@ -105,8 +93,8 @@ if (verb === 'say') {
 
   if (isNaN(rate) || rate < -10 || rate > 10) fail('--rate must be an integer -10..10');
 
-  // Escape the text and paths for PowerShell here-string usage.
-  // We embed them as PS variables set before the script body so no inner escaping is needed.
+
+
   const safeWav  = wavOut.replace(/'/g, "''");
   const safeText = text.replace(/'/g, "''");
   const safeVoice = voice.replace(/'/g, "''");

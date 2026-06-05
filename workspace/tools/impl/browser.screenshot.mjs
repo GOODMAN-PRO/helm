@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Screenshot the current browser page viewport.
-// playwright is imported lazily inside runBrowser — safe to import without launching a browser.
-
 import { fileURLToPath } from 'node:url';
 
 async function main() {

@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Web tool — fetch a URL or search the web via DuckDuckGo (no API key).
-// web.fetch: curl-based, fast.
-// web.search: tries DDG HTML endpoint first; falls back to Playwright if bot-detection fires.
-// Usage: web.mjs fetch  --url <url>
-//        web.mjs search --query <q> [--limit 10]
-
 import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +14,7 @@ const get     = k => { const i = rawArgs.indexOf(`--${k}`); return i !== -1 ? ra
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 function curlGet(url) {
-  // Bare 'curl' (not /usr/bin/curl): Windows 10+ ships curl.exe and POSIX has curl on PATH — cross-platform.
+
   const r = spawnSync('curl', [
     '-sL', '--max-time', '20', '--max-filesize', '5000000',
     '-A', UA, '--compressed',
@@ -45,22 +39,22 @@ function stripHtml(html) {
     .trim();
 }
 
-// Decode a DDG redirect URL to the real destination URL.
+
 function decodeDDGUrl(href) {
   const m = href.match(/uddg=([^&]+)/);
   if (m) { try { return decodeURIComponent(m[1]); } catch {} }
   return href;
 }
 
-// Parse DDG HTML search results (works when bot-detection is not active).
-// Each organic result is in <div class="result ... web-result ..."> blocks.
+
+
 function parseDDG(html) {
   const results = [];
-  // Split on web-result divs (skip ads which have "result--ad")
+
   const blocks = html.split('<div class="result results_links');
   for (const block of blocks.slice(1)) {
     if (block.includes('result--ad')) continue;
-    // Extract title from result__a
+
     const titleM = /class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
     if (!titleM) continue;
     const url   = decodeDDGUrl(titleM[1]);
@@ -89,14 +83,14 @@ async function playwrightSearch(query, limit) {
     await page.goto(`https://duckduckgo.com/?q=${encodeURIComponent(query)}&ia=web`, {
       waitUntil: 'domcontentloaded', timeout: 30_000,
     });
-    // Wait for result containers (DDG uses data-testid or li.result)
+
     await page.waitForSelector('[data-testid="result"], li.result', { timeout: 15_000 }).catch(() => {});
 
     const results = await page.evaluate((max) => {
-      // Modern DDG: data-testid="result"
+
       let items = Array.from(document.querySelectorAll('[data-testid="result"]'));
       if (!items.length) {
-        // Older DDG: li.result
+
         items = Array.from(document.querySelectorAll('li.result'));
       }
       return items.slice(0, max).map(item => {
@@ -149,7 +143,7 @@ if (verb === 'fetch') {
     results = parseDDG(html).slice(0, limit);
     source  = 'ddg-html';
   } catch {
-    // Attempt 2: Playwright navigating real DDG (JS rendered, bypasses bot detection)
+
     try {
       results = (await playwrightSearch(query, limit)).slice(0, limit);
       source  = 'playwright-ddg';

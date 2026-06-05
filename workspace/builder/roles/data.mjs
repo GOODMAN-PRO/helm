@@ -1,13 +1,6 @@
-// data.mjs — data-layer roles: database-architect + database-engineer.
-// database-architect designs the schema (pure design artifact, no code).
-// database-engineer implements it end-to-end: Prisma schema, migration, singleton client, seed.
-//
-// Default stack: Next.js App Router + Prisma ORM (SQLite dev).
-// If ctx.stack.notes describes a different ORM or DB, engineer adapts accordingly.
-
 import { fileURLToPath } from 'node:url';
 
-// ── role definitions ──────────────────────────────────────────────────────────
+
 
 export const roles = [
   {
@@ -277,22 +270,22 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(['opus','sonnet','haiku'].includes(role.model),             `${role.id}: model is valid`);
   }
 
-  // 3. correct ids
+
   assert(roles[0].id === 'database-architect', 'first role id is database-architect');
   assert(roles[1].id === 'database-engineer',  'second role id is database-engineer');
 
-  // 4. phase + deps spot-check
+
   assert(roles[0].phase === 'architecture',                            'architect phase is architecture');
   assert(roles[0].deps.includes('solutions-architect'),               'architect deps includes solutions-architect');
   assert(roles[1].phase === 'data',                                    'engineer phase is data');
   assert(roles[1].deps.includes('project-scaffolder'),                'engineer deps includes project-scaffolder');
   assert(roles[1].deps.includes('database-architect'),                'engineer deps includes database-architect');
 
-  // 5. produces
+
   assert(roles[0].produces.includes('schema-design'),                 'architect produces schema-design');
   assert(roles[1].produces.length === 0,                              'engineer produces [] (writes files directly)');
 
-  // 6. task(fakeCtx) returns a non-empty string, references stack notes + brief
+
   const fakeCtx = {
     brief: 'a task management SaaS',
     stack: { summary: 'Next.js+Prisma', notes: 'Prisma SQLite' },
@@ -306,7 +299,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(out.includes('Prisma SQLite'),              `${role.id}: task output references stack notes`);
   }
 
-  // 7. task with missing stack fields doesn't throw
+
   const minimalCtx = { brief: 'x', stack: {}, artifactsDigest: () => '' };
   for (const role of roles) {
     let threw = false;

@@ -1,23 +1,4 @@
 #!/usr/bin/env node
-// Helm secrets vault — share sensitive info with Helm WITHOUT putting it in chat or git.
-//
-// Secrets are encrypted at rest (AES-256-GCM). The master key lives in the macOS Keychain, or on
-// Windows a DPAPI-encrypted key file (Linux: a 0600 key file) — never in the repo. The owner adds
-// secrets locally via stdin (never as a CLI arg, so they
-// don't leak into shell history or the process list). Helm reads them with `get` when it needs
-// a credential — the plaintext never touches Discord/iMessage logs or git.
-//
-// Usage:
-//   node secrets.mjs init                 # one-time: create+store the master key in Keychain
-//   node secrets.mjs set <NAME>           # reads the value from STDIN, encrypts, stores
-//   echo -n "sk-..." | node secrets.mjs set OPENAI_KEY
-//   node secrets.mjs get <NAME>           # prints the plaintext (use sparingly)
-//   node secrets.mjs list                 # names only, never values
-//   node secrets.mjs rm <NAME>
-//
-// Key resolution: env HELM_VAULT_KEY (64 hex chars) overrides Keychain (used by tests).
-// Vault file: env HELM_VAULT_FILE overrides the default workspace/secrets/vault.json.
-
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, unlinkSync } from 'node:fs';
@@ -34,8 +15,8 @@ const IS_WIN = process.platform === 'win32';
 const die = m => { console.error(m); process.exit(1); };
 const out = o => console.log(JSON.stringify(o, null, 2));
 
-// Windows DPAPI: encrypt/decrypt bound to the current Windows user — the key never sits in plaintext
-// at rest (the CurrentUser scope ties it to this account, like the Keychain does on macOS).
+
+
 const CS_VAULT = `
 Add-Type -TypeDefinition @'
 using System;
@@ -107,7 +88,7 @@ function ps(script) {
 const dpapiProtect   = hex => ps(`Add-Type -AssemblyName System.Security; [Convert]::ToBase64String([Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes('${hex}'),$null,'CurrentUser'))`);
 const dpapiUnprotect = b64 => ps(`Add-Type -AssemblyName System.Security; [Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String('${b64}'),$null,'CurrentUser'))`);
 
-// Master-key store, per platform. macOS -> Keychain. Windows -> Windows Credential Manager. Linux -> 0600 file.
+
 function keychainGet() {
   if (IS_MAC) {
     const r = spawnSync('/usr/bin/security', ['find-generic-password', '-a', KC_ACCOUNT, '-s', KC_SERVICE, '-w'], { encoding: 'utf8' });
@@ -141,7 +122,7 @@ function keychainGet() {
 }
 function keychainSet(hex) {
   if (IS_MAC) {
-    // -U updates if it already exists
+
     const r = spawnSync('/usr/bin/security', ['add-generic-password', '-a', KC_ACCOUNT, '-s', KC_SERVICE, '-w', hex, '-U'], { encoding: 'utf8' });
     if (r.status !== 0) die('keychain write failed: ' + (r.stderr || '').trim());
     return;

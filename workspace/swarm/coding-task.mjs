@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Two-phase localize+repair for targeted code changes.
-//
-// Phase 1 (localize): ask Claude which file and lines contain the relevant code -> {file, startLine}
-// Phase 2 (repair): feed that excerpt to Claude, get <<<OLD/===/>>>NEW patch, apply via apply-edit.
-//
-// Exports: codingTask(description, cwd, model) -> { applied, diffs, errors, location, rawPatch }
-// CLI: echo "<task description>" | node coding-task.mjs [--cwd <path>] [--model <model>]
-
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +37,7 @@ function runClaude(cwd, model, prompt) {
 }
 
 export async function codingTask(description, cwd, model = 'sonnet') {
-  // Phase 1: localize — identify which file and line range contain the relevant code
+
   const localizePrompt = [
     'You are a code localization agent. Your only job is to identify the source file and approximate line range for the task below.',
     '',
@@ -112,7 +104,7 @@ export async function codingTask(description, cwd, model = 'sonnet') {
   return { ...editResult, location, rawPatch: repairResult.result };
 }
 
-// CLI entry point
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   const cwdIdx = argv.indexOf('--cwd');

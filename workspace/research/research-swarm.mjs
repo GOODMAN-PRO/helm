@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Helm RESEARCH swarm. N agents research a topic each (web search/fetch) and write a report;
-// then a synthesis pass fuses every report into HELM-UPGRADE-PLAN.md.
-// Read-only to the repo (writes only under workspace/research/) — safe to run unattended.
-//
-// usage: node workspace/research/research-swarm.mjs [--workers 5] [--model sonnet]
-
 import { spawn, spawnSync } from 'node:child_process';
 import { resolveClaude } from '../lib/engine.mjs';
 import { readFileSync, appendFileSync, mkdirSync, readdirSync } from 'node:fs';
@@ -12,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/research
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
 loadEnv({ path: path.join(ROOT, '.env'), override: true });
 const CLAUDE = process.env.CLAUDE_BIN || 'claude';

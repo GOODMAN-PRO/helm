@@ -1,13 +1,9 @@
-// reference-standard.mjs — shared award-grade quality bar injected into every builder agent prompt.
-// Pure ESM, no dependencies, no I/O, never throws.
-// Self-test: node motion/reference-standard.mjs
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// AWARD_STANDARD — the quality bar every frontend/design agent must meet.
-// Directive text; usable verbatim as prompt context.
-// ---------------------------------------------------------------------------
+
+
+
+
 
 export const AWARD_STANDARD = `
 You are building to the standard of apple.com, Awwwards Site of the Day, Stripe, and Linear —
@@ -58,9 +54,9 @@ commented-out blocks. If data is not yet available, show a polished empty state 
 div. Ship only what is complete.
 `.trim();
 
-// ---------------------------------------------------------------------------
-// POLISH_CHECKLIST — fine → exceptional details every agent must verify.
-// ---------------------------------------------------------------------------
+
+
+
 
 export const POLISH_CHECKLIST = `
 - Spacing rhythm: all gaps, padding, and margins derive from a 4px base grid; no arbitrary px values.
@@ -80,21 +76,21 @@ export const POLISH_CHECKLIST = `
 - Link and button copy: action-oriented, specific ("View case study" not "Click here"); no generic labels.
 `.trim();
 
-// ---------------------------------------------------------------------------
-// standardFor — returns AWARD_STANDARD for a given interface kind.
-// Kind is reserved for future variants ('app', 'email', etc.); always returns
-// the string, never throws.
-// ---------------------------------------------------------------------------
+
+
+
+
+
 
 export function standardFor(kind = 'web') {
-  // kind is reserved — all variants use the same standard for now.
+
   void kind;
   return AWARD_STANDARD;
 }
 
-// ---------------------------------------------------------------------------
-// Self-test (only runs when executed directly)
-// ---------------------------------------------------------------------------
+
+
+
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let pass = true;

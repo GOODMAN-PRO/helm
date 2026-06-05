@@ -1,14 +1,8 @@
-// responsive-motion-engineer.mjs — makes animations correct + delightful on every device
-// and fully accessible under prefers-reduced-motion.
-// Phase: quality. Depends on feature-engineer finishing first.
-// CONTRACT: §1 Role schema, §2 BuildContext, §8 Award-grade web standard.
-// Self-contained: no imports from other builder modules.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// Role definition
-// ---------------------------------------------------------------------------
+
+
+
 
 export const roles = [
   {
@@ -308,9 +302,9 @@ Write the report AFTER applying all file edits. Do not stub any section.`;
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Self-test (never spawns claude; mocks all collaborators)
-// ---------------------------------------------------------------------------
+
+
+
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const VALID_PHASES = new Set([
@@ -339,17 +333,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('\n=== responsive-motion-engineer.mjs self-test ===\n');
 
-  // Export shape
+
   assert('exports an array',  Array.isArray(roles));
   assert('exactly 1 role',    roles.length === 1);
 
   const role = roles[0];
 
-  // Required keys
+
   const REQUIRED = ['id', 'title', 'phase', 'deps', 'model', 'produces', 'system', 'task'];
   for (const key of REQUIRED) assert(`role has key: ${key}`, key in role);
 
-  // Exact contract values
+
   assert('id correct',           role.id === 'responsive-motion-engineer');
   assert('title correct',        role.title === 'Responsive & Reduced-Motion Engineer');
   assert('phase is quality',     role.phase === 'quality');
@@ -363,7 +357,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('system is substantial', role.system.length >= 200);
   assert('task is function',     typeof role.task === 'function');
 
-  // task(fakeCtx) returns a non-empty string and references stack notes
+
   let taskResult;
   try {
     taskResult = role.task(fakeCtx);

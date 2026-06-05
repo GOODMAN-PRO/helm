@@ -1,66 +1,8 @@
-// reverse-app-deep.mjs — the DEEP layer for the `reverse app` command.
-//
-// The base `analyzeApp` in reverse.mjs is shallow: Info.plist dump, `otool -L`, entitlements. This module
-// goes the rest of the way — it explains WHAT an application actually IS and HOW it works internally, by
-// cracking open the things that carry the real answer:
-//
-//   - Electron app.asar (parsed in PURE JS, no `asar` npm dep) — package.json, the full dependency tree,
-//     the main-process entry file's startup behavior, and detected subsystems (auto-update, telemetry,
-//     plugin host, embedded server, native addons). This is THE payload for Obsidian / VS Code / Claude /
-//     Slack and every other Electron desktop app.
-//   - Architectures (lipo / file): arm64 / x86_64, universal or not.
-//   - Embedded frameworks with their versions (Electron Framework 30.x, Sparkle, Squirrel, …).
-//   - Helper apps & background services (Electron GPU/Renderer/Plugin helpers, XPCServices, LoginItems).
-//   - The auto-update feed (Sparkle SUFeedURL / electron-updater) — where the app phones home for updates.
-//   - Code signing (Authority / TeamIdentifier / Identifier / hardened runtime).
-//   - A capabilities summary from Info.plist (category, URL schemes, document types, background modes, and
-//     every NS*UsageDescription privacy string — i.e. what the app is allowed to touch).
-//
-// Windows PE (.exe/.dll) and Linux ELF get pure-JS header parsing: machine/subsystem, imported DLLs /
-// NEEDED libraries, interpreter, version info, and runtime inference (.NET, Electron, Qt, Go, Rust).
-//
-// ETHICS: this reads files that already sit on the owner's disk and explains them. It defeats nothing.
-// Use only on apps you own or are authorized to analyze.
-//
-// SOLE EXPORT:  async function appDeepDive(appPath, platform = process.platform) -> { lines, findings }
-//   `lines`    — Markdown lines to APPEND to the report (one array element per line).
-//   `findings` — structured object the caller's synthesis reads. KEYS (all optional; absent on failure):
-//       platform          string   — the platform branch taken ('darwin' | 'win32' | 'linux').
-//       kind              string   — 'electron' | 'native-macos' | 'pe' | 'elf' | 'unknown'.
-//       app               object   — { name, productName, version, description, author, homepage,
-//                                       license, main } pulled from the Electron package.json.
-//       electron          object   — Electron-specific detail:
-//                                       { asarPath, hasUnpacked, mainEntry, fileCount, jsFileCount,
-//                                         totalBytes, topLevel:[...], dependencies:{name:ver},
-//                                         devDependencies:{name:ver}, depCount, mainRequires:[...],
-//                                         mainSignals:[...], electronVersion }
-//       subsystems        string[] — human-readable detected subsystems (auto-update, telemetry, plugin
-//                                     host, local server, native addons, …).
-//       architectures     string[] — CPU archs in the main executable (e.g. ['arm64','x86_64']).
-//       universal         boolean  — true if >1 arch (a universal/fat binary).
-//       frameworks        object[] — [{ name, version }] embedded *.framework bundles.
-//       helpers           string[] — helper *.app / XPCService / LoginItem names under Contents.
-//       updateFeed        object   — { type:'sparkle'|'electron-updater', url, publicEDKey? } if found.
-//       signing           object   — { signed, identifier, authority:[...], teamId, hardenedRuntime,
-//                                       flags } from codesign.
-//       capabilities      object   — { category, minOS, urlSchemes:[...], documentTypes:[...],
-//                                       backgroundModes:[...], privacyStrings:{ key: description } }.
-//       executable        string   — path to the analyzed main executable.
-//       pe / elf          object   — Windows/Linux header detail (machine, subsystem, imports/needed,
-//                                     interpreter, version info, runtime).
-//       errors            string[] — non-fatal problems encountered (each stage failure is recorded here).
-//
-// This function NEVER throws. On total failure it returns { lines: [], findings: {} }. Partial output is
-// the normal, expected case — every stage is independently guarded.
-
 import { spawnSync } from 'node:child_process';
 import { openSync, readSync, closeSync, existsSync, readdirSync, statSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// ---- local self-contained helpers (mirrors reverse.mjs conventions; reimplemented to stay independent) ----
-
-// Run a system tool, never throw. Mirrors reverse.mjs `run`.
 function run(cmd, args, opts = {}) {
   try {
     const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024, ...opts });
@@ -87,28 +29,20 @@ const fmtBytes = n => {
   return `${(n / 1024 ** 3).toFixed(2)} GB`;
 };
 
-// =====================================================================================================
-// ASAR PARSER (pure JS — no `asar` npm dependency)
-// Format: [4-byte pickle len-of-len][4-byte header-size][4-byte L][L bytes JSON header][...file data...]
-// We read ONLY the small header via ranged reads, never the whole archive (asar can be tens of MB).
-// =====================================================================================================
-
-// Open an asar and return { header, dataStart, fd } — caller MUST closeSync(fd). Throws on bad magic;
-// every caller wraps this in try/catch.
 function openAsar(asarPath) {
   const fd = openSync(asarPath, 'r');
   try {
-    // First pickle: 8 bytes. bytes[0..3] = size of the size field (always 4); bytes[4..7] = header object size.
+
     const sizeBuf = Buffer.alloc(8);
     readSync(fd, sizeBuf, 0, 8, 0);
-    const size = sizeBuf.readUInt32LE(4);               // total bytes of the header pickle that follows
+    const size = sizeBuf.readUInt32LE(4);
     if (!size || size > 256 * 1024 * 1024) throw new Error(`implausible asar header size ${size}`);
     const headerBuf = Buffer.alloc(size);
     readSync(fd, headerBuf, 0, size, 8);
-    const L = headerBuf.readUInt32LE(4);                // length of the JSON string inside the pickle
+    const L = headerBuf.readUInt32LE(4);
     const json = headerBuf.toString('utf8', 8, 8 + L);
     const header = JSON.parse(json);
-    const dataStart = 8 + size;                         // file payloads begin right after the header pickle
+    const dataStart = 8 + size;
     return { header, dataStart, fd };
   } catch (e) {
     closeSync(fd);
@@ -116,7 +50,6 @@ function openAsar(asarPath) {
   }
 }
 
-// Walk header.files down a POSIX-style path ('package.json', 'main.js', 'a/b/c'). Returns the node or null.
 function asarNode(header, relPath) {
   const parts = relPath.split('/').filter(Boolean);
   let node = header;
@@ -127,19 +60,17 @@ function asarNode(header, relPath) {
   return node;
 }
 
-// Read a single file out of an open asar by relative path. Returns a Buffer or null. `cap` bounds the read.
 function asarReadFile(asar, relPath, cap = 4 * 1024 * 1024) {
   const node = asarNode(asar.header, relPath);
-  if (!node || node.files) return null;                 // missing, or it's a directory
+  if (!node || node.files) return null;
   const size = Math.min(Number(node.size) || 0, cap);
   if (size <= 0) return Buffer.alloc(0);
-  const off = asar.dataStart + Number(node.offset);     // offset is a decimal STRING in the header
+  const off = asar.dataStart + Number(node.offset);
   const buf = Buffer.alloc(size);
   readSync(asar.fd, buf, 0, size, off);
   return buf;
 }
 
-// Tally the archive: top-level entries, total JS files, and total uncompressed byte size (recursive).
 function asarStats(header) {
   const topLevel = header.files ? Object.keys(header.files) : [];
   let fileCount = 0, jsFileCount = 0, totalBytes = 0;
@@ -158,11 +89,6 @@ function asarStats(header) {
   return { topLevel, fileCount, jsFileCount, totalBytes };
 }
 
-// =====================================================================================================
-// SIGNAL DETECTION — map dependency names + main-entry source to human-readable subsystems.
-// =====================================================================================================
-
-// Known dependency-name → subsystem fingerprints. First match per group wins for the headline list.
 const DEP_SIGNALS = [
   { re: /^electron-updater$|^electron-builder$/i,                 label: 'Auto-update (electron-updater)' },
   { re: /^update-electron-app$/i,                                 label: 'Auto-update (update-electron-app)' },
@@ -186,7 +112,6 @@ const DEP_SIGNALS = [
   { re: /^node-machine-id$/i,                                     label: 'Device fingerprinting (machine-id)' },
 ];
 
-// Source-level fingerprints applied to the main-process entry file.
 const SOURCE_SIGNALS = [
   { re: /\bautoUpdater\b|electron-updater|checkForUpdates/,       label: 'Auto-update wired in main process' },
   { re: /\bBrowserWindow\b/,                                      label: 'Creates BrowserWindow(s)' },
@@ -201,7 +126,6 @@ const SOURCE_SIGNALS = [
   { re: /\.node['"]\)/,                                           label: 'Loads a native addon (.node)' },
 ];
 
-// Pull the require()/import specifiers a JS file loads at startup (best-effort regex, deduped).
 function extractRequires(src) {
   const out = new Set();
   const re = /(?:require\(\s*|import\s+[^'"]*?from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
@@ -251,7 +175,6 @@ function analyzeElectron(asarPath, findings, lines, errors) {
       if (ev) electron.electronVersion = ev;
     }
 
-    // ---- main entry: what it loads + what it does at startup ----
     const mainRel = (electron.mainEntry || 'main.js').replace(/^\.\//, '');
     const mainBuf = asarReadFile(asar, mainRel) || asarReadFile(asar, 'main.js') || asarReadFile(asar, 'index.js');
     if (mainBuf) {
@@ -260,12 +183,6 @@ function analyzeElectron(asarPath, findings, lines, errors) {
       electron.mainSignals = SOURCE_SIGNALS.filter(s => s.re.test(src)).map(s => s.label);
     }
 
-    // ---- bundle library scan ----
-    // Production Electron apps bundle their editor / Markdown / DB / search code into a minified app.js
-    // rather than listing them as npm deps, so dependency names alone miss what the app is built from
-    // (and a gap analysis based only on deps would be wrong). Scan the largest JS files for distinctive
-    // library signatures. Emits canonical tokens (codemirror, markdown, sqlite, yjs, …) that the
-    // domain-analysis layer recognizes. Capped reads keep this fast even on multi-MB bundles.
     try {
       const jsFiles = [];
       (function walk(node, prefix) {
@@ -302,7 +219,7 @@ function analyzeElectron(asarPath, findings, lines, errors) {
       for (const jf of jsFiles.slice(0, 3)) {
         const buf = asarReadFile(asar, jf.path, 8 * 1024 * 1024);
         if (!buf) continue;
-        const txt = buf.toString('latin1');   // latin1 is fast and preserves ASCII signature bytes
+        const txt = buf.toString('latin1');
         for (const s of SCAN) if (!found.has(s.tok) && s.re.test(txt)) found.add(s.tok);
       }
       electron.bundleSignals = [...found];
@@ -310,24 +227,22 @@ function analyzeElectron(asarPath, findings, lines, errors) {
   } catch (e) {
     errors.push(`electron analysis: ${e.message}`);
   } finally {
-    try { closeSync(asar.fd); } catch { /* already closed */ }
+    try { closeSync(asar.fd); } catch {  }
   }
 
   findings.kind = 'electron';
   findings.electron = electron;
 
-  // ---- subsystem detection from deps + source ----
   const subsystems = new Set();
   const allDeps = { ...(electron.dependencies || {}), ...(electron.devDependencies || {}) };
   for (const depName of Object.keys(allDeps)) {
     for (const sig of DEP_SIGNALS) { if (sig.re.test(depName)) { subsystems.add(sig.label); break; } }
   }
   for (const label of (electron.mainSignals || [])) subsystems.add(label);
-  // native addon presence from the file listing
-  if ((electron.topLevel || []).some(n => /node_modules|\.node$/.test(n))) { /* deep .node detected later via unpacked */ }
+
+  if ((electron.topLevel || []).some(n => /node_modules|\.node$/.test(n))) {  }
   findings.subsystems = [...subsystems];
 
-  // ---- render Markdown ----
   const app = findings.app || {};
   lines.push('## Application Internals (Electron)', '');
   lines.push('This is an **Electron** desktop application — a Chromium browser + a Node.js runtime bundled together, with the app\'s own code shipped inside an `app.asar` archive. The archive was parsed directly to recover what the app is built from.', '');
@@ -481,7 +396,7 @@ function analyzeHelpers(appPath, findings, lines, errors) {
   const contents = path.join(appPath, 'Contents');
   const helpers = [];
   try {
-    // Electron helper apps live under Contents/Frameworks; XPC and login items have their own dirs.
+
     const scanDirs = [
       ['Frameworks', /\.app$/],
       ['XPCServices', /\.xpc$/],
@@ -706,7 +621,7 @@ function analyzePE(filePath, findings, lines, errors) {
     fd = openSync(filePath, 'r');
     const head = Buffer.alloc(0x400);
     const n = readSync(fd, head, 0, head.length, 0);
-    if (n < 64 || head.readUInt16LE(0) !== 0x5a4d) { errors.push('not a PE (no MZ)'); return; } // 'MZ'
+    if (n < 64 || head.readUInt16LE(0) !== 0x5a4d) { errors.push('not a PE (no MZ)'); return; }
     const peOff = head.readUInt32LE(0x3c);
     const sig = Buffer.alloc(4); readSync(fd, sig, 0, 4, peOff);
     if (sig.toString('ascii', 0, 2) !== 'PE') { errors.push('not a PE (no PE\\0\\0)'); return; }
@@ -719,10 +634,10 @@ function analyzePE(filePath, findings, lines, errors) {
 
     const opt = Buffer.alloc(Math.min(optSize, 240)); readSync(fd, opt, 0, opt.length, peOff + 24);
     const magic = opt.readUInt16LE(0);
-    const isPE32Plus = magic === 0x20b;                  // PE32+ = 64-bit
+    const isPE32Plus = magic === 0x20b;
     const subsystem = opt.readUInt16LE(68);
     const dllChars = opt.readUInt16LE(70);
-    // Data directory 14 = CLR header → .NET. Offset differs between PE32 and PE32+.
+
     const ddBase = isPE32Plus ? 112 : 96;
     let isDotNet = false;
     if (opt.length >= ddBase + 15 * 8) {
@@ -730,7 +645,6 @@ function analyzePE(filePath, findings, lines, errors) {
       isDotNet = clrRva !== 0;
     }
 
-    // Section table follows the optional header.
     const secOff = peOff + 24 + optSize;
     const secBuf = Buffer.alloc(Math.min(numSections, 32) * 40);
     readSync(fd, secBuf, 0, secBuf.length, secOff);
@@ -759,7 +673,7 @@ function analyzePE(filePath, findings, lines, errors) {
       const sibs = readdirSync(dir);
       if (sibs.some(s => /\.pak$/.test(s)) || sibs.includes('resources') || sibs.some(s => /chrome_\w+\.pak/.test(s))) runtime.push('Electron / Chromium');
       if (sibs.some(s => /^Qt\w*\.dll$/i.test(s))) runtime.push('Qt');
-    } catch { /* dir unreadable */ }
+    } catch {  }
     if (!runtime.length) runtime.push(pe.dotnet ? '.NET' : 'native Win32');
     pe.runtime = runtime;
     findings.pe = pe;

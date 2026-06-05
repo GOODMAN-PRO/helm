@@ -1,9 +1,3 @@
-// testing.mjs — Test Engineer role for the Helm full-stack builder.
-// Adds a real, runnable test suite to the generated project: unit tests for core logic/services
-// and Zod schemas, component tests for key UI, integration tests for API routes, and at least
-// one Playwright e2e covering the primary happy-path user flow. Configures Vitest + Testing
-// Library + Playwright and ensures `<pm> run test` actually passes.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -213,7 +207,7 @@ integration tests, what the e2e flow covers, and the final pass/fail count from 
   },
 ];
 
-// Self-test — only runs when executed directly: node roles/testing.mjs
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let passed = 0;
   let failed = 0;
@@ -230,7 +224,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('--- testing.mjs self-test ---');
 
-  // Shape assertions
+
   assert('roles is an array', Array.isArray(roles));
   assert('roles has exactly one entry', roles.length === 1);
 
@@ -246,7 +240,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('system is a non-empty string', typeof role.system === 'string' && role.system.length > 0);
   assert('task is a function', typeof role.task === 'function');
 
-  // task(ctx) — mock ctx matching the shape required by the contract
+
   const fakeCtx = {
     brief: 'x',
     stack: {

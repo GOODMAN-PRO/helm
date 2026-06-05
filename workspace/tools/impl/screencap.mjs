@@ -6,11 +6,11 @@ import { captureScreen, defaultShotPath, safeRoots } from './capture-screen.mjs'
 const args = process.argv.slice(2);
 const outIdx = args.indexOf('--out');
 const requested = (outIdx !== -1 && args[outIdx + 1]) ? args[outIdx + 1] : defaultShotPath();
-// --direct: raw capture only (no scheduled-task fallback). Used by the HelmShot task to avoid recursion.
+
 const direct = args.includes('--direct');
 
-// Guard: --out must resolve under one of the allowlisted roots. Prevents the agent
-// (or a crafted scheduler payload) from clobbering arbitrary files via this tool.
+
+
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE  = path.resolve(__dirname, '../..');
 const SAFE_ROOTS = safeRoots(WORKSPACE);

@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Helm scheduler daemon. Ticks every 30s, fires due jobs by spawning claude -p.
-// Keeps jobs.db at workspace/scheduler/jobs.db.
-// Launched by launchd com.helm.scheduler; safe to run manually.
-
 import { DatabaseSync } from 'node:sqlite';
 import { spawn, spawnSync } from 'node:child_process';
 import { resolveClaude } from '../lib/engine.mjs';
@@ -13,8 +9,8 @@ import os     from 'node:os';
 import { config as loadEnv } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT      = path.resolve(__dirname, '../..'); // secondme/
-const WORKSPACE = path.resolve(__dirname, '..');    // secondme/workspace/
+const ROOT      = path.resolve(__dirname, '../..');
+const WORKSPACE = path.resolve(__dirname, '..');
 
 loadEnv({ path: path.join(ROOT, '.env'), override: true });
 
@@ -27,7 +23,7 @@ const {
 const DB_PATH  = path.join(__dirname, 'jobs.db');
 const PUSH_BIN = path.join(ROOT, 'bin', 'helm-push.mjs');
 
-// Ensure db exists (idempotent init inline so the daemon is self-bootstrapping).
+
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
   CREATE TABLE IF NOT EXISTS jobs (
@@ -41,8 +37,8 @@ db.exec(`
     created  INTEGER NOT NULL DEFAULT (unixepoch())
   );
 `);
-// Idempotent: notify column added if missing.
-try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch { /* already present */ }
+
+try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch {  }
 
 function pushOwner(text) {
   try {
@@ -64,7 +60,7 @@ const stmtDue = db.prepare(
 const stmtUpdate = db.prepare(
   `UPDATE jobs SET last_run = unixepoch(), next_run = ? WHERE id = ?`
 );
-// Bug fix 3: rescheduling a new job that didn't match this tick must NOT touch last_run.
+
 const stmtSchedule = db.prepare(
   `UPDATE jobs SET next_run = ? WHERE id = ?`
 );
@@ -72,11 +68,11 @@ const stmtDisable = db.prepare(
   `UPDATE jobs SET enabled = 0, next_run = NULL WHERE id = ?`
 );
 
-// Bug fix 1: track in-flight job IDs to prevent concurrent execution of the same job.
+
 const running = new Set();
 
 function fireJob(job) {
-  running.add(job.id); // Bug fix 1: mark in-flight before async work begins
+  running.add(job.id);
   const slug = job.name.replace(/[^a-z0-9]+/gi, '-').slice(0, 40);
   const runDir = makeRunDir(slug);
 
@@ -92,7 +88,7 @@ function fireJob(job) {
     '--permission-mode', PERMISSION_MODE,
     '--append-system-prompt', persona,
     '--add-dir', WORKSPACE,
-    '--add-dir', os.homedir(), // full home access, on whatever OS this is
+    '--add-dir', os.homedir(),
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
   ];
 
@@ -124,7 +120,7 @@ function fireJob(job) {
 
   child.on('close', code => {
     clearTimeout(killTimer);
-    running.delete(job.id); // Bug fix 1: clear in-flight on completion
+    running.delete(job.id);
     appendLog(runDir, { event: 'close', code });
     let result = '(no output)';
     try {
@@ -143,7 +139,7 @@ function fireJob(job) {
 
   child.on('error', e => {
     clearTimeout(killTimer);
-    running.delete(job.id); // Bug fix 1: clear in-flight on error
+    running.delete(job.id);
     appendLog(runDir, { event: 'error', message: e.message });
     finaliseRun(runDir, `ERROR: ${e.message}`);
     log(`job "${job.name}" error: ${e.message}`);
@@ -157,7 +153,7 @@ function tick() {
 
   for (const job of due) {
     try {
-      // Bug fix 1: skip jobs that are already running to prevent overlap.
+
       if (running.has(job.id)) {
         log(`job "${job.name}" still in-flight — skipping this tick`);
         continue;
@@ -170,14 +166,14 @@ function tick() {
         continue;
       }
 
-      // Bug fix 2: a job is overdue when next_run was explicitly set (not NULL) and is now
-      // in the past — meaning the daemon was down when it should have fired. Fire it as a
-      // catch-up regardless of whether cronMatches the current minute.
+
+
+
       const isOverdue = job.next_run !== null;
 
       if (!cronMatches(job.cron, now) && !isOverdue) {
-        // New job (next_run IS NULL) that doesn't match this minute — schedule it.
-        // Bug fix 3: use stmtSchedule (next_run only) so last_run is not poisoned.
+
+
         stmtSchedule.run(Math.floor(next.getTime() / 1000), job.id);
         continue;
       }
@@ -196,9 +192,9 @@ function tick() {
 }
 
 log('scheduler started (tick every 30s)');
-tick(); // fire once on startup in case anything is overdue
+tick();
 setInterval(tick, 30_000);
 
-// Keep the process alive.
+
 process.on('SIGTERM', () => { log('SIGTERM — shutting down'); db.close(); process.exit(0); });
 process.on('SIGINT',  () => { log('SIGINT — shutting down');  db.close(); process.exit(0); });

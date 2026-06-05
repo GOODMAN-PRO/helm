@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Deep multi-source web research with citations.
-// Usage:
-//   node workspace/tools/impl/research.mjs --question "<...>" [--depth 1-3] [--out <md>]
-//
-// Pipeline:
-//   1. claude -p  → 3–5 focused search queries (JSON array)
-//   2. web.mjs search --query <q> --limit 5   (per query)
-//   3. web.mjs fetch --url <u>                 (top ~6 unique URLs)
-//   4. claude -p  → structured report with [n] inline citations + Sources list
-//
-// Output: JSON { ok, question, report, sources:[{n,title,url}], path }
-
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE = path.resolve(__dirname, '../..');
 const WEB_MJS   = path.join(__dirname, 'web.mjs');
 
-// ── arg parsing ────────────────────────────────────────────────────────────────
+
 const rawArgs = process.argv.slice(2);
 const get = k => { const i = rawArgs.indexOf(`--${k}`); return i !== -1 ? rawArgs[i + 1] : null; };
 
@@ -32,9 +20,9 @@ function die(msg) { console.log(JSON.stringify({ ok: false, error: msg })); proc
 
 if (!question) die('--question is required');
 
-// ── helpers ────────────────────────────────────────────────────────────────────
 
-/** Run claude CLI synchronously; returns trimmed stdout string or throws. */
+
+
 function runClaude(prompt) {
   const r = spawnSync(
     'C:\\Users\\User\\.local\\bin\\claude.exe',
@@ -60,7 +48,7 @@ function webSearch(query, limit) {
   } catch { return []; }
 }
 
-/** Run web.mjs fetch; returns stripped text capped to maxChars (or '' on failure). */
+
 function webFetch(url, maxChars = 4000) {
   const r = spawnSync(
     process.execPath,
@@ -81,7 +69,7 @@ function extractJsonArray(text) {
   return JSON.parse(m[0]);
 }
 
-/** Build a slug safe for a filename. */
+
 function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 }
@@ -110,7 +98,7 @@ try {
   die(`Step 1 (query generation) failed: ${e.message}`);
 }
 
-// ── step 2: search each query ─────────────────────────────────────────────────
+
 const resultsByQuery = [];
 const searchLimit = 5;
 
@@ -119,10 +107,10 @@ for (const q of queries) {
   resultsByQuery.push({ query: q, results });
 }
 
-// ── step 3: collect unique URLs and fetch page content ────────────────────────
-// De-duplicate by URL; keep insertion order (first-seen query wins).
+
+
 const seen  = new Set();
-const pool  = [];   // { title, url, snippet }
+const pool  = [];
 
 for (const { results } of resultsByQuery) {
   for (const r of results) {
@@ -205,7 +193,7 @@ try {
   die(`Could not save report to ${mdPath}: ${e.message}`);
 }
 
-// ── output ────────────────────────────────────────────────────────────────────
+
 console.log(JSON.stringify({
   ok: true,
   question,

@@ -1,7 +1,3 @@
-// webgl-3d-engineer.mjs — WebGL / 3D Engineer role: tasteful 3D/WebGL hero accents.
-// Phase: frontend. Depends on hero-showcase-engineer finishing first.
-// Actually edits project files; writes a brief note to .helm-build/artifacts/webgl-notes.md.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -216,8 +212,8 @@ be visible in the running dev server.`;
   },
 ];
 
-// ── self-test ─────────────────────────────────────────────────────────────────
-// Run: node workspace/builder/roles/webgl-3d-engineer.mjs
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const VALID_PHASES = new Set([
     'discovery','architecture','design','scaffold','data',
@@ -245,19 +241,19 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('\n=== webgl-3d-engineer.mjs self-test ===\n');
 
-  // Shape
+
   assert('exports an array',  Array.isArray(roles));
   assert('exactly 1 role',    roles.length === 1);
 
   const role = roles[0];
 
-  // Required keys
+
   const REQUIRED = ['id', 'title', 'phase', 'deps', 'model', 'produces', 'system', 'task'];
   for (const key of REQUIRED) {
     assert(`has key: ${key}`, key in role);
   }
 
-  // Exact spec values
+
   assert('id is webgl-3d-engineer',              role.id === 'webgl-3d-engineer');
   assert('title is WebGL / 3D Engineer',         role.title === 'WebGL / 3D Engineer');
   assert('phase is frontend',                    role.phase === 'frontend');
@@ -269,7 +265,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('system is a non-empty string',         typeof role.system === 'string' && role.system.length > 50);
   assert('task is a function',                   typeof role.task === 'function');
 
-  // task(fakeCtx) — non-empty string that references ctx.brief
+
   let taskOutput;
   try {
     taskOutput = role.task(fakeCtx);

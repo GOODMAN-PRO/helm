@@ -1,15 +1,11 @@
-// verify.mjs — verifies a generated project installs, type-checks, lints, builds, and tests.
-// Only uses: node:fs, node:path, node:child_process, node:os, node:url.
-// Never throws — all errors are caught and returned as structured step results.
-
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-// Truncate combined output to last ~N chars — keeps the most relevant tail (errors) without
-// blowing up the result object with megabytes of install logs.
+
+
 const TAIL_CHARS = 3000;
 function tail(s) {
   if (!s) return '';
@@ -17,8 +13,8 @@ function tail(s) {
   return '…[truncated]\n' + s.slice(-TAIL_CHARS);
 }
 
-// Detect package manager from lockfiles present in projectDir.
-// Priority: pnpm > yarn > bun > npm (npm has no lockfile requirement).
+
+
 function detectPm(projectDir) {
   if (existsSync(join(projectDir, 'pnpm-lock.yaml'))) return 'pnpm';
   if (existsSync(join(projectDir, 'yarn.lock')))      return 'yarn';
@@ -26,7 +22,7 @@ function detectPm(projectDir) {
   return 'npm';
 }
 
-// Read and parse package.json — returns {} on any error (defensive).
+
 function readPkg(projectDir) {
   try {
     return JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
@@ -35,8 +31,8 @@ function readPkg(projectDir) {
   }
 }
 
-// Run a single verification step via spawnSync. Returns a step result object.
-// shell:true is needed on macOS/Linux so npx and script aliases resolve correctly.
+
+
 function runStep(name, cmd, args, projectDir, timeoutMs) {
   const start = Date.now();
   let result;
@@ -45,13 +41,13 @@ function runStep(name, cmd, args, projectDir, timeoutMs) {
       cwd: projectDir,
       shell: true,
       timeout: timeoutMs,
-      maxBuffer: 20 * 1024 * 1024,   // 20 MB — large installs can be chatty
+      maxBuffer: 20 * 1024 * 1024,
       encoding: 'utf8',
-      // combine stderr into stdout so the tail contains both
+
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
-    // spawnSync itself can throw (e.g. ENOMEM) — capture as failed step
+
     return {
       name,
       ok: false,
@@ -79,7 +75,7 @@ function runStep(name, cmd, args, projectDir, timeoutMs) {
  * @returns {{ ok, steps, summary, pm }}
  */
 export async function verifyProject(projectDir, opts = {}) {
-  // Guard: no package.json → bail early with a clear signal
+
   if (!existsSync(join(projectDir, 'package.json'))) {
     return { ok: false, steps: [], summary: 'no project (package.json missing)', pm: null };
   }
@@ -95,18 +91,18 @@ export async function verifyProject(projectDir, opts = {}) {
 
   const steps = [];
 
-  // ── 1. Install ──────────────────────────────────────────────────────────────
-  // Always run — ensures the project is in a known installed state before any
-  // subsequent step. bun/pnpm/yarn/npm all support a bare `install` subcommand.
+
+
+
   try {
     steps.push(runStep('install', pm, ['install'], projectDir, 300_000));
   } catch (err) {
     steps.push({ name: 'install', ok: false, output: String(err), durationMs: 0 });
   }
 
-  // ── 2. Typecheck ─────────────────────────────────────────────────────────────
-  // Prefer a "typecheck" script; fall back to `npx tsc --noEmit` if tsconfig.json
-  // exists. Skip entirely if there's no TypeScript config and no script.
+
+
+
   const hasTsConfig = existsSync(join(projectDir, 'tsconfig.json'));
   if (scripts['typecheck']) {
     try {
@@ -122,8 +118,8 @@ export async function verifyProject(projectDir, opts = {}) {
     }
   }
 
-  // ── 3. Lint ──────────────────────────────────────────────────────────────────
-  // Only if the project declares a lint script.
+
+
   if (scripts['lint']) {
     try {
       steps.push(runStep('lint', pm, ['run', 'lint'], projectDir, 120_000));
@@ -132,8 +128,8 @@ export async function verifyProject(projectDir, opts = {}) {
     }
   }
 
-  // ── 4. Build ─────────────────────────────────────────────────────────────────
-  // Only if the project declares a build script. Build is the primary success signal.
+
+
   if (scripts['build']) {
     try {
       steps.push(runStep('build', pm, ['run', 'build'], projectDir, 300_000));
@@ -142,8 +138,8 @@ export async function verifyProject(projectDir, opts = {}) {
     }
   }
 
-  // ── 5. Test ───────────────────────────────────────────────────────────────────
-  // Prefer a "test" script; fall back to `npx vitest run` if vitest is a dep.
+
+
   const hasVitest = 'vitest' in deps;
   if (scripts['test']) {
     try {
@@ -159,9 +155,9 @@ export async function verifyProject(projectDir, opts = {}) {
     }
   }
 
-  // ── Overall ok ───────────────────────────────────────────────────────────────
-  // ok = build passed (if it ran) AND typecheck passed (if it ran).
-  // If neither ran, ok = all steps passed (install-only scenario).
+
+
+
   const buildStep     = steps.find(s => s.name === 'build');
   const typecheckStep = steps.find(s => s.name === 'typecheck');
 
@@ -169,7 +165,7 @@ export async function verifyProject(projectDir, opts = {}) {
   if (buildStep) {
     ok = buildStep.ok && (typecheckStep ? typecheckStep.ok : true);
   } else {
-    // No build script — ok only if every step that ran passed.
+
     ok = steps.every(s => s.ok);
   }
 
@@ -181,10 +177,10 @@ export async function verifyProject(projectDir, opts = {}) {
   return { ok, steps, summary, pm };
 }
 
-// ── Self-test ─────────────────────────────────────────────────────────────────
-// Runs when executed directly: `node verify.mjs`
-// Creates a minimal temp project with a trivial passing build script, verifies it,
-// then verifies a non-existent dir returns the no-project shape. Cleans up on exit.
+
+
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let tmpDir;
   let allPassed = true;
@@ -199,7 +195,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   try {
-    // ── Test A: non-existent directory ──────────────────────────────────────
+
     console.log('\n[A] verifyProject on non-existent dir');
     const noProject = await verifyProject('/nonexistent-helm-verify-test-dir-xyz');
     assert(noProject.ok === false,    'ok is false');
@@ -207,18 +203,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(noProject.steps.length === 0, 'steps is empty');
     assert(/no project/.test(noProject.summary), 'summary contains "no project"');
 
-    // ── Test B: minimal passing project ─────────────────────────────────────
+
     console.log('\n[B] verifyProject on minimal temp project');
     tmpDir = join(tmpdir(), `helm-verify-test-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
 
-    // Minimal package.json: only a build script that exits 0.
+
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({
       name: 'helm-verify-test',
       version: '0.0.1',
       private: true,
       scripts: {
-        // shell-level no-op; works on macOS, Linux, and Windows (node is always present)
+
         build: 'node -e "process.exit(0)"',
       },
     }, null, 2));
@@ -241,14 +237,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(buildStep != null,         'build step present (script declared)');
     assert(buildStep.ok === true,     'build step ok');
 
-    // No typecheck script and no tsconfig.json → no typecheck step
+
     const typecheckStep = result.steps.find(s => s.name === 'typecheck');
     assert(typecheckStep == null,     'no typecheck step (no tsconfig)');
 
-    // ok = build passed (no typecheck) → true
+
     assert(result.ok === true,        'overall ok is true');
 
-    // ── Test C: failing build ────────────────────────────────────────────────
+
     console.log('\n[C] verifyProject on project with failing build');
     const tmpDir2 = join(tmpdir(), `helm-verify-test-fail-${Date.now()}`);
     mkdirSync(tmpDir2, { recursive: true });

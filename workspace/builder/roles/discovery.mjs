@@ -1,14 +1,10 @@
 #!/usr/bin/env node
-// discovery.mjs — three roles that turn a raw app idea into a crisp, buildable spec.
-// Phase: discovery (PM + RA) and architecture (SA).
-// Each role's system prompt and task demand production-quality, zero-fluff output.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
-  // ──────────────────────────────────────────────────────────────────────────
-  // 1. Product Manager — discovery
-  // ──────────────────────────────────────────────────────────────────────────
+
+
+
   {
     id:       'product-manager',
     title:    'Product Manager',
@@ -87,9 +83,9 @@ no placeholders. A developer reading this PRD should know exactly what to build.
     },
   },
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 2. Requirements Analyst — discovery
-  // ──────────────────────────────────────────────────────────────────────────
+
+
+
   {
     id:       'requirements-analyst',
     title:    'Requirements Analyst',
@@ -185,9 +181,9 @@ and testers most often find missing at review time.`;
     },
   },
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 3. Solutions Architect — architecture
-  // ──────────────────────────────────────────────────────────────────────────
+
+
+
   {
     id:       'solutions-architect',
     title:    'Solutions Architect',
@@ -309,8 +305,8 @@ to any project. Align every decision with the PRD's features and the requirement
   },
 ];
 
-// ── self-test ─────────────────────────────────────────────────────────────────
-// Run: node workspace/builder/roles/discovery.mjs
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const VALID_PHASES = new Set([
     'discovery','architecture','design','scaffold','data',
@@ -338,14 +334,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('\n=== discovery.mjs self-test ===\n');
 
-  // Basic shape
+
   assert('exports an array',              Array.isArray(roles));
   assert('exactly 3 roles',              roles.length === 3);
 
   for (const role of roles) {
     const tag = role.id ?? '(unknown)';
 
-    // Required string fields
+
     assert(`${tag}: id is a non-empty string`,     typeof role.id === 'string' && role.id.length > 0);
     assert(`${tag}: title is a non-empty string`,  typeof role.title === 'string' && role.title.length > 0);
     assert(`${tag}: phase is valid`,               VALID_PHASES.has(role.phase));
@@ -354,23 +350,23 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     assert(`${tag}: produces is a non-empty array`,Array.isArray(role.produces) && role.produces.length > 0);
     assert(`${tag}: system is a non-empty string`, typeof role.system === 'string' && role.system.length > 0);
 
-    // task() must be a function that returns a non-empty string
+
     assert(`${tag}: task is a function`,           typeof role.task === 'function');
     const taskOutput = role.task(fakeCtx);
     assert(`${tag}: task(fakeCtx) returns a string`, typeof taskOutput === 'string');
     assert(`${tag}: task(fakeCtx) is non-empty`,   taskOutput.length > 0);
   }
 
-  // Specific ids match spec
+
   const ids = roles.map(r => r.id);
   assert('role ids are correct', JSON.stringify(ids) === JSON.stringify(['product-manager','requirements-analyst','solutions-architect']));
 
-  // Dep chain sanity
+
   assert('product-manager has no deps',          roles[0].deps.length === 0);
   assert('requirements-analyst deps on PM',      roles[1].deps.includes('product-manager'));
   assert('solutions-architect deps on PM + RA',  roles[2].deps.includes('product-manager') && roles[2].deps.includes('requirements-analyst'));
 
-  // Phase assignments
+
   assert('product-manager phase is discovery',       roles[0].phase === 'discovery');
   assert('requirements-analyst phase is discovery',  roles[1].phase === 'discovery');
   assert('solutions-architect phase is architecture',roles[2].phase === 'architecture');

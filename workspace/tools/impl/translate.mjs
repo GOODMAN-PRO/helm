@@ -1,30 +1,22 @@
 #!/usr/bin/env node
-// High-quality translation via the claude engine.
-// Usage:
-//   translate.mjs --text "<...>" --to <language> [--from <language>] [--formal true|false]
-//   translate.mjs --file <path>  --to <language> [--from <language>] [--formal true|false] [--out <path>]
-//
-// Output: { ok, translated, from, to, chars }
-// Always exits 0; errors surface as { ok: false, error: "..." }.
-
 import { spawnSync }   from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-// ── arg parsing ────────────────────────────────────────────────────────────────
+
 const args = process.argv.slice(2);
 const get  = (k) => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 
 const textArg  = get('text');
 const filePath = get('file');
 const toLang   = get('to');
-const fromLang = get('from');       // optional; claude auto-detects if absent
-const formalRaw= get('formal');     // "true" | "false" | null
-const outPath  = get('out');        // optional output file
+const fromLang = get('from');
+const formalRaw= get('formal');
+const outPath  = get('out');
 
 const out = (o) => { console.log(JSON.stringify(o)); process.exit(0); };
 const fail = (m) => out({ ok: false, error: m });
 
-// ── validate ───────────────────────────────────────────────────────────────────
+
 if (!toLang) fail('--to <language> is required');
 
 let sourceText = '';
@@ -32,7 +24,7 @@ let sourceText = '';
 if (filePath) {
   let raw;
   try { raw = readFileSync(filePath, 'utf8'); } catch (e) { fail(`cannot read file: ${e.message}`); }
-  // Cap at ~12 000 chars to stay within a reasonable prompt window.
+
   sourceText = raw.slice(0, 12_000);
 } else if (textArg) {
   sourceText = textArg;
@@ -42,7 +34,7 @@ if (filePath) {
 
 if (!sourceText.trim()) fail('source text is empty');
 
-// ── build prompt ───────────────────────────────────────────────────────────────
+
 const formalTag = formalRaw === 'true'
   ? 'Use a formal register (professional, polite, no contractions).'
   : formalRaw === 'false'
@@ -72,7 +64,7 @@ const prompt = [
   sourceText,
 ].filter(l => l !== null).join('\n');
 
-// ── run claude ────────────────────────────────────────────────────────────────
+
 let raw;
 try {
   const r = spawnSync('claude', ['-p', prompt], { encoding: 'utf8', timeout: 120_000 });
@@ -84,8 +76,8 @@ try {
 
 if (!raw) fail('claude returned empty output');
 
-// ── parse output ──────────────────────────────────────────────────────────────
-// Split on the last occurrence of "SOURCE_LANG:" so multi-line translations work.
+
+
 const sourceLangMarker = 'SOURCE_LANG:';
 const markerIdx = raw.lastIndexOf(sourceLangMarker);
 
@@ -93,20 +85,20 @@ let translated;
 let detectedFrom;
 
 if (markerIdx !== -1) {
-  // Everything before the marker line is the translation; strip trailing newline.
+
   const translationPart = raw.slice(0, markerIdx).trimEnd();
   const langPart        = raw.slice(markerIdx + sourceLangMarker.length).trim().split('\n')[0].trim();
 
   translated   = translationPart;
   detectedFrom = langPart || (fromLang || 'unknown');
 } else {
-  // Marker absent (defensive): treat entire output as translation.
+
   translated   = raw;
   detectedFrom = fromLang || 'unknown';
 }
 
-// Safety: if claude still prepended "Here is the translation:" style text, strip it.
-// Heuristic: if translated starts with a colon-terminated phrase on its own line, drop that line.
+
+
 const firstLine = translated.split('\n')[0];
 if (/^(here is|voici|aquí está|ecco|hier ist|これは|이것은)/i.test(firstLine)) {
   translated = translated.split('\n').slice(1).join('\n').trimStart();
@@ -116,12 +108,12 @@ translated = translated.trim();
 
 if (!translated) fail('translation result was empty after parsing');
 
-// ── optional file output ──────────────────────────────────────────────────────
+
 if (outPath) {
   try { writeFileSync(outPath, translated, 'utf8'); } catch (e) { fail(`cannot write --out file: ${e.message}`); }
 }
 
-// ── emit result ───────────────────────────────────────────────────────────────
+
 out({
   ok:         true,
   translated,

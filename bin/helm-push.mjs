@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// helm-push — DM the owner via Discord REST using the bot token in .env.
-//   helm-push "message text"            -> sends a text DM
-//   helm-push -f /abs/path "caption"    -> sends a file attachment with optional caption
-// Exits non-zero on failure. Safe to call from launchd / cron.
-
 import { readFileSync, statSync, createReadStream } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

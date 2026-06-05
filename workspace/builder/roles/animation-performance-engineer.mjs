@@ -1,8 +1,3 @@
-// animation-performance-engineer.mjs — Animation Performance Engineer role:
-// keep rich scroll/3D animations at 60fps with great Core Web Vitals.
-// Phase: quality. Depends on feature-engineer finishing first.
-// Measures, fixes, code-splits, and verifies — no stubs.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -212,8 +207,8 @@ Stack notes for reference: ${ctx.stack?.notes ?? ''}`;
   },
 ];
 
-// ── self-test ─────────────────────────────────────────────────────────────────
-// Run: node workspace/builder/roles/animation-performance-engineer.mjs
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const VALID_PHASES = new Set([
     'discovery', 'architecture', 'design', 'scaffold', 'data',

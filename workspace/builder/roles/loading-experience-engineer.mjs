@@ -1,5 +1,3 @@
-// loading-experience-engineer.mjs — Loading & Reveal Engineer role: premium preloader,
-// choreographed hero reveal, route-level skeletons, no-flash theme, reduced-motion respect.
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -164,7 +162,7 @@ After writing all files, save a concise artifact:
   },
 ];
 
-// Self-test — run only when this file is executed directly.
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let passed = true;
 
@@ -177,7 +175,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const [role] = roles;
 
-  // Role shape
+
   check('roles is a non-empty array', Array.isArray(roles) && roles.length === 1);
   check('id is loading-experience-engineer', role.id === 'loading-experience-engineer');
   check('title is Loading & Reveal Engineer', role.title === 'Loading & Reveal Engineer');
@@ -188,13 +186,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   check('system is a rich string (>200 chars)', typeof role.system === 'string' && role.system.length > 200);
   check('task is a function', typeof role.task === 'function');
 
-  // Key system content checks
+
   check('system mentions sessionStorage', role.system.includes('sessionStorage'));
   check('system mentions prefers-reduced-motion', role.system.includes('prefers-reduced-motion'));
   check('system mentions no-flash', role.system.toLowerCase().includes('no-flash') || role.system.includes('no flash'));
   check('system mentions skeleton', role.system.toLowerCase().includes('skeleton'));
 
-  // task(fakeCtx) returns a non-empty string
+
   const fakeCtx = {
     brief: 'x',
     stack: { summary: 'Next.js', notes: 'App Router, loading.tsx' },

@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// workspace/tools/impl/computer.mjs
-// Unified "computer use" facade for Helm's Windows control stack.
-//
-// Usage:
-//   node computer.mjs <action> [--json '{...}']
-//
-// Actions: screenshot, size, move, click, double, right, type, key, hotkey,
-//          scroll, drag, find_element, find_text, click_element, click_text,
-//          wait, do
-//
-// Always prints exactly one JSON object to stdout.
-
 import { spawnSync }               from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { tmpdir }                  from 'node:os';
@@ -20,14 +8,14 @@ import { fileURLToPath }           from 'node:url';
 import { doInput, screenBounds, resolveAnchor } from './win-input.mjs';
 import { captureScreen, defaultShotPath }        from './capture-screen.mjs';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+
+
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 
-/** Parse --json arg from process.argv and return the object (or {}). */
+
 function parseJsonArg(argv) {
   const i = argv.indexOf('--json');
   if (i === -1) return {};
@@ -36,8 +24,7 @@ function parseJsonArg(argv) {
   try { return JSON.parse(raw); } catch (e) { die('bad --json: ' + e.message); }
 }
 
-/** Collect --key value flags (the dispatcher convention) into an object, coercing numbers/bools.
- *  Lets `computer.mjs <action> --name OK --role Button` work the same as `--json '{...}'`. */
+
 function parseFlags(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
@@ -85,7 +72,7 @@ function resolveXY(p, requireCoords = false) {
       if (!p2) die(`unknown anchor "${at}" — use top-left|top-right|bottom-left|bottom-right|center|top|bottom|left|right`);
       return { x: p2[0], y: p2[1] };
     }
-    // percentage
+
     return {
       x: b.left + Math.round((b.width - 1) * Number(xpct) / 100),
       y: b.top  + Math.round((b.height - 1) * Number(ypct) / 100),
@@ -96,10 +83,10 @@ function resolveXY(p, requireCoords = false) {
   return { x: undefined, y: undefined };
 }
 
-// ---------------------------------------------------------------------------
-// Spawn a sibling tool (uia.mjs / ocr.mjs) and return parsed stdout.
-// Returns {ok, ...} — never throws.
-// ---------------------------------------------------------------------------
+
+
+
+
 function spawnSibling(relPath, extraArgs) {
   const abs = join(__dirname, relPath);
   if (!existsSync(abs)) {
@@ -126,10 +113,10 @@ function claudioAvailable() {
   return r.status === 0;
 }
 
-// ---------------------------------------------------------------------------
-// Ask claude (vision) whether verify description is satisfied.
-// Returns {verified: bool} or throws.
-// ---------------------------------------------------------------------------
+
+
+
+
 function verifyWithClaude(description, imgPath) {
   const prompt =
     `Please use your Read tool to read the image at the path below. ` +
@@ -192,11 +179,11 @@ async function actionClick(p) {
   const verb = button === 'double' ? 'doubleclick' : button === 'right' ? 'rightclick' : 'click';
 
   const action = { verb, x, y };
-  // If no coords, omit move (click at current cursor)
+
   if (x == null || y == null) {
-    // We still need an x/y for the powershell verb; read current position if needed.
-    // Simplest: just pass 0,0 without the move prefix — instead we just call click
-    // at whatever coords are provided. If truly missing, error.
+
+
+
     die('click requires x and y (or at/xpct+ypct)');
   }
   const r = doInput(action);
@@ -267,14 +254,14 @@ async function actionFindElement(p) {
   if (p.role)  extra.push('--role',  String(p.role));
   if (p.title) extra.push('--title', String(p.title));
   const result = spawnSibling('uia.mjs', ['find', '--name', String(p.name), ...extra]);
-  // result already contains {ok, found, element} — print as-is.
+
   console.log(JSON.stringify(result));
 }
 
 async function actionFindText(p) {
   if (p.text == null) die('find_text requires text');
   const result = spawnSibling('ocr.mjs', ['find', '--text', String(p.text)]);
-  // result already contains {ok, found, best, ...} — print as-is.
+
   console.log(JSON.stringify(result));
 }
 
@@ -333,8 +320,8 @@ async function actionDo(p) {
   const maxTries = Math.max(1, Number(retries));
 
   for (let attempt = 1; attempt <= maxTries; attempt++) {
-    // Run the sub-action by recursively calling ourselves via spawnSync
-    // (keeps the logic DRY and ensures the sub-action goes through the same parsing/validation).
+
+
     const subPayload = JSON.stringify(subArgs);
     const r = spawnSync(
       process.execPath,
@@ -358,7 +345,7 @@ async function actionDo(p) {
       return;
     }
 
-    // Screenshot and verify
+
     const imgPath = join(tmpdir(), `helm-computer-do-${process.pid}-${attempt}.png`);
     const shot = captureScreen(imgPath);
     if (!shot.ok) {
@@ -383,7 +370,7 @@ async function actionDo(p) {
     lastResult = { attempt, explanation: vr.explanation };
   }
 
-  // Exhausted retries
+
   ok({
     action,
     verified: false,
@@ -392,9 +379,9 @@ async function actionDo(p) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Main dispatch
-// ---------------------------------------------------------------------------
+
+
+
 
 const ACTIONS = {
   screenshot:    actionScreenshot,

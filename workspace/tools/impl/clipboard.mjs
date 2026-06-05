@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Read or write the system clipboard (text). Useful for pasting long text reliably (set, then
-// gui.hotkey ctrl+v) and for reading what the owner copied.
-//   clipboard.mjs get            -> { text }
-//   clipboard.mjs set --text ".."-> writes text to the clipboard
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);

@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Tool: mic.record [--seconds N]
-// Records a WAV clip from the default mic. Returns path or install note.
-
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,13 +1,8 @@
-// motion-designer.mjs — defines the motion-designer role.
-// Slot: roles/motion-designer.mjs → consumed by the roles aggregator (roles.mjs).
-// CONTRACT: §1 Role schema, §2 BuildContext, §8 Award-grade web standard.
-// Self-contained: no imports from other builder modules.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// System prompt — senior motion designer persona
-// ---------------------------------------------------------------------------
+
+
+
 
 const MOTION_DESIGNER_SYSTEM = `\
 You are a senior motion designer who has shipped motion systems for products at the level of
@@ -44,9 +39,9 @@ Your beliefs:
 You produce a motion-system.md that is the single source of truth for all animation in the project.
 No engineer should ever guess an easing curve or duration — every decision is in your spec.`;
 
-// ---------------------------------------------------------------------------
-// Role definition
-// ---------------------------------------------------------------------------
+
+
+
 
 export const roles = [
   {
@@ -60,8 +55,8 @@ export const roles = [
     system: MOTION_DESIGNER_SYSTEM,
 
     task(ctx) {
-      // Pull in creative-direction and design-system artifacts so the motion system
-      // references the same palette, type scale, and brand personality.
+
+
       const digest = ctx.artifactsDigest();
       const stackNote = ctx.stack?.notes ?? ctx.stack?.summary ?? '(stack not yet resolved)';
 
@@ -226,20 +221,20 @@ because it does.`;
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Self-test (never spawns claude; mocks all collaborators)
-// ---------------------------------------------------------------------------
+
+
+
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let pass = true;
   const fail = (msg) => { console.error(`FAIL: ${msg}`); pass = false; };
 
-  // 1. Export shape
+
   if (!Array.isArray(roles) || roles.length !== 1) {
     fail(`expected 1 role, got ${Array.isArray(roles) ? roles.length : typeof roles}`);
   }
 
-  // 2. Required keys present and typed correctly
+
   const REQUIRED_KEYS = ['id', 'title', 'phase', 'deps', 'model', 'produces', 'system', 'task'];
   const role = roles[0];
   for (const key of REQUIRED_KEYS) {
@@ -250,7 +245,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     fail('system prompt too short or not a string');
   }
 
-  // 3. Exact field values per spec
+
   if (role.id      !== 'motion-designer') fail(`id: expected 'motion-designer', got '${role.id}'`);
   if (role.title   !== 'Motion Designer') fail(`title: expected 'Motion Designer', got '${role.title}'`);
   if (role.phase   !== 'design')          fail(`phase: expected 'design', got '${role.phase}'`);
@@ -262,7 +257,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     fail(`produces must include 'motion-system'`);
   }
 
-  // 4. task(fakeCtx) returns a non-empty string and interpolates the brief
+
   const fakeCtx = {
     brief: 'x',
     stack: { summary: 'Next.js', notes: '' },

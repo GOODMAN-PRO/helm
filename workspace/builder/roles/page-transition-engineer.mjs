@@ -1,15 +1,8 @@
-// page-transition-engineer.mjs — Page Transition Engineer role for the Helm full-stack builder.
-// Implements premium route/page transitions: framer-motion template.tsx + AnimatePresence,
-// View Transitions API (with fallback), Lenis re-init on route change, scroll restoration,
-// and prefers-reduced-motion instant/cross-fade path.
-//
-// §1 of CONTRACT.md owns the role schema; §8 sets the award-grade motion bar.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// Role definition
-// ---------------------------------------------------------------------------
+
+
+
 
 export const roles = [
   {
@@ -20,8 +13,8 @@ export const roles = [
     model: 'sonnet',
     produces: [],
 
-    // Expert persona: deep knowledge of Next.js App Router constraints, framer-motion,
-    // View Transitions API, Lenis, and GSAP ScrollTrigger lifecycle across navigations.
+
+
     system: `You are an expert page-transition engineer with deep experience in Next.js App Router,
 framer-motion, the native View Transitions API, Lenis smooth-scroll, and GSAP ScrollTrigger.
 You have shipped many production sites where route transitions are seamless, fast, and feel
@@ -49,7 +42,7 @@ Core expertise:
   path renders an instant page swap or a 150ms cross-fade — never a full slide/wipe.
 - No stubs, no TODOs, no placeholder variants. Every transition is implemented and wired.`,
 
-    // task(ctx) builds the concrete instruction for this build from the project context.
+
     task(ctx) {
       const stackNotes  = ctx.stack?.notes ?? 'Next.js App Router, framer-motion, Lenis, GSAP';
       const brief       = ctx.brief ?? '';
@@ -154,7 +147,7 @@ Export a \`<SharedElement id={string}>\` wrapper component that:
 ### 7. Global transition CSS  →  \`src/styles/transitions.css\` (imported in root layout)
 Add CSS for:
 \`\`\`css
-/* View Transitions API root animation — overrides the UA default cross-fade */
+
 ::view-transition-old(root), ::view-transition-new(root) {
   animation-duration: 0.45s;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
@@ -171,7 +164,7 @@ Add CSS for:
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Reduced-motion: instant swap, no animation */
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
   ::view-transition-new(root) {
@@ -233,18 +226,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('page-transition-engineer.mjs — self-test\n');
 
-  // 1. Export shape
+
   assert('roles is an array',  Array.isArray(roles));
   assert('exactly one role',   roles.length === 1, `got ${roles.length}`);
 
   const role = roles[0];
 
-  // 2. Required keys
+
   for (const key of REQUIRED_KEYS) {
     assert(`role has key '${key}'`, key in role);
   }
 
-  // 3. Field values match the spec
+
   assert("id = 'page-transition-engineer'", role.id    === 'page-transition-engineer');
   assert("title = 'Page Transition Engineer'", role.title === 'Page Transition Engineer');
   assert("phase = 'frontend'",               role.phase === 'frontend');
@@ -258,7 +251,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('system is non-empty string',       typeof role.system === 'string' && role.system.trim().length > 0);
   assert('task is a function',               typeof role.task   === 'function');
 
-  // 4. task(fakeCtx) returns a non-empty string with key phrases
+
   const fakeCtx = {
     brief:           'x',
     stack:           { summary: 'Next.js', notes: 'App Router, template.tsx' },
@@ -279,7 +272,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('task references stack notes',
     typeof taskResult === 'string' && taskResult.includes('App Router, template.tsx'));
 
-  // 5. System prompt covers key domain signals
+
   const sys = role.system.toLowerCase();
   assert('system mentions template.tsx',         sys.includes('template.tsx'));
   assert('system mentions animatepresence',      sys.includes('animatepresence'));

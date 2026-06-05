@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// Helm memory consolidation.
-//
-// Run nightly. Does three things, all idempotent:
-//   1. Distil recent episodes into durable facts when the same topic recurs.
-//   2. Decay stale, low-confidence, never-repeated facts; prune sub-floor rows.
-//   3. Dedupe near-identical facts/preferences within the same kind+key, merging
-//      evidence counts and keeping the highest confidence.
-//
-// Flags:
-//   --dry-run        report changes without writing
-//   --since-days N   distillation window (default 30)
-//   --decay-days N   age in days before a fact starts decaying (default 30)
-//   --floor C        prune facts with confidence below this AND evidence_count<2 (default 0.05)
-//
-// Owner-safe by design: facts with source='CLAUDE.md' or evidence_count>=2 are never pruned.
-
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -41,7 +25,7 @@ const DECAY_DAYS = parseInt(flags['decay-days'] ?? 30, 10);
 const FLOOR      = parseFloat(flags.floor ?? 0.05);
 
 const db = new DatabaseSync(DB_PATH);
-// Ensure columns exist (consolidate may run before memory.mjs ever did).
+
 try { db.exec(`ALTER TABLE facts ADD COLUMN evidence_count INTEGER NOT NULL DEFAULT 1`); } catch {}
 try { db.exec(`ALTER TABLE facts ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0`); } catch {}
 db.exec(`UPDATE facts SET last_seen = COALESCE(NULLIF(last_seen, 0), updated)`);
@@ -52,25 +36,25 @@ db.exec(`UPDATE facts SET valid_from = COALESCE(NULLIF(valid_from, 0), created)`
 
 const stats = { distilled: 0, decayed: 0, pruned: 0, deduped: 0 };
 
-// --- 1. distil recurring episode topics into facts -----------------------------
-//
-// Heuristic: tokenise summaries from the last N days, count significant stems
-// (>=4 chars, non-stop), and promote any stem mentioned in >=3 distinct episodes
-// to a learned fact. The value is the episode count + most-recent example.
+
+
+
+
+
 const STOP = new Set(['the','and','that','this','with','from','have','will','for','was','were',
   'are','his','her','its','their','they','them','our','your','all','any','but','not','can','could',
   'would','should','about','when','where','what','which','also','been','been','some','only','just',
   'into','than','then','more','most','very','over','helm','owner','nice',
-  // Mechanism/log nouns that show up in episode summaries themselves and would otherwise
-  // dominate the distilled-fact list (e.g. "fact superseded", "think-tick: ...", "memory").
+
+
   'fact','facts','note','notes','mode','preference','preferences','tick','think','memory',
   'supersed','superseded','supersede','superseding','mention','mentioned','mentions',
   'episode','episodes','learned','update','updated','dump','index','smoke','workspace',
   'still','pend','pending','wir','wired','loader','project','projects','skill','skills']);
 const sinceTs = Math.floor(Date.now() / 1000) - SINCE_DAYS * 86400;
 const eps = db.prepare(`SELECT id, ts, summary FROM episodes WHERE ts >= ? ORDER BY ts ASC`).all(sinceTs);
-const stemCount = new Map();      // stem -> Set(episode ids)
-const stemExample = new Map();    // stem -> latest summary mentioning it
+const stemCount = new Map();
+const stemExample = new Map();
 for (const e of eps) {
   const summary = e.summary || '';
   // Skip mechanism-noise episodes (smoke artifacts, fact-supersede notices, think-tick

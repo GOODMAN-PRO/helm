@@ -1,8 +1,3 @@
-// creative-director.mjs — Creative Director role for the Helm full-stack builder.
-// Sets the big idea, art direction, emotional arc, and signature "wow" moments
-// that downstream design/animation engineers build toward.
-// Output: .helm-build/artifacts/creative-direction.md
-
 import { fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -52,7 +47,7 @@ Name specific GSAP techniques, Lenis behaviors, Framer Motion variants, Three.js
 creative direction document should eliminate ambiguity, not create it.`,
 
     task(ctx) {
-      // Pull all prior artifacts (UX flows, PRD, requirements) for full context.
+
       const priorArtifacts = ctx.artifactsDigest();
       const stackSummary = ctx.stack?.summary ?? 'Next.js';
       const stackNotes = ctx.stack?.notes ?? '';

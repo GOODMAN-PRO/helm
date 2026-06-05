@@ -1,18 +1,9 @@
 #!/usr/bin/env node
-// data.mjs — data analysis tool for Helm (CSV / JSON)
-// Verbs:
-//   summary  --path <file>
-//   query    --path <file> [--where "<col><op><val>"] [--select "c1,c2"] [--sort <col>] [--desc true] [--limit N]
-//   agg      --path <file> --group <col> --metric <col> --op sum|avg|count|min|max
-//   chart    --path <file> --x <col> --y <col> [--type bar|line|pie] [--out <png>]
-//
-// Always prints ONE JSON object; exits 0.
-
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// ── arg parsing ────────────────────────────────────────────────────────────────
+
 const rawArgs = process.argv.slice(2);
 const verb = rawArgs[0];
 
@@ -25,11 +16,11 @@ function getArg(name) {
 
 function die(msg, extra = {}) {
   console.log(JSON.stringify({ ok: false, error: msg, ...extra }));
-  process.exit(0); // always exit 0 per HARD RULES
+  process.exit(0);
 }
 
-// ── CSV parser ─────────────────────────────────────────────────────────────────
-// Handles quoted fields, commas inside quotes, newlines inside quotes, header row.
+
+
 function parseCsv(text) {
   const rows = [];
   let i = 0;
@@ -37,8 +28,8 @@ function parseCsv(text) {
 
   function parseField() {
     if (i < len && text[i] === '"') {
-      // quoted field
-      i++; // skip opening quote
+
+      i++;
       let field = '';
       while (i < len) {
         if (text[i] === '"') {
@@ -238,7 +229,7 @@ function applyWhere(records, filter) {
   });
 }
 
-// ── verb: summary ──────────────────────────────────────────────────────────────
+
 function runSummary() {
   const filePath = getArg('path');
   if (!filePath) die('summary requires --path');
@@ -259,19 +250,19 @@ function runSummary() {
   console.log(JSON.stringify({ ok: true, rows: records.length, columns }, null, 2));
 }
 
-// ── verb: query ────────────────────────────────────────────────────────────────
+
 function runQuery() {
   const filePath = getArg('path');
   if (!filePath) die('query requires --path');
 
   const { headers, records } = loadFile(filePath);
 
-  // WHERE
+
   const whereClause = getArg('where');
   const filter = parseWhere(whereClause);
   let rows = applyWhere(records, filter);
 
-  // SELECT
+
   const selectArg = getArg('select');
   let selectCols = null;
   if (selectArg) {
@@ -280,7 +271,7 @@ function runQuery() {
     if (missing.length > 0) die(`unknown columns in --select: ${missing.join(', ')}`);
   }
 
-  // SORT
+
   const sortCol = getArg('sort');
   if (sortCol) {
     if (!headers.includes(sortCol)) die(`unknown --sort column: ${sortCol}`);
@@ -294,7 +285,7 @@ function runQuery() {
     });
   }
 
-  // LIMIT
+
   const limitArg = getArg('limit');
   if (limitArg !== null) {
     const n = parseInt(limitArg, 10);
@@ -302,7 +293,7 @@ function runQuery() {
     rows = rows.slice(0, n);
   }
 
-  // Narrow columns
+
   if (selectCols) {
     rows = rows.map(r => {
       const out = {};
@@ -314,7 +305,7 @@ function runQuery() {
   console.log(JSON.stringify({ ok: true, count: rows.length, rows }, null, 2));
 }
 
-// ── verb: agg ──────────────────────────────────────────────────────────────────
+
 function runAgg() {
   const filePath = getArg('path');
   const groupCol  = getArg('group');
@@ -334,7 +325,7 @@ function runAgg() {
   if (!headers.includes(groupCol)) die(`unknown --group column: ${groupCol}`);
   if (metricCol && !headers.includes(metricCol)) die(`unknown --metric column: ${metricCol}`);
 
-  // Group records
+
   const groups = {};
   for (const rec of records) {
     const key = rec[groupCol] !== undefined ? String(rec[groupCol]).trim() : '(blank)';
@@ -359,13 +350,13 @@ function runAgg() {
     return { group, value: value !== null ? +value.toPrecision(10) : null };
   });
 
-  // Sort by group name for stable output
+
   result.sort((a, b) => String(a.group).localeCompare(String(b.group)));
 
   console.log(JSON.stringify({ ok: true, op, group: groupCol, metric: metricCol || '(count)', results: result }, null, 2));
 }
 
-// ── verb: chart ────────────────────────────────────────────────────────────────
+
 async function runChart() {
   const filePath  = getArg('path');
   const xCol      = getArg('x');
@@ -444,7 +435,7 @@ async function runChart() {
     };
   }
 
-  // Fetch PNG from QuickChart (free, no key)
+
   const configStr = JSON.stringify(chartConfig);
   const encoded   = encodeURIComponent(configStr);
   const url       = `https://quickchart.io/chart?width=800&height=400&c=${encoded}`;
@@ -479,7 +470,7 @@ async function runChart() {
   }, null, 2));
 }
 
-// ── dispatch ───────────────────────────────────────────────────────────────────
+
 if (!verb || verb.startsWith('--')) {
   die('usage: data.mjs <summary|query|agg|chart> [--flags...]');
 }

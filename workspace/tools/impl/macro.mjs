@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-// Macro record & replay for Helm's native Windows input system.
-// Usage:
-//   macro.mjs list
-//   macro.mjs show   --name <n>
-//   macro.mjs save   --name <n> --json '<steps>'
-//   macro.mjs record --name <n> [--seconds N=10] [--interval ms=80]
-//   macro.mjs replay --name <n> [--speed x=1]
-//
-// Steps are objects: {type:"move"|"click"|"type"|"key"|"hotkey"|"scroll"|"drag"|"wait", ...}
-// doInput() uses {verb,...} — we translate on replay.
-
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -19,19 +8,19 @@ import { doInput } from './win-input.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MACROS_DIR = path.resolve(__dirname, '../../macros');
 
-// Ensure the macros directory exists.
+
 try { mkdirSync(MACROS_DIR, { recursive: true }); } catch {}
 
-// Argument helpers (mirror window.mjs convention).
+
 const args = process.argv.slice(2);
 const verb = args[0];
 const get  = k => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 
-// Print exactly one JSON result and exit.
+
 function out(obj) { console.log(JSON.stringify(obj)); process.exit(obj.ok ? 0 : 1); }
 function fail(msg) { out({ ok: false, error: msg }); }
 
-// Run a PowerShell script via -EncodedCommand (avoids all quoting/escaping issues).
+
 function runPs(script, timeoutMs = 30_000) {
   const b64 = Buffer.from(script, 'utf16le').toString('base64');
   return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', b64], {
@@ -39,13 +28,13 @@ function runPs(script, timeoutMs = 30_000) {
   });
 }
 
-// Macro file path for a given name (sanitise to alphanumeric + hyphens/underscores).
+
 function macroPath(name) {
   const safe = String(name).replace(/[^a-zA-Z0-9_\-]/g, '_');
   return path.join(MACROS_DIR, `${safe}.json`);
 }
 
-// Valid step types and required fields.
+
 const STEP_TYPES = {
   move:    s => s.x != null && s.y != null,
   click:   s => s.x != null && s.y != null,
@@ -68,7 +57,7 @@ function validateSteps(steps) {
   return null;
 }
 
-// Translate a step {type,...} to a doInput action {verb,...}.
+
 function stepToAction(step, speed = 1) {
   switch (step.type) {
     case 'move':   return { verb: 'move',   x: step.x, y: step.y };
@@ -78,20 +67,20 @@ function stepToAction(step, speed = 1) {
     case 'hotkey': return { verb: 'hotkey', combo: step.combo };
     case 'scroll': return { verb: 'scroll', amount: step.amount, x: step.x, y: step.y };
     case 'drag':   return { verb: 'drag',   x: step.x, y: step.y, x2: step.x2, y2: step.y2 };
-    case 'wait':   return null;  // handled by sleep in replay
+    case 'wait':   return null;
     default:       return null;
   }
 }
 
-// Synchronous sleep using Atomics (no external deps, works in Node ESM).
+
 const sleepMs = ms => {
   if (ms <= 0) return;
   try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.round(ms)); } catch {}
 };
 
-// ── subcommands ────────────────────────────────────────────────────────────────
 
-// list -> {ok, macros:[{name, steps, created}]}
+
+
 if (verb === 'list') {
   let files = [];
   try { files = readdirSync(MACROS_DIR).filter(f => f.endsWith('.json')); } catch {}
@@ -117,7 +106,7 @@ else if (verb === 'show') {
   out({ ok: true, name: data.name, steps: data.steps, created: data.created });
 }
 
-// save --name <n> --json '<steps>' -> {ok, name, steps}
+
 else if (verb === 'save') {
   const name = get('name');
   if (!name) fail('save requires --name <n>');
@@ -132,22 +121,22 @@ else if (verb === 'save') {
   out({ ok: true, name, steps });
 }
 
-// record --name <n> [--seconds N=10] [--interval ms=80]
-// Samples cursor + mouse buttons via P/Invoke in a PowerShell polling loop.
-// Emits move+wait steps between clicks; left/right button DOWN transitions emit click steps.
-// Keyboard capture is NOT implemented (GetAsyncKeyState for general keys is unreliable
-// when the focus is on another window and cannot distinguish key-up reliably without a low-level hook).
+
+
+
+
+
 else if (verb === 'record') {
   const name = get('name');
   if (!name) fail('record requires --name <n>');
   const seconds  = Math.max(1, Math.min(300, Number(get('seconds')  || 10)));
   const interval = Math.max(20, Math.min(2000, Number(get('interval') || 80)));
 
-  // PowerShell polling loop: GetCursorPos + GetAsyncKeyState for LMB/RMB.
-  // We record one JSON array to stdout. Using ConvertTo-Json at the end.
-  // The loop runs for `seconds` seconds, sampling every `interval` ms.
-  // On a button DOWN transition we emit a click event; between clicks we emit
-  // move + wait events so timing is preserved on replay.
+
+
+
+
+
   const ps = `
 $ErrorActionPreference = 'Stop'
 Add-Type @"
@@ -211,25 +200,25 @@ $steps | ConvertTo-Json -Depth 5 -Compress
   const r = runPs(ps, (seconds + 15) * 1000);
   const raw = (r.stdout || '').trim();
   // Only fail on a non-zero exit; empty stdout just means nothing was captured (cursor didn't move).
-  // stderr is PowerShell CLIXML progress noise — ignore it unless the process actually failed.
+
   if (r.status !== 0) {
     const errText = (r.stdout || '').trim().slice(0, 400) || (r.stderr || '').replace(/<[^>]+>/g, '').trim().slice(0, 200) || 'powershell failed';
     fail('record failed: ' + errText);
   }
 
-  // ConvertTo-Json emits null for an empty list sometimes; normalise.
+
   let steps = [];
   if (raw && raw !== 'null') {
     try {
       const parsed = JSON.parse(raw);
-      // ConvertTo-Json wraps a single item as an object, not array.
+
       steps = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : []);
     } catch (e) {
       fail('could not parse recorded steps: ' + e.message + ' raw=' + raw.slice(0, 200));
     }
   }
 
-  // Normalise PowerShell hashtable field names (could be PascalCase from ConvertTo-Json).
+
   steps = steps.map(s => {
     const norm = {};
     for (const [k, v] of Object.entries(s)) norm[k.toLowerCase()] = v;
@@ -241,8 +230,8 @@ $steps | ConvertTo-Json -Depth 5 -Compress
   out({ ok: true, name, steps, count: steps.length });
 }
 
-// replay --name <n> [--speed x=1]
-// Executes each step via doInput(); wait steps are slept (duration / speed).
+
+
 else if (verb === 'replay') {
   const name = get('name');
   if (!name) fail('replay requires --name <n>');

@@ -1,15 +1,3 @@
-// Helm — terminal client (full-screen TUI).
-//
-// This does NOT run its own brain. It connects to the ONE already-running Helm (the Discord/iMessage
-// service) over a loopback port and is just another window into the SAME conversation. Messages you
-// type here, and Helm's replies, are mirrored across the terminal, Discord and iMessage.
-//
-// Start Helm first:  helm start   (or it's already running 24/7).  Then:
-//   helm                open the full-screen chat
-//   helm "do the thing" one-shot: send one message, print the reply, exit
-//   echo "..." | helm   one-shot from stdin (pipe-friendly)
-//
-// In the TUI: type + Enter to send · PgUp/PgDn or mouse wheel to scroll · Ctrl-C / Esc / /exit to quit.
 import net from 'node:net';
 import readline from 'node:readline';
 import path from 'node:path';
@@ -23,8 +11,8 @@ loadEnv({ path: path.join(__dirname, '.env'), override: true });
 const PORT = parseInt(process.env.HELM_CLI_PORT || '4625', 10);
 const HOST = '127.0.0.1';
 
-// When Helm produces a file (a generated image, a screenshot), the brain sends an {type:'attach'}
-// with the paths. The terminal can't render pixels inline, so we OPEN images in the OS default viewer.
+
+
 const IMG_RE = /\.(png|jpe?g|gif|webp|bmp|svg|tiff?|heic|heif|avif)$/i;
 function openExternally(file) {
   try {
@@ -35,13 +23,13 @@ function openExternally(file) {
     return true;
   } catch { return false; }
 }
-// Turn one attachment path into a short status line, opening it if it's a local image.
+
 function describeAttachment(f) {
   if (!f) return null;
   const name = path.basename(f);
   if (!existsSync(f)) return `attachment (not found locally): ${f}`;
   if (IMG_RE.test(f)) return (openExternally(f) ? `opened image ${name}` : `image (couldn't open) ${f}`);
-  return `attachment: ${f}`;   // non-image: show the path, don't auto-launch
+  return `attachment: ${f}`;
 }
 
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -63,7 +51,7 @@ const notRunning = () => {
   console.error(`${C.dim}The terminal is a client of the one running Helm — it shares the same brain/conversation as Discord & iMessage.${C.x}`);
 };
 
-// ---- one-shot: send a single message, print the first reply, exit ----
+
 async function oneShot(text) {
   let sock;
   try { sock = await connect(); } catch { notRunning(); process.exit(1); }
@@ -78,7 +66,7 @@ async function oneShot(text) {
       let m; try { m = JSON.parse(line); } catch { continue; }
       if (m.type === 'reply') {
         clearTimeout(timer); process.stdout.write(m.text + '\n'); gotReply = true;
-        // Don't exit instantly — an {attach} for a generated image arrives right after the reply.
+
         clearTimeout(finishTimer); finishTimer = setTimeout(finish, 500);
       } else if (m.type === 'attach') {
         for (const f of (m.files || [])) { const l = describeAttachment(f); if (l) process.stdout.write(`${C.dim}· ${l}${C.x}\n`); }
@@ -90,13 +78,13 @@ async function oneShot(text) {
   sock.write(JSON.stringify({ type: 'msg', text }) + '\n');
 }
 
-// ============================ full-screen TUI ============================
+
 const ESC = '\x1b[';
 const out = s => process.stdout.write(s);
 const stripAnsi = s => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 // Brand logo: the ship's-wheel mark + HELM wordmark, in the cyan→sky gradient. Drawn on startup.
-const WHEEL = [   // a ship's-wheel mark in box-drawing chars; 6 uniform-width rows to match the wordmark
+const WHEEL = [
   '   ╭─┼─╮   ',
   '  ╭┤ │ ├╮  ',
   '  ├┼─●─┼┤  ',
@@ -112,16 +100,16 @@ const WORD = [
   '██║  ██║███████╗███████╗██║ ╚═╝ ██║',
   '╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝',
 ];
-const GRAD = [C.teal, C.teal, C.cyan, C.cyan, C.sky, C.sky];   // per-row gradient for the wordmark
+const GRAD = [C.teal, C.teal, C.cyan, C.cyan, C.sky, C.sky];
 
-// Strip markdown markers to PLAIN text (for width-correct wrapping). Helm replies are markdown
-// (**bold**, _italic_, `code`); the terminal can't render those, so we show the words without the
-// noise symbols. Applied before wrapping so line widths stay accurate.
+
+
+
 function demarkdown(s) {
   return String(s)
-    .replace(/\*\*([^*]+)\*\*/g, '$1')      // **bold**  -> bold
-    .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1$2')  // *italic* -> italic (avoid bullets)
-    .replace(/(^|[\s(])_([^_\n]+)_/g, '$1$2')    // _italic_ -> italic
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1$2')
+    .replace(/(^|[\s(])_([^_\n]+)_/g, '$1$2')
     .replace(/`([^`]+)`/g, '$1')            // `code`    -> code
     .replace(/^#{1,6}\s+/gm, '')            // # heading -> heading
     .replace(/^\s*[-*]\s+/gm, '• ');        // - bullet  -> • bullet
@@ -164,12 +152,12 @@ function tui(sock) {
   const stdin = process.stdin;
   let W = process.stdout.columns || 80;
   let H = process.stdout.rows || 24;
-  const PANE_W = () => W - 2;             // 1-col gutter each side
+  const PANE_W = () => W - 2;
   const HEADER_H = 1, STATUS_H = 1, INPUT_H = 3;
   const bodyH = () => Math.max(1, H - HEADER_H - STATUS_H - INPUT_H);
 
-  const history = [];   // { role: 'you'|'helm'|'sys'|'other', text, label }
-  let scroll = 0;       // how many lines scrolled up from the bottom
+  const history = [];
+  let scroll = 0;
   let input = '';
   let status = '';
   let connected = true;
@@ -181,25 +169,25 @@ function tui(sock) {
   const VERBS = ['Cogitating', 'Pondering', 'Thinking', 'Noodling', 'Working', 'Brewing', 'Conjuring', 'Computing', 'Musing', 'Tinkering'];
   let busy = false, spinFrame = 0, busyStart = 0, busyVerb = VERBS[0], spinTimer = null;
   const PLACEHOLDER = 'Ask Helm anything…  ( / for commands )';
-  let pasteBuf = null;   // non-null while a bracketed paste is being received
+  let pasteBuf = null;
 
-  // The command menu is open whenever the input starts with "/". Filter by what's typed so far.
+
   const menuOpen = () => input.startsWith('/');
   const menuMatches = () => {
-    const q = input.slice(1).toLowerCase();   // text after the leading "/"
+    const q = input.slice(1).toLowerCase();
     return COMMANDS.filter(c => c.cmd.replace(/^\//, '').toLowerCase().startsWith(q));
   };
 
   // alt screen + bracketed paste + modifyOtherKeys=2. The last one (CSI >4;2m) asks the terminal to
   // report modified keys as distinct escape sequences — that's what lets us tell Shift+Enter apart from
-  // a plain Enter (normally they send the identical byte). Unknown to a terminal that doesn't support
-  // it, the sequence is simply ignored, so it's safe everywhere.
+
+
   const enterAlt = () => out(`${ESC}?1049h${ESC}?2004h${ESC}>4;2m`);
-  const leaveAlt = () => out(`${ESC}>4;0m${ESC}?2004l${ESC}?25h${ESC}?1049l`);   // reset modifyOtherKeys, paste off, show cursor, restore
+  const leaveAlt = () => out(`${ESC}>4;0m${ESC}?2004l${ESC}?25h${ESC}?1049l`);
   const moveTo = (r, c) => out(`${ESC}${r};${c}H`);
   const clearLine = () => out(`${ESC}2K`);
 
-  // flatten history into wrapped, colored display lines
+
   function renderLines() {
     const lines = [];
     const w = PANE_W();
@@ -260,10 +248,10 @@ function tui(sock) {
     W = process.stdout.columns || 80;
     H = process.stdout.rows || 24;
     // Hide the cursor while painting so it doesn't streak across the screen; drawInputBox re-shows it
-    // parked at the input. Only hard-clear on resize; otherwise home the cursor (no full blank flash).
+
     out(`${ESC}?25l` + (prevW !== W || prevH !== H ? `${ESC}H${ESC}J` : `${ESC}H`));
 
-    // header
+
     const dot = connected ? `${C.grn}●${C.x}` : `${C.red}●${C.x}`;
     const title = `${C.teal}${C.b}⎈ Helm${C.x} ${C.dim}terminal${C.x}`;
     const right = `${dot} ${connected ? `${C.gray}127.0.0.1:${PORT} · shared with Discord & iMessage${C.x}` : `${C.red}disconnected${C.x}`}`;
@@ -271,7 +259,7 @@ function tui(sock) {
     moveTo(1, 2); out(title + ' '.repeat(pad) + right);
     moveTo(2, 1); out(`${C.dim}${'─'.repeat(W)}${C.x}`);
 
-    // body (message pane) — show the window of lines per scroll
+
     const all = renderLines();
     const view = bodyH();
     const maxScroll = Math.max(0, all.length - view);
@@ -282,15 +270,15 @@ function tui(sock) {
       moveTo(3 + i, 2); clearLine();
       if (slice[i] !== undefined) out(slice[i]);
     }
-    // scroll indicator
+
     if (scroll > 0) { moveTo(3, W - 4); out(`${C.dim}↑${scroll}${C.x}`); }
 
-    // slash-command menu: floats over the bottom of the body pane, just above the input box
+
     if (menuOpen()) {
       const items = menuMatches();
       if (menuIdx >= items.length) menuIdx = Math.max(0, items.length - 1);
       const rows = Math.min(items.length, Math.max(1, view - 1));
-      const firstRow = 3 + view - rows;   // bottom-align within the body pane
+      const firstRow = 3 + view - rows;
       for (let i = 0; i < rows; i++) {
         const it = items[i]; const sel = i === menuIdx;
         moveTo(firstRow + i, 2); clearLine();
@@ -302,15 +290,15 @@ function tui(sock) {
       if (!items.length) { moveTo(3 + view - 1, 2); clearLine(); out(`${C.dim}  (no matching command)${C.x}`); }
     }
 
-    // status line — a Claude-Code-style spinner while Helm works, else hints
+
     moveTo(H - INPUT_H, 2); clearLine();
     out(statusLineText());
 
-    // rounded input box (Claude-Code look)
+
     drawInputBox();
   }
 
-  // The text shown on the status line above the input.
+
   function statusLineText() {
     if (menuOpen()) return `${C.dim}↑/↓ choose · Tab/Enter complete · Esc cancel${C.x}`;
     if (busy) {
@@ -333,12 +321,12 @@ function tui(sock) {
     const inner = iw - PROMPT_COL;
     // Multi-line input (a paste, or composed with Shift+Enter) shows a "[N lines]" tag plus the line
     // you're currently on, so the box stays one row tall but you can see what you're typing. Single-line
-    // input shows normally.
+
     const nlines = input ? input.split('\n').length : 0;
     let display, cursorLen;
     if (nlines > 1) {
       const lines = input.split('\n');
-      const cur = lines[lines.length - 1];                 // the line currently being edited
+      const cur = lines[lines.length - 1];
       const tag = `${C.sky}[${nlines} lines]${C.x} `;
       const room = Math.max(4, inner - stripAnsi(tag).length);
       const shownCur = cur.length > room ? '…' + cur.slice(cur.length - (room - 1)) : cur;
@@ -351,13 +339,13 @@ function tui(sock) {
     }
     out(`${C.dim}│${C.x} ${C.cyan}>${C.x} ${display}${ESC}K`);
     moveTo(H, 1); out(`${C.dim}╰${'─'.repeat(iw - 2)}╯${C.x}`);
-    // park the cursor right after the rendered text and SHOW it so you can see where you're typing
+
     moveTo(H - 1, PROMPT_COL + cursorLen);
     out(`${ESC}?25h`);
   }
 
-  // Lightweight redraw of JUST the input line (no full-screen clear) — used while typing so the
-  // screen doesn't flicker on every keystroke. Also repaints the status line (spinner stays live).
+
+
   function drawInput() {
     if (splashing) return draw();
     moveTo(H - INPUT_H, 2); clearLine(); out(statusLineText());
@@ -366,7 +354,7 @@ function tui(sock) {
 
   function add(role, text, label) { splashing = false; history.push({ role, text, label }); scroll = 0; draw(); }
 
-  // ---- socket -> history ----
+
   let buf = '';
   sock.on('data', chunk => {
     buf += chunk; let nl;
@@ -375,30 +363,30 @@ function tui(sock) {
       let m; try { m = JSON.parse(line); } catch { continue; }
       if (m.type === 'reply') { stopSpin(); status = ''; add('helm', m.text); }
       else if (m.type === 'echo') {
-        // don't double-show our own terminal lines (we already added them on send)
+
         if (/terminal/i.test(m.from || '')) continue;
         add('other', m.text, m.from || 'other');
       }
       else if (m.type === 'status') { status = m.text; if (!splashing) draw(); }
-      else if (m.type === 'attach') {                                  // Helm sent files — open images, list the rest
+      else if (m.type === 'attach') {
         for (const f of (m.files || [])) { const line = describeAttachment(f); if (line) add('sys', line); }
       }
-      else if (m.type === 'info')   { history.push({ role: 'sys', text: m.text }); scroll = 0; if (!splashing) draw(); }   // queue under the splash, don't dismiss it
+      else if (m.type === 'info')   { history.push({ role: 'sys', text: m.text }); scroll = 0; if (!splashing) draw(); }
     }
   });
   sock.on('close', () => { connected = false; status = 'Helm disconnected (service stopped?). Press Esc to quit.'; draw(); });
   sock.on('error', () => { connected = false; status = 'connection lost. Press Esc to quit.'; draw(); });
 
-  // ---- raw keyboard ----
-  // ONE input consumer: parse raw stdin ourselves (keys + bracketed paste) so a paste can't race a
-  // separate keypress stream. (Two listeners — data + readline keypress — fired in the wrong order and
-  // let pasted newlines slip through as Enter, splitting a paste into many messages.)
+
+
+
+
   if (stdin.isTTY) stdin.setRawMode(true);
   enterAlt(); draw();
 
   const quit = () => { stopSpin(); try { if (stdin.isTTY) stdin.setRawMode(false); } catch {} leaveAlt(); try { sock.end(); } catch {} process.exit(0); };
 
-  // Spinner: animate the status line ~8x/sec while Helm is working; pick a fresh verb each time.
+
   function startSpin() {
     busy = true; busyStart = Date.now(); spinFrame = 0;
     busyVerb = VERBS[Math.floor((busyStart / 1000) % VERBS.length)];
@@ -420,18 +408,18 @@ function tui(sock) {
     }
     if (!connected) { add('sys', 'not connected — start Helm with `helm start`.'); return; }
     add('you', text);
-    // 'stop' cancels; for anything else, show the working spinner until the reply lands.
+
     if (!/^\s*\/?(stop|cancel|abort|halt)\s*$/i.test(text)) startSpin();
     try { sock.write(JSON.stringify({ type: 'msg', text }) + '\n'); } catch { stopSpin(); add('sys', 'send failed.'); }
   }
 
-  // Complete the highlighted menu command into the input, ready to run (or run instantly if it takes
-  // no arguments). Returns true if it consumed the key.
+
+
   function menuComplete() {
     const items = menuMatches();
     if (!items.length) return false;
     const chosen = items[menuIdx] || items[0];
-    // commands that take args get the name + a space so you can keep typing; bare ones are ready to send
+
     const takesArgs = /!mode|!model|vault|^\/?mind/.test(chosen.cmd);
     input = chosen.cmd + (takesArgs ? ' ' : '');
     if (!takesArgs) return submit(), true;   // run bare commands (/help, /exit, stop, doctor) immediately
@@ -439,7 +427,7 @@ function tui(sock) {
   }
 
   // Handle a single logical key. name = symbolic key ('return','escape','backspace','up',… or null),
-  // ch = the literal character for printable keys, ctrl = control-modifier flag.
+
   function handleKey(name, ch, ctrl) {
     if (ctrl && name === 'c') return quit();
     if (name === 'escape') {
@@ -451,19 +439,19 @@ function tui(sock) {
     // first keypress on the splash dismisses it into the chat (without also typing that char)
     if (splashing) { splashing = false; draw(); if (name === 'return') return; }
 
-    // ---- slash-command menu navigation (only while input starts with "/") ----
+
     if (menuOpen()) {
       if (name === 'up')   { menuIdx = Math.max(0, menuIdx - 1); return draw(); }
       if (name === 'down') { menuIdx = Math.min(menuMatches().length - 1, menuIdx + 1); return draw(); }
       if (name === 'tab')  { if (menuComplete()) return; }
       if (name === 'return') { if (menuComplete()) return; }
-      if (name === 'backspace') { input = input.slice(0, -1); menuIdx = 0; return draw(); }   // re-filter (full draw)
+      if (name === 'backspace') { input = input.slice(0, -1); menuIdx = 0; return draw(); }
       if (ch && !ctrl) { input += ch; menuIdx = 0; return draw(); }
-      // fall through for ctrl-u etc.
+
     }
 
     if (name === 'return') return submit();
-    // typing + backspace only repaint the input line (no full clear) → no flicker
+
     if (name === 'backspace') { input = input.slice(0, -1); return drawInput(); }
     if (name === 'pageup')   { scroll += Math.max(1, bodyH() - 1); return draw(); }
     if (name === 'pagedown') { scroll = Math.max(0, scroll - Math.max(1, bodyH() - 1)); return draw(); }
@@ -494,65 +482,65 @@ function tui(sock) {
     if (wasSplash) draw(); else drawInput();
   }
 
-  // Act on a "CSI" key event reported by modifyOtherKeys (ESC[27;mod;key~) or the kitty/CSI-u protocol
-  // (ESC[key;mod u). key = the base keycode/ASCII, mod = 1 + bitmask(Shift1 Alt2 Ctrl4).
+
+
   function csiKey(key, mod) {
     const ctrl = ((mod - 1) & 4) !== 0;
-    if (key === 13 || key === 10) return mod > 1 ? newline() : handleKey('return', null, false);   // modified Enter -> newline
+    if (key === 13 || key === 10) return mod > 1 ? newline() : handleKey('return', null, false);
     if (key === 27) return handleKey('escape', null, false);
     if (key === 9)  return handleKey('tab', null, false);
     if (key === 127 || key === 8) return handleKey('backspace', null, false);
     if (ctrl && key >= 32 && key < 127) { const ch = String.fromCharCode(key).toLowerCase(); return handleKey(ch, ch, true); }
-    if (mod === 1 && key >= 32 && key < 127) return handleKey(null, String.fromCharCode(key), false);   // unmodified printable
-    // alt/shift-only combos and anything else: ignore
+    if (mod === 1 && key >= 32 && key < 127) return handleKey(null, String.fromCharCode(key), false);
+
   }
 
-  // Walk a run of raw bytes that contains NO paste: arrows/keys, Enter, backspace, ctrl keys, chars.
+
   const KEYSEQ = { '\x1b[A':'up','\x1b[B':'down','\x1b[C':'right','\x1b[D':'left',
     '\x1b[5~':'pageup','\x1b[6~':'pagedown','\x1b[H':'home','\x1b[F':'end','\x1b[3~':'delete',
     '\x1bOA':'up','\x1bOB':'down','\x1bOC':'right','\x1bOD':'left' };
   function feedKeys(s) {
     while (s.length) {
       if (s[0] === '\x1b') {
-        // Alt/Meta+Enter arrives as ESC + CR/LF -> newline
+
         if (s[1] === '\r' || s[1] === '\n') { s = s.slice(2); newline(); continue; }
-        // modifyOtherKeys form: ESC [ 27 ; mod ; key ~   (this is what Shift+Enter becomes)
+
         let mk = s.match(/^\x1b\[27;(\d+);(\d+)~/);
         if (mk) { s = s.slice(mk[0].length); csiKey(+mk[2], +mk[1]); continue; }
-        // kitty / fixterms form: ESC [ key ; mod u   (or ESC [ key u)
+
         let ku = s.match(/^\x1b\[(\d+)(?:;(\d+))?u/);
         if (ku) { s = s.slice(ku[0].length); csiKey(+ku[1], ku[2] ? +ku[2] : 1); continue; }
-        // exact key sequences (arrows, pgup, etc.)
+
         let m = null;
         for (const k of Object.keys(KEYSEQ)) if (s.startsWith(k)) { m = k; break; }
         if (m) { s = s.slice(m.length); handleKey(KEYSEQ[m], null, false); continue; }
-        // modified arrows: ESC [ 1 ; mod (A-D) — map to the base arrow (only when fully arrived)
+
         let ma = s.match(/^\x1b\[1;\d+([A-D])/);
         if (ma) { const map = { A:'up', B:'down', C:'right', D:'left' }; s = s.slice(ma[0].length); handleKey(map[ma[1]], null, false); continue; }
-        if (/^\x1b(\[[0-9;]*|O)$/.test(s)) { keyCarry = s; return; }   // incomplete escape seq — wait for more
-        s = s.slice(1); handleKey('escape', null, false); continue;     // a bare Esc
+        if (/^\x1b(\[[0-9;]*|O)$/.test(s)) { keyCarry = s; return; }
+        s = s.slice(1); handleKey('escape', null, false); continue;
       }
       const c = s[0];
-      // Enter (CR, optionally CRLF) sends the message. Ctrl+J (LF, 0x0a) inserts a newline — these are
-      // distinct bytes on every terminal, so Ctrl+J is a universal "new line" that needs no key protocol.
+
+
       if (c === '\r') { s = s.slice(1); if (s[0] === '\n') s = s.slice(1); handleKey('return', null, false); continue; }
       if (c === '\n') { s = s.slice(1); newline(); continue; }
       if (c === '\t') { s = s.slice(1); handleKey('tab', null, false); continue; }
       if (c === '\x7f' || c === '\b') { s = s.slice(1); handleKey('backspace', null, false); continue; }
-      if (c === '\x03') { s = s.slice(1); handleKey('c', 'c', true); continue; }   // ctrl-c
-      if (c === '\x15') { s = s.slice(1); handleKey('u', 'u', true); continue; }   // ctrl-u
-      if (c < ' ') { s = s.slice(1); continue; }                                   // ignore other control bytes
-      s = s.slice(1); handleKey(null, c, false);                                   // printable
+      if (c === '\x03') { s = s.slice(1); handleKey('c', 'c', true); continue; }
+      if (c === '\x15') { s = s.slice(1); handleKey('u', 'u', true); continue; }
+      if (c < ' ') { s = s.slice(1); continue; }
+      s = s.slice(1); handleKey(null, c, false);
     }
   }
 
-  // ---- single raw-input consumer (no readline keypress stream → no race) ----
-  // A paste is recognized two ways so it works on EVERY terminal:
-  //   1. Bracketed paste — terminals that support it wrap the block in ESC[200~ … ESC[201~.
-  //   2. Heuristic — a chunk that carries a newline (and isn't a lone Enter) or is a long blob is a
-  //      paste too. Windows terminals often DON'T send bracketed markers; without this the block
-  //      byte-walks and every newline fires Enter, splitting it into many messages and clearing the
-  //      box (looks like "nothing pasted"). Treat it as one block instead.
+
+
+
+
+
+
+
   const PASTE_START = '\x1b[200~', PASTE_END = '\x1b[201~';
   let keyCarry = '';   // partial escape sequence carried to the next data chunk
   stdin.on('data', chunk => {
@@ -577,17 +565,17 @@ function tui(sock) {
     const loneEnter = s === '\r' || s === '\n' || s === '\r\n';
     if (!loneEnter && s[0] !== '\x1b' && (/[\r\n]/.test(s) || s.length > 24)) { pasteInto(s); return; }
 
-    feedKeys(s);   // ordinary keystrokes
+    feedKeys(s);
   });
 
   process.stdout.on('resize', draw);
   sock.write(JSON.stringify({ type: 'hello' }) + '\n');
-  // queue the greeting WITHOUT dismissing the splash — the logo stays until the user acts, then this
-  // message is already there underneath it.
+
+
   history.push({ role: 'sys', text: "connected. Type a message — Helm, Discord and iMessage all share this conversation." });
 }
 
-// ---- plain fallback (no TTY / NO_COLOR-style minimal): the old line REPL ----
+
 async function plainInteractive(sock) {
   console.log(`${C.teal}${C.b}Helm${C.x} ${C.dim}— terminal (shared with Discord & iMessage). /help · /exit${C.x}\n`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: `${C.cyan}you ›${C.x} ` });
@@ -618,12 +606,12 @@ async function plainInteractive(sock) {
 async function interactive() {
   let sock;
   try { sock = await connect(); } catch { notRunning(); process.exit(1); }
-  // Full-screen TUI when we have a real interactive terminal; otherwise the plain REPL.
+
   if (process.stdout.isTTY && process.stdin.isTTY && !process.env.HELM_PLAIN) tui(sock);
   else plainInteractive(sock);
 }
 
-// ---- entry: arg or piped stdin = one-shot; else interactive ----
+
 const argMsg = process.argv.slice(2).join(' ').trim();
 if (argMsg) oneShot(argMsg);
 else if (!process.stdin.isTTY) {

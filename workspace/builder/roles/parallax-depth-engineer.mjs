@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// parallax-depth-engineer.mjs — Parallax & Depth Engineer role.
-// Adds multi-layer parallax, depth-on-scroll, sticky galleries/sequences,
-// and pointer/scroll 3D-tilt to the project. Phase: frontend.
-// Depends on scroll-animation-engineer (motion system + GSAP/Lenis wiring must exist first).
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -288,8 +283,8 @@ When all edits are applied:
   },
 ];
 
-// ── self-test ──────────────────────────────────────────────────────────────────
-// Run: node workspace/builder/roles/parallax-depth-engineer.mjs
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const VALID_PHASES = new Set([
     'discovery', 'architecture', 'design', 'scaffold', 'data',

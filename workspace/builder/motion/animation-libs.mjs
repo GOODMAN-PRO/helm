@@ -1,31 +1,27 @@
-// animation-libs.mjs — shared animation toolkit knowledge for the builder.
-// Injected into frontend/design agent prompts; also imported by stack/quality code.
-// Pure knowledge module: no I/O, no deps, never throws.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// ANIMATION_DEPS — npm packages to install for award-grade animated sites.
-// 3D libs (three, @react-three/*) are optional but listed; agents that don't
-// need 3D should install just the first four.
-// ---------------------------------------------------------------------------
+
+
+
+
+
 export const ANIMATION_DEPS = [
   'gsap',
-  '@gsap/react',          // useGSAP hook (official; replaces raw useLayoutEffect patterns)
+  '@gsap/react',
   'lenis',
-  '@studio-freight/react-lenis',  // Lenis React context wrapper
+  '@studio-freight/react-lenis',
   'framer-motion',
   'three',
   '@react-three/fiber',
   '@react-three/drei',
-  '@studio-freight/tempus', // unified rAF scheduler; Lenis + GSAP ticker sync
+  '@studio-freight/tempus',
 ];
 
-// ---------------------------------------------------------------------------
-// ANIMATION_STACK — rich prompt-ready string explaining which library to use
-// for what, with Next.js App Router idioms and gotchas.
-// ~300 words + code snippets; usable verbatim as prompt context.
-// ---------------------------------------------------------------------------
+
+
+
+
+
 export const ANIMATION_STACK = `
 ## Animation stack — which tool for what
 
@@ -140,10 +136,10 @@ Never hide content behind animation — it must be accessible with JS off or mot
 - Target 60fps: profile in DevTools, kill any animation that causes paint/layout recalcs.
 `.trim();
 
-// ---------------------------------------------------------------------------
-// installCmd — returns the install command for ANIMATION_DEPS + optional extras.
-// Supports npm (default), pnpm, yarn. Never throws.
-// ---------------------------------------------------------------------------
+
+
+
+
 export function installCmd(packageManager = 'npm', extras = []) {
   try {
     const pm = String(packageManager || 'npm').toLowerCase().trim();
@@ -154,14 +150,14 @@ export function installCmd(packageManager = 'npm', extras = []) {
     if (pm === 'yarn') return `yarn add ${allPkgs}`;
     return `npm install ${allPkgs}`;
   } catch {
-    // defensive: if something unexpectedly goes wrong, return a safe default
+
     return `npm install ${ANIMATION_DEPS.join(' ')}`;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Self-test (guarded — only runs when executed directly)
-// ---------------------------------------------------------------------------
+
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let passed = 0;
   let failed = 0;

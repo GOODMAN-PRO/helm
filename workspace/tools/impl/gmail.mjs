@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// Helm's own Gmail integration — no third-party MCP server. Sends over SMTP and reads over IMAP using
-// a Gmail App Password (needs 2-Step Verification on + an app password from
-// myaccount.google.com/apppasswords). Credentials live in the Helm vault:
-//   GMAIL_USER          your full gmail address
-//   GMAIL_APP_PASSWORD  the 16-char app password (spaces optional)
-//
-// Verbs:
-//   node gmail.mjs send --to <addr> --subject <s> --body <text> [--cc <a>] [--bcc <a>]
-//   node gmail.mjs list [--max 10] [--mailbox INBOX] [--query <text>]   (query searches subject/from/body)
-//   node gmail.mjs read --uid <n> [--mailbox INBOX]
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

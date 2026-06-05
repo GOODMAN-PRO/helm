@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// audit.mjs — automated website auditor for the checklist-driven builder.
-//
-// Builds + serves a generated Next.js project, then runs Playwright against it to verify the high-value
-// AUTO checklist items — the ones that catch the real defects we keep hitting: broken images, 404s,
-// console errors / React hydration mismatches, horizontal scroll, text cut off the viewport edge (desktop
-// AND mobile), raw HTML entities, lorem/placeholder text, missing SEO/meta, missing alt/lang, AND the two
-// that matter most for animated sites: a <canvas> that renders BLANK (the invisible-3D bug) and reveal
-// targets stuck invisible (the never-fired-ScrollTrigger bug).
-//
-// auditSite(projectDir, opts) -> { ok, checks:[{id,category,severity,pass,detail}], summary, screenshots }
-// Never throws — a check that errors is reported as a fail with the error text.
-
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -28,13 +16,13 @@ async function waitForServer(port, ms = 90_000) {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) {
     try { const r = await fetch(`http://localhost:${port}`, { method: 'GET' }); if (r.status) return true; }
-    catch { /* not up yet */ }
+    catch {  }
     await new Promise(r => setTimeout(r, 1000));
   }
   return false;
 }
 
-// Recursively read source files (capped) for static (grep-style) checks.
+
 function readSources(dir, exts = ['.ts', '.tsx', '.js', '.jsx', '.css'], cap = 1500) {
   const out = [];
   const skip = new Set(['node_modules', '.next', 'dist', 'build', '.git']);
@@ -52,14 +40,14 @@ function readSources(dir, exts = ['.ts', '.tsx', '.js', '.jsx', '.css'], cap = 1
   return out;
 }
 
-// ── the browser-side check battery (runs inside the page via evaluate) ──────────────────────────────
-// Returns a plain object of measurements; the Node side turns those into pass/fail checks.
+
+
 async function measure(page) {
   return await page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
     const isMarquee = el => el.closest('[data-marquee],[data-noscroll],marquee') || /marquee|ticker|carousel|slider|track/i.test(el.className || '');
     // Is this element's overflow CLIPPED by some ancestor? If so, content past the viewport edge is hidden
-    // by design (marquees, carousels, scroll tracks) — not a real "text bleeding off the page" bug.
+
     const clippedByAncestor = el => {
       for (let a = el.parentElement, hops = 0; a && hops < 8; a = a.parentElement, hops++) {
         const cs = getComputedStyle(a);
@@ -67,7 +55,7 @@ async function measure(page) {
       }
       return false;
     };
-    // overflow / cutoff text — only flag text that is BOTH outside the viewport AND not clipped away.
+
     const cut = [];
     document.querySelectorAll('h1,h2,h3,h4,p,span,a,li,button').forEach(el => {
       const cs = getComputedStyle(el);
@@ -92,15 +80,15 @@ async function measure(page) {
         const ctx = off.getContext('2d'); ctx.drawImage(c, 0, 0, 80, 50);
         const d = ctx.getImageData(0, 0, 80, 50).data; let nonblank = 0, lum = 0;
         for (let i = 0; i < d.length; i += 4) { const a = d[i + 3]; if (a > 8 && (d[i] + d[i + 1] + d[i + 2]) > 24) nonblank++; lum += (d[i] + d[i + 1] + d[i + 2]); }
-        canvas.visiblePixels = nonblank;            // >some threshold => the canvas drew something visible
+        canvas.visiblePixels = nonblank;
         canvas.avgLum = lum / (d.length / 4);
       } catch (e) { canvas.error = String(e).slice(0, 60); }
     }
-    // reveal visibility — elements that look like reveal targets but are stuck invisible/clipped
+
     const stuck = [];
     document.querySelectorAll('[data-reveal],[class*="reveal"],section h2,section p').forEach(el => {
       const r = el.getBoundingClientRect();
-      const inView = r.top < innerHeight * 1.2 && r.bottom > 0;   // near/in viewport
+      const inView = r.top < innerHeight * 1.2 && r.bottom > 0;
       if (!inView) return;
       const cs = getComputedStyle(el);
       const op = parseFloat(cs.opacity);
@@ -138,19 +126,19 @@ export async function auditSite(projectDir, opts = {}) {
     return finalize(checks, screenshots);
   }
 
-  // 1) BUILD
+
   let buildOut = '';
   if (build) {
     const r = sh('npm', ['run', 'build'], { cwd: projectDir, env: { ...process.env, CI: '1', NEXT_TELEMETRY_DISABLED: '1' }, timeout: 300_000 });
     buildOut = ((r.stdout || '') + (r.stderr || ''));
     add('build.passes', 'build', 'critical', r.status === 0, r.status === 0 ? 'next build ok' : buildOut.slice(-400));
-    if (r.status !== 0) return finalize(checks, screenshots);   // can't serve a broken build
-    // first-load JS budget (rough, from build output)
+    if (r.status !== 0) return finalize(checks, screenshots);
+
     const m = buildOut.match(/First Load JS shared by all\s+([\d.]+)\s*(kB|MB)/i) || buildOut.match(/([\d.]+)\s*kB\s+First Load JS/i);
     if (m) { const kb = parseFloat(m[1]) * (/, *MB/i.test(m[2] || '') ? 1024 : 1); add('perf.firstLoadJs', 'perf', 'minor', kb <= 400, `${m[1]}${m[2] || 'kB'} shared first-load`); }
   }
 
-  // static source checks (grep)
+
   const srcs = readSources(projectDir);
   const allSrc = srcs.map(s => s.src).join('\n');
   add('content.noStubs', 'content', 'major', !/\bTODO\b|FIXME|not implemented|coming soon/i.test(allSrc), 'no TODO/FIXME/not-implemented/coming-soon in source');
@@ -210,13 +198,13 @@ export async function auditSite(projectDir, opts = {}) {
       const stuckReal = d.stuck.filter(Boolean);
       add('anim.revealsVisible', 'animation', 'major', stuckReal.length === 0, stuckReal.length ? `content stuck invisible after scroll: ${stuckReal.slice(0, 3).join(' ; ')}` : 'reveal targets visible after scroll');
       if (d.canvas.present || requireCanvas) {
-        const vis = d.canvas.present && (d.canvas.visiblePixels || 0) > 25;   // canvas drew clearly-visible pixels
+        const vis = d.canvas.present && (d.canvas.visiblePixels || 0) > 25;
         const hint = d.canvas.present && !vis ? ' (blank read — ensure the WebGL canvas sets gl={{ preserveDrawingBuffer: true }} so it can be sampled, AND that the scene is lit, on-camera and not black-on-black / gated off by reduced-motion)' : '';
         add('anim.canvasRenders', 'animation', requireCanvas ? 'critical' : 'major', vis, (d.canvas.present ? `canvas visiblePixels=${d.canvas.visiblePixels} avgLum=${Math.round(d.canvas.avgLum || 0)}` : 'no <canvas> present') + hint);
       }
       await ctx.close();
 
-      // ---- mobile pass (overflow / cutoff at 375) ----
+
       const mctx = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true });
       const mpage = await mctx.newPage();
       await mpage.goto(`http://localhost:${port}`, { waitUntil: 'networkidle', timeout: 45_000 }).catch(() => {});
@@ -254,7 +242,7 @@ function finalize(checks, screenshots) {
   };
 }
 
-// Format a report's failing items as a directive list a fix-agent can act on.
+
 export function failuresForAgent(report) {
   const order = c => -SEV[c.severity];
   return report.fails.slice().sort((a, b) => order(a) - order(b))

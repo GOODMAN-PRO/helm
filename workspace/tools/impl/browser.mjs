@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Unified CLI entry: browser.mjs <verb> [--url <url>] [--selector <sel>] [--text <txt>] [--out <path>]
-// Delegates to browser-shared.mjs; playwright is imported lazily there.
-
 import { fileURLToPath } from 'node:url';
 
 async function main() {

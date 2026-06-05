@@ -1,5 +1,3 @@
-// features.mjs — Feature Engineer role: builds the actual product pages/features,
-// end-to-end wired, no stubs, no mock data. Heart of the app.
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -97,11 +95,11 @@ endpoint or an ambiguous UX flow). Keep it under 600 words.`;
   },
 ];
 
-// Self-test — run only when this file is executed directly.
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let passed = true;
 
-  // 1. Role shape assertions
+
   const [role] = roles;
 
   const check = (label, condition) => {
@@ -123,7 +121,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   check('system is a non-empty string', typeof role.system === 'string' && role.system.length > 100);
   check('task is a function', typeof role.task === 'function');
 
-  // 2. task(ctx) returns a non-empty string with a fake ctx
+
   const fakeCtx = {
     brief: 'a recipe sharing app',
     stack: {

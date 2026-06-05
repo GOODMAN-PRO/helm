@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// Helm build swarm.
-//
-//   N builder agents  ->  each in its own isolated git worktree/branch, builds ONE feature
-//   N reviewer agents ->  independently check each build (diff + smoke), APPROVE / REJECT (+ fix)
-//   one revision round for rejects
-//   sequential SMOKE-GATED merge into main  ->  auto-revert any merge that breaks smoke
-//
-// Main is never left broken: a feature that fails review or the smoke gate simply doesn't land.
-//
-// tasks: workspace/swarm/tasks.json = [{ id, title, spec, status }]
-// usage: node workspace/swarm/swarm.mjs [--workers 5] [--reviewers 5]
-//        [--build-model sonnet] [--review-model sonnet] [--tasks <file>] [--dry]
-
 import { spawn, spawnSync } from 'node:child_process';
 import { resolveClaude } from '../lib/engine.mjs';
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
@@ -20,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { HANDOFF_SCHEMA, pruneFileReads } from '../sessions/compact.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/swarm
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(__dirname, '../..');
 loadEnv({ path: path.join(ROOT, '.env'), override: true });
@@ -39,7 +26,7 @@ const AGENT_CAP_MS = 60 * 60_000;
 const SWARM_WT = path.join(ROOT, '.swarm');
 const LOG = path.join(__dirname, 'swarm.log');
 const REPORT = path.join(__dirname, 'REPORT.md');
-// Overall wall-time guard: abort queued tasks if the swarm runs too long.
+
 const SWARM_MAX_WALL_MS = parseInt(process.env.SWARM_MAX_WALL_MIN || '240', 10) * 60_000;
 const SWARM_START = Date.now();
 
@@ -47,12 +34,12 @@ const ts = () => new Date().toISOString();
 const log = m => { const l = `[swarm ${ts()}] ${m}`; console.log(l); try { appendFileSync(LOG, l + '\n'); } catch {} };
 const flushTasks = tasks => { try { writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2)); } catch (e) { log('WARN: could not flush tasks: ' + e.message); } };
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
-// On Windows npm is npm.cmd — spawnSync can't run a .cmd without a shell (ENOENT). Route npm via shell there.
+
 const IS_WIN = process.platform === 'win32';
 const npm = (args, opts = {}) => sh(IS_WIN ? 'npm.cmd' : 'npm', args, { shell: IS_WIN, ...opts });
 const git = (cwd, ...a) => sh('git', ['-c', 'user.name=Helm', '-c', 'user.email=helm@localhost', '-C', cwd, ...a]);
 const notify = msg => { try { sh(process.execPath, [path.join(ROOT, 'bin', 'helm-push.mjs'), msg]); } catch {} };
-// Extract the LAST VERDICT line — reviewers may quote previous verdicts before writing their own.
+
 const lastVerdict = s => { const ms = (s || '').match(/VERDICT:\s*(?:APPROVE|REJECT)[^\n]*/gi); return ms ? ms[ms.length - 1] : ''; };
 
 function runClaude(cwd, model, prompt) {
@@ -152,7 +139,7 @@ const reviewPrompt = (t, builderSummary, handoff) => [
       log(`task ${t.id} already merged (status: merged-pending-smoke) — skipping rebuild`);
       return false;
     }
-    // Crash during git merge itself. State of main is unknown — operator must inspect.
+
     if (t.status === 'merging') {
       log(`WARN: task ${t.id} status is 'merging' — possible crash mid-merge, operator review required — skipping`);
       return false;
@@ -183,7 +170,7 @@ const reviewPrompt = (t, builderSummary, handoff) => [
     else {
       const r = await runClaude(t._wt, BUILD_MODEL, buildPrompt(t));
       t._build = r.result;
-      // Read structured handoff written by the build agent (preferred over raw stdout).
+
       const handoffPath = path.join(t._wt, 'handoff.json');
       if (existsSync(handoffPath)) {
         try {
@@ -220,8 +207,8 @@ const reviewPrompt = (t, builderSummary, handoff) => [
   for (const t of todo) {
     if (t._verdict !== 'APPROVE') { results.push({ id: t.id, status: 'rejected', note: t._vtext }); continue; }
 
-    // Critic gate: independent diff review before touching main.
-    // Asks Claude to reply with PASS or FAIL on the first line; on FAIL the task is not merged.
+
+
     if (!DRY) {
       const critDiff = git(ROOT, 'diff', baseMain, `swarm/${t.id}`).stdout || '(empty diff)';
       const critR = await runClaude(ROOT, REVIEW_MODEL, [
@@ -247,7 +234,7 @@ const reviewPrompt = (t, builderSummary, handoff) => [
     t.status = 'merging'; if (!DRY) flushTasks(tasks);
     const m = git(ROOT, 'merge', '--no-ff', '--no-edit', `swarm/${t.id}`);
     if (m.status !== 0) {
-      // conflict — combine both sides with a resolver agent instead of bailing
+
       log(`conflict ${t.id}; invoking resolver`);
       await runClaude(ROOT, REVIEW_MODEL, [
         `A git merge of feature branch swarm/${t.id} into main hit CONFLICTS. Resolve them now.`,
@@ -258,9 +245,9 @@ const reviewPrompt = (t, builderSummary, handoff) => [
       if (git(ROOT, 'diff', '--name-only', '--diff-filter=U').stdout.trim()) {
         git(ROOT, 'merge', '--abort'); results.push({ id: t.id, status: 'conflict-unresolved' }); log(`unresolved ${t.id}`); continue;
       }
-      // Commit the resolved merge. If the resolver already committed (MERGE_HEAD gone),
-      // this fails harmlessly. If MERGE_HEAD still exists and commit fails, abort to keep
-      // the repo clean for subsequent tasks.
+
+
+
       const mc = git(ROOT, 'commit', '--no-edit');
       if (mc.status !== 0 && sh('git', ['-C', ROOT, 'rev-parse', 'MERGE_HEAD']).status === 0) {
         git(ROOT, 'merge', '--abort');
@@ -283,7 +270,7 @@ const reviewPrompt = (t, builderSummary, handoff) => [
     }
   }
 
-  // Save each task's proposed diff (vs the run's base) for review, regardless of merge outcome.
+
   const DIFFS = path.join(__dirname, 'diffs');
   mkdirSync(DIFFS, { recursive: true });
   for (const t of todo) {

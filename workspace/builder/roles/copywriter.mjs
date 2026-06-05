@@ -1,8 +1,3 @@
-// copywriter.mjs — Copywriter role for the Helm full-stack builder.
-// Writes all real, production-grade copy for the site/app: headlines, CTAs, microcopy,
-// error states, empty states, SEO tags, form labels. Never lorem ipsum, never placeholder.
-// Output lands in .helm-build/artifacts/copy.md, organized by page/section.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -48,7 +43,7 @@ unless it's genuinely surprising. No "powerful", "robust", "seamless", "leverage
 deliverables — write the real thing.`,
 
     task(ctx) {
-      // Pull all prior artifacts so the agent has full structural + design context.
+
       const priorArtifacts = ctx.artifactsDigest();
       const stackInfo = ctx.stack
         ? `Stack: ${ctx.stack.summary || ctx.stack.id || 'unknown'}${ctx.stack.notes ? `\nStack notes: ${ctx.stack.notes}` : ''}`

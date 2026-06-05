@@ -1,20 +1,12 @@
 #!/usr/bin/env node
-// screen.record.mjs — Record the screen to MP4 via ffmpeg gdigrab (Windows).
-//
-// Verbs:
-//   start [--out <mp4>] [--seconds N] [--fps 30] [--region x,y,w,h]
-//   stop
-//   status
-//   gif --src <mp4> --out <gif> [--fps 10] [--width 640]
-
 import { spawnSync, spawn } from 'node:child_process';
 import { existsSync, writeFileSync, readFileSync, unlinkSync, statSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+
+
+
 
 const args = process.argv.slice(2);
 const verb = args[0];
@@ -32,25 +24,25 @@ function out(obj) {
 
 function die(msg) {
   console.log(JSON.stringify({ ok: false, error: msg }));
-  process.exit(0); // always exit 0 per hard rule
+  process.exit(0);
 }
 
-// ---------------------------------------------------------------------------
-// Locate ffmpeg / ffprobe
-// ---------------------------------------------------------------------------
+
+
+
 
 const FFMPEG_FALLBACK_DIR =
   'C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\' +
   'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin';
 
 function findBin(name) {
-  // Try PATH first
+
   const r = spawnSync('where', [name], { encoding: 'utf8', shell: false });
   if (r.status === 0) {
     const first = r.stdout.trim().split('\n')[0].trim();
     if (first) return first;
   }
-  // Fallback to known WinGet install
+
   const fb = path.join(FFMPEG_FALLBACK_DIR, name + '.exe');
   if (existsSync(fb)) return fb;
   return null;
@@ -61,17 +53,17 @@ const FFPROBE = findBin('ffprobe');
 
 if (!FFMPEG) die('ffmpeg not found on PATH or in the WinGet fallback location. Install via: winget install Gyan.FFmpeg');
 
-// ---------------------------------------------------------------------------
-// Build default output path
-// ---------------------------------------------------------------------------
+
+
+
 
 function defaultMp4() {
   return path.join(os.tmpdir(), `helm-rec-${Date.now()}.mp4`);
 }
 
-// ---------------------------------------------------------------------------
-// Parse optional --region x,y,w,h into ffmpeg args
-// ---------------------------------------------------------------------------
+
+
+
 
 function regionArgs(region) {
   if (!region) return [];
@@ -83,9 +75,9 @@ function regionArgs(region) {
   return ['-offset_x', String(x), '-offset_y', String(y), '-video_size', `${w}x${h}`];
 }
 
-// ---------------------------------------------------------------------------
-// Check if a PID is alive (Windows)
-// ---------------------------------------------------------------------------
+
+
+
 
 function pidAlive(pid) {
   const r = spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], {
@@ -95,9 +87,9 @@ function pidAlive(pid) {
   return r.status === 0 && r.stdout.includes(String(pid));
 }
 
-// ---------------------------------------------------------------------------
-// VERB: start
-// ---------------------------------------------------------------------------
+
+
+
 
 if (verb === 'start') {
   const outArg     = get('out') || defaultMp4();
@@ -105,10 +97,10 @@ if (verb === 'start') {
   const fps        = get('fps') || '30';
   const region     = get('region');
 
-  // Resolve absolute path for output
+
   const outAbs = path.resolve(outArg);
 
-  // Build ffmpeg command
+
   const ffArgs = [
     '-f', 'gdigrab',
     '-framerate', fps,
@@ -120,7 +112,7 @@ if (verb === 'start') {
   ];
 
   if (secondsArg !== null) {
-    // BOUNDED: blocking call
+
     const secs = parseFloat(secondsArg);
     if (isNaN(secs) || secs <= 0) die('--seconds must be a positive number');
 
@@ -140,7 +132,7 @@ if (verb === 'start') {
     if (!isNaN(oldPid) && pidAlive(oldPid)) {
       die('A recording is already active (PID ' + oldPid + '). Run stop first.');
     }
-    // stale pidfile — clean up
+
     try { unlinkSync(PID_FILE); } catch {}
     try { unlinkSync(PATH_FILE); } catch {}
   }
@@ -153,14 +145,14 @@ if (verb === 'start') {
   });
   child.unref();
 
-  // Give ffmpeg a moment to start and fail fast if it errors immediately
-  // (we can't wait too long; just check the PID is still alive after 800ms)
+
+
   const pid = child.pid;
   if (!pid) die('Failed to spawn ffmpeg (no PID returned)');
 
-  // Busy-wait 800ms so a bad invocation surfaces
+
   const t0 = Date.now();
-  while (Date.now() - t0 < 800) { /* spin */ }
+  while (Date.now() - t0 < 800) {  }
 
   if (!pidAlive(pid)) {
     die('ffmpeg exited immediately — gdigrab may require an unlocked interactive desktop session');
@@ -173,9 +165,9 @@ if (verb === 'start') {
   process.exit(0);
 }
 
-// ---------------------------------------------------------------------------
-// VERB: stop
-// ---------------------------------------------------------------------------
+
+
+
 
 if (verb === 'stop') {
   if (!existsSync(PID_FILE)) {
@@ -199,18 +191,18 @@ if (verb === 'stop') {
     process.exit(0);
   }
 
-  // Try graceful stop: send 'q\n' to ffmpeg's stdin via a PowerShell SendKeys trick.
-  // On Windows, ffmpeg listens on its stdin for 'q' to finalize the file cleanly.
-  // We pipe 'q' through a helper process that writes to the target's stdin via
-  // the Windows console API (WriteConsoleInput) — simplest cross-process approach
-  // is to use a named pipe that ffmpeg already opened. Since gdigrab opens in
-  // non-interactive mode (detached, no console), the stdin pipe approach is
-  // unreliable. Use taskkill /PID <n> with a CTRL_C_EVENT signal via PowerShell
-  // GenerateConsoleCtrlEvent, which causes ffmpeg to flush + finalize.
-  //
-  // The most reliable "graceful" approach on Windows for a detached ffmpeg:
-  // 1. Use PowerShell to send WM_CLOSE or GenerateConsoleCtrlEvent.
-  // 2. If that doesn't kill it within 3s, fall back to taskkill /F.
+
+
+
+
+
+
+
+
+
+
+
+
 
   const psScript = `
 $procId = ${pid}
@@ -254,17 +246,17 @@ if ($proc) {
   const psOut = (r.stdout || '').trim();
   const method = psOut.includes('GRACEFUL') ? 'graceful (Ctrl+C)' : 'forced (taskkill)';
 
-  // Brief pause so ffmpeg can finalize the MP4 header
+
   const t0 = Date.now();
-  while (Date.now() - t0 < 500) { /* spin */ }
+  while (Date.now() - t0 < 500) {  }
 
   out({ ok: true, path: outP, stopped: true, method });
   process.exit(0);
 }
 
-// ---------------------------------------------------------------------------
-// VERB: status
-// ---------------------------------------------------------------------------
+
+
+
 
 if (verb === 'status') {
   if (!existsSync(PID_FILE)) {
@@ -276,7 +268,7 @@ if (verb === 'status') {
   const outP = existsSync(PATH_FILE) ? readFileSync(PATH_FILE, 'utf8').trim() : null;
 
   if (isNaN(pid) || !pidAlive(pid)) {
-    // stale
+
     try { unlinkSync(PID_FILE); } catch {}
     try { unlinkSync(PATH_FILE); } catch {}
     out({ ok: true, recording: false, note: 'Stale pidfile cleaned up.' });
@@ -287,9 +279,9 @@ if (verb === 'status') {
   process.exit(0);
 }
 
-// ---------------------------------------------------------------------------
-// VERB: gif
-// ---------------------------------------------------------------------------
+
+
+
 
 if (verb === 'gif') {
   const src   = get('src');
@@ -305,8 +297,8 @@ if (verb === 'gif') {
 
   if (!existsSync(srcAbs)) die('Source file not found: ' + srcAbs);
 
-  // Two-pass palette GIF:
-  // Pass 1: generate palette
+
+
   const palette = path.join(os.tmpdir(), `helm-palette-${Date.now()}.png`);
   const pass1 = spawnSync(
     FFMPEG,
@@ -333,7 +325,7 @@ if (verb === 'gif') {
     { encoding: 'utf8', stdio: 'pipe' }
   );
 
-  // Clean up palette regardless
+
   try { unlinkSync(palette); } catch {}
 
   if (pass2.status !== 0) {

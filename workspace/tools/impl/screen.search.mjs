@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Tool: screen.search --query <q> [--limit N]
-// Searches ocr_text in events.db. Requires OCR to have been enabled in watcher.
-// If no OCR data present, returns a helpful error.
-
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +28,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS events (
   ocr_text TEXT
 )`);
 
-// Check whether any OCR data exists
+
 const ocrCount = db.prepare('SELECT COUNT(*) as n FROM events WHERE ocr_text IS NOT NULL').get();
 if (!ocrCount || ocrCount.n === 0) {
   console.log(JSON.stringify({

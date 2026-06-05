@@ -1,8 +1,3 @@
-// accessibility.mjs — Accessibility Specialist role for the Helm full-stack builder.
-// Phase: quality. Audits and FIXES the real project to WCAG 2.1 AA, then writes a
-// findings + fixes report to .helm-build/artifacts/a11y-report.md.
-// Runs after feature-engineer so every component exists before the audit starts.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -182,7 +177,7 @@ WCAG 2.1 AA as assessed by static analysis.`;
   },
 ];
 
-// Self-test — runs only when executed directly: node roles/accessibility.mjs
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let passed = 0;
   let failed = 0;
@@ -199,7 +194,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('--- accessibility.mjs self-test ---');
 
-  // Shape
+
   assert('roles is an array', Array.isArray(roles));
   assert('roles has exactly one entry', roles.length === 1);
 
@@ -215,7 +210,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('system is a non-empty string', typeof role.system === 'string' && role.system.length > 0);
   assert('task is a function', typeof role.task === 'function');
 
-  // task(ctx) with fakeCtx — must return non-empty string referencing brief
+
   const fakeCtx = {
     brief: 'x',
     stack: { summary: 'Next.js', notes: '' },
@@ -226,7 +221,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('task output is non-empty', taskOutput.length > 0);
   assert('task output references the brief', taskOutput.includes('x'));
 
-  // Spot-check that the system prompt covers key WCAG areas
+
   assert('system mentions WCAG 2.1 AA', role.system.includes('WCAG 2.1 AA'));
   assert('system mentions focus trap', role.system.toLowerCase().includes('focus trap'));
   assert('system mentions skip', role.system.toLowerCase().includes('skip'));
@@ -234,7 +229,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('system mentions aria-label', role.system.includes('aria-label'));
   assert('system mentions prefers-reduced-motion', role.system.includes('prefers-reduced-motion'));
 
-  // Spot-check task covers artifact output path
+
   assert('task mentions a11y-report.md', taskOutput.includes('a11y-report.md'));
   assert('task mentions WCAG 2.1 AA', taskOutput.includes('WCAG 2.1 AA'));
 

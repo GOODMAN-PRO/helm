@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Tool: mic.transcribe --file <path>
-// Runs whisper.cpp against a WAV file. Returns text or install note.
-
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

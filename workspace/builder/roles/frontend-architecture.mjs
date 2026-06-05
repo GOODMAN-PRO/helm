@@ -1,15 +1,8 @@
-// frontend-architecture.mjs — Frontend Architect role for the Helm full-stack builder.
-// Establishes the frontend foundation: routing tree, RSC/client strategy, data-fetching
-// patterns, global state, typed API client, error/loading boundaries, form conventions,
-// and shared providers. Implements scaffolding pieces AND documents patterns.
-//
-// §1 of CONTRACT.md owns the role schema interface.
-
 import { fileURLToPath } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// Role definition
-// ---------------------------------------------------------------------------
+
+
+
 
 export const roles = [
   {
@@ -20,7 +13,7 @@ export const roles = [
     model: 'opus',
     produces: ['frontend-architecture'],
 
-    // Rich expert persona — demands RSC correctness, type safety, performance, clear conventions.
+
     system: `You are a principal frontend architect with 12+ years of React experience and deep
 expertise in Next.js App Router, React Server Components (RSC), TypeScript strict mode, and
 production-grade frontend systems. You have shipped many large-scale Next.js applications and
@@ -44,7 +37,7 @@ Your output MUST be production-quality, fully-wired, NO-STUB code:
 - Every import resolves. Every component renders. Every type is correct.
 - Write to REAL project files; use the artifact mechanism to record the architecture document.`,
 
-    // task() returns the concrete instruction string for this build, referencing ctx.stack.notes.
+
     task(ctx) {
       const stackNotes = ctx.stack?.notes ?? 'Next.js App Router, TypeScript, Tailwind, shadcn/ui';
       const brief = ctx.brief ?? '';
@@ -195,18 +188,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('frontend-architecture.mjs — self-test\n');
 
-  // 1. Exactly one role exported.
+
   assert('roles is an array',   Array.isArray(roles));
   assert('exactly one role',    roles.length === 1, `got ${roles.length}`);
 
   const role = roles[0];
 
-  // 2. Required keys present.
+
   for (const key of REQUIRED_KEYS) {
     assert(`role has key '${key}'`, key in role);
   }
 
-  // 3. Field values.
+
   assert("id = 'frontend-architect'",     role.id      === 'frontend-architect');
   assert("phase = 'frontend'",            role.phase   === 'frontend');
   assert("model = 'opus'",                role.model   === 'opus');
@@ -218,7 +211,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('system is non-empty string',    typeof role.system === 'string' && role.system.trim().length > 0);
   assert('task is a function',            typeof role.task   === 'function');
 
-  // 4. task(fakeCtx) returns a non-empty string.
+
   const fakeCtx = {
     brief:           'A task management app with teams and projects',
     stack:           { summary: 'Next.js', notes: 'App Router, RSC, react-hook-form, Zod' },
@@ -239,7 +232,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('task references stack notes',
     typeof taskResult === 'string' && taskResult.includes(fakeCtx.stack.notes));
 
-  // 5. system prompt mentions RSC correctness signals.
+
   const systemLower = role.system.toLowerCase();
   assert('system mentions RSC',            systemLower.includes('rsc') || systemLower.includes('server component'));
   assert('system mentions type safety',    systemLower.includes('type') || systemLower.includes('zod'));

@@ -1,16 +1,10 @@
 #!/usr/bin/env node
-// Tool: notify.unread
-// Returns current unread totals: { messages, calendar, mail }.
-// Queries live sources directly (does not require poller daemon running).
-// If a source is inaccessible (permission missing), its value is null and a
-// 'warning' field explains why.
-
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { macOnlyOrExit } from './mac-only.mjs';
 
-macOnlyOrExit('notify.unread');   // reads macOS Messages/Mail via AppleScript + chat.db
+macOnlyOrExit('notify.unread');
 const CHAT_DB = `${process.env.HOME}/Library/Messages/chat.db`;
 
 function getMessagesUnread() {

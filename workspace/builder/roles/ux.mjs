@@ -1,8 +1,3 @@
-// ux.mjs — UX Designer role for the Helm full-stack builder.
-// Designs information architecture, user flows, screen inventory, and navigation model
-// from the PRD/requirements artifacts. No visual styling — structure and flow only.
-// The output (.helm-build/artifacts/ux-flows.md) is the blueprint frontend engineers build from.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -43,7 +38,7 @@ screen inventories, and nested lists for component/state breakdowns. Be concrete
 "user sees a list of their habits sorted by streak, descending" beats "display habits".`,
 
     task(ctx) {
-      // Pull all prior artifacts (requirements, PRD, etc.) so the agent has full context.
+
       const priorArtifacts = ctx.artifactsDigest();
       const stackInfo = ctx.stack
         ? `Stack: ${ctx.stack.summary || ctx.stack.id || 'unknown'}${ctx.stack.notes ? `\nStack notes: ${ctx.stack.notes}` : ''}`

@@ -1,29 +1,23 @@
-// stack.mjs — tech-stack presets + scaffolding for the full-stack app builder.
-// Each StackPreset describes a target stack and knows how to scaffold it non-interactively.
-// resolveStack() maps a free-text brief → the best preset; never throws.
-//
-// §6 of CONTRACT.md owns this interface. Collaborators import STACKS and resolveStack only.
-
 import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { showcaseStack } from './stack-showcase.mjs';   // award-grade animated showcase preset
-import { nextCreateArgs, ensureNextScaffold } from './scaffold-util.mjs';   // correct flags + guaranteed fallback
+import { showcaseStack } from './stack-showcase.mjs';
+import { nextCreateArgs, ensureNextScaffold } from './scaffold-util.mjs';
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
-/** Run a scaffolder command non-interactively; return {ok, output, error?}. Never throws. */
+
+
+
+
 function runScaffolder(cmd, args, { cwd, timeoutMs = 600_000 } = {}) {
   try {
     const result = spawnSync(cmd, args, {
       cwd,
-      // CI=1 suppresses create-next-app and astro interactive prompts
+
       env: { ...process.env, CI: '1', ADBLOCK: '1' },
       timeout: timeoutMs,
-      maxBuffer: 20 * 1024 * 1024,  // 20 MB — scaffold output can be verbose
+      maxBuffer: 20 * 1024 * 1024,
       windowsHide: true,
       encoding: 'utf8',
     });
@@ -31,7 +25,7 @@ function runScaffolder(cmd, args, { cwd, timeoutMs = 600_000 } = {}) {
     const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
 
     if (result.error) {
-      // spawn error (ENOENT, ETIMEDOUT, etc.) — network/CLI unavailable
+
       return { ok: false, output, error: result.error.message };
     }
     if (result.status !== 0) {
@@ -39,7 +33,7 @@ function runScaffolder(cmd, args, { cwd, timeoutMs = 600_000 } = {}) {
     }
     return { ok: true, output };
   } catch (err) {
-    // defensive: should never reach here given the try above, but just in case
+
     return { ok: false, output: '', error: String(err?.message ?? err) };
   }
 }
@@ -57,10 +51,10 @@ function ensureParent(projectDir) {
 
 /** @type {Record<string, import('./context.mjs').StackPreset>} */
 export const STACKS = {
-  // -------------------------------------------------------------------------
-  // 1. next-fullstack (DEFAULT)
-  // Full-stack SaaS starter: App Router + auth + ORM + UI + testing.
-  // -------------------------------------------------------------------------
+
+
+
+
   'next-fullstack': {
     id: 'next-fullstack',
     label: 'Next.js Full-Stack',
@@ -68,7 +62,7 @@ export const STACKS = {
       'Next.js 14 (App Router) · TypeScript · Tailwind CSS · shadcn/ui · ' +
       'Prisma ORM (SQLite dev) · Auth.js v5 · Zod · Vitest · Playwright · ' +
       'ESLint + Prettier. Best for full-stack web apps, SaaS, APIs.',
-    packageManager: 'pnpm',  // pnpm preferred; scaffold uses --use-npm as a safe fallback
+    packageManager: 'pnpm',
     devCommand: 'next dev',
     buildCommand: 'next build',
     testCommand: 'vitest run',
@@ -86,22 +80,22 @@ export const STACKS = {
     ].join('\n'),
 
     async scaffold(projectDir) {
-      // Correct, fully non-interactive create-next-app args live in scaffold-util (the old hard-coded
-      // `--no-import-alias`/`--no-turbopack` flags don't exist and made it fail). ensureNextScaffold
-      // GUARANTEES a buildable project: if create-next-app produces nothing, it writes a minimal base.
+
+
+
       const parent = ensureParent(projectDir);
       const r = runScaffolder('npx', nextCreateArgs(projectDir, 'npm'), { cwd: parent, timeoutMs: 300_000 });
-      const ensured = ensureNextScaffold(projectDir, r);   // guarantees a package.json (real or fallback)
-      // Install deps separately (bounded) — create-next-app's own install is the flaky/slow part.
+      const ensured = ensureNextScaffold(projectDir, r);
+
       const inst = runScaffolder('npm', ['install', '--no-audit', '--no-fund'], { cwd: projectDir, timeoutMs: 600_000 });
       return { ok: ensured.ok, fallback: ensured.fallback, output: [ensured.output, inst.output].filter(Boolean).join('\n'), error: inst.ok ? ensured.error : `deps install issue: ${inst.error}` };
     },
   },
 
-  // -------------------------------------------------------------------------
-  // 2. astro-site
-  // Content/marketing sites: lightning-fast static + optional SSR islands.
-  // -------------------------------------------------------------------------
+
+
+
+
   'astro-site': {
     id: 'astro-site',
     label: 'Astro Static Site',
@@ -125,10 +119,10 @@ export const STACKS = {
     ].join('\n'),
 
     async scaffold(projectDir) {
-      // npm create astro@latest <dir> -- --template minimal --typescript strict
-      //   --no-install   skip npm install (faster; verifyProject runs install)
-      //   --no-git       do not init a git repo (Helm manages git at the workspace level)
-      //   --yes          accept all defaults non-interactively
+
+
+
+
       const parent = ensureParent(projectDir);
       return runScaffolder(
         'npm',
@@ -148,10 +142,10 @@ export const STACKS = {
     },
   },
 
-  // -------------------------------------------------------------------------
-  // 3. vite-react-spa
-  // Lightweight SPA: client-only React app, no SSR, no server.
-  // -------------------------------------------------------------------------
+
+
+
+
   'vite-react-spa': {
     id: 'vite-react-spa',
     label: 'Vite + React SPA',
@@ -175,8 +169,8 @@ export const STACKS = {
     ].join('\n'),
 
     async scaffold(projectDir) {
-      // npm create vite@latest <dir> -- --template react-ts
-      // Non-interactive by design (no prompts in this template flag path).
+
+
       const parent = ensureParent(projectDir);
       return runScaffolder(
         'npm',
@@ -192,46 +186,37 @@ export const STACKS = {
     },
   },
 
-  // 4. showcase-site — award-grade, highly-animated marketing/showcase sites (rivals apple.com)
+
   'showcase-site': showcaseStack,
 };
 
-// ---------------------------------------------------------------------------
-// resolveStack
-// ---------------------------------------------------------------------------
 
-// Keyword patterns that override the default.
-// More-specific patterns first; default falls through to next-fullstack.
+
+
+
+
+
 const KEYWORD_RULES = [
   {
-    // Award-grade, highly-animated/interactive/immersive sites → showcase-site (checked FIRST)
+
     pattern: /animat|interactive|immersive|award|apple[\s-]?grade|awwwards|scroll[\s-]?(animation|driven|telling)|parallax|3d|webgl|cinematic|product\s+(launch|showcase|reveal)|motion/i,
     id: 'showcase-site',
   },
   {
-    // Static/content sites → astro
+
     pattern: /landing|marketing|blog|portfolio|docs|static|brochure|content[\s-]site/i,
     id: 'astro-site',
   },
   {
-    // Client-only dashboards / admin tools → vite SPA
+
     pattern: /dashboard|spa\b|single[\s-]page|internal[\s-]tool|admin[\s-]panel|admin tool/i,
     id: 'vite-react-spa',
   },
 ];
 
-/**
- * Map a hint (stack id OR free-text brief) to a StackPreset.
- * - If hint is a known STACKS key, return that preset directly.
- * - Otherwise keyword-match the text and return the best fit.
- * - Default: 'next-fullstack'.
- * Never throws.
- *
- * @param {string|undefined|null} hint
- * @returns {import('./context.mjs').StackPreset}
- */
+
 export function resolveStack(hint) {
-  // Exact id match — fast path
+
   if (hint && STACKS[hint]) return STACKS[hint];
 
   const text = String(hint ?? '');
@@ -244,9 +229,9 @@ export function resolveStack(hint) {
   return STACKS['next-fullstack'];
 }
 
-// ---------------------------------------------------------------------------
-// Self-test (run with: node stack.mjs)
-// ---------------------------------------------------------------------------
+
+
+
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const REQUIRED_FIELDS = [
@@ -275,18 +260,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
     assert(`${tag}.scaffold is function`, typeof preset.scaffold === 'function');
     assert(`${tag}.packageManager valid`, ['npm', 'pnpm'].includes(preset.packageManager));
-    // Confirm scaffold is NOT called in the test (CONTRACT requirement)
+
   }
 
   console.log('\n--- stack.mjs self-test ---\n');
 
-  // 1. All three presets well-formed
+
   for (const [id, preset] of Object.entries(STACKS)) {
     assert(`STACKS['${id}'].id matches key`, preset.id === id);
     checkPreset(preset, `STACKS['${id}']`);
   }
 
-  // 2. resolveStack — exact id
+
   const byId = resolveStack('next-fullstack');
   assert('resolveStack("next-fullstack") → next-fullstack', byId.id === 'next-fullstack');
 
@@ -296,7 +281,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const byIdSpa = resolveStack('vite-react-spa');
   assert('resolveStack("vite-react-spa") → vite-react-spa', byIdSpa.id === 'vite-react-spa');
 
-  // 3. resolveStack — keyword matching
+
   const marketing = resolveStack('a marketing landing page for my SaaS');
   assert('keyword "landing page" → astro-site', marketing.id === 'astro-site');
 
@@ -315,7 +300,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const internalTool = resolveStack('internal tool for ops team');
   assert('keyword "internal tool" → vite-react-spa', internalTool.id === 'vite-react-spa');
 
-  // 4. resolveStack — default fallback
+
   const unknown = resolveStack('whatever random thing with no keywords');
   assert('unknown brief → next-fullstack (default)', unknown.id === 'next-fullstack');
 
@@ -328,12 +313,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const emptyHint = resolveStack('');
   assert('empty hint → next-fullstack', emptyHint.id === 'next-fullstack');
 
-  // 5. All required presets accessible
+
   checkPreset(resolveStack('next-fullstack'), 'resolved[next-fullstack]');
   checkPreset(resolveStack('a marketing landing page'), 'resolved[marketing keyword]');
   checkPreset(resolveStack('whatever'), 'resolved[default]');
 
-  // Summary
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
 }

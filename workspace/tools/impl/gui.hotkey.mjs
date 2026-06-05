@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// Press a keyboard shortcut / combo, e.g. "ctrl+c", "ctrl+shift+esc", "alt+tab", "win+r", "ctrl+a".
-// Holds each key down in order then releases in reverse — so modifiers (ctrl/alt/shift/win) work.
 import { winInput } from './win-input.mjs';
 
 const args = process.argv.slice(2);

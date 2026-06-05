@@ -1,6 +1,3 @@
-// Shared browser implementation. playwright is imported lazily inside runBrowser()
-// so this module is safe to import without triggering a browser launch or chromium download.
-
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, renameSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -12,7 +9,7 @@ export const PROFILE    = path.join(WORKSPACE, 'browser-profile');
 export const STATE_FILE = path.join(WORKSPACE, 'browser-state.json');
 export const DOWNLOADS   = path.join(WORKSPACE, 'downloads');
 
-// A realistic desktop-Chrome UA so sites don't serve the "HeadlessChrome" experience (some block it).
+
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 export function loadState() {
@@ -39,7 +36,7 @@ function stripHtml(html) {
 }
 
 async function ensureChromium(chromium) {
-  // Auto-install on first use if the binary is missing. Cross-platform (`npx` resolves per-OS).
+
   const exePath = chromium.executablePath();
   if (!existsSync(exePath)) {
     const { execSync } = await import('node:child_process');
@@ -55,7 +52,7 @@ const hostSlug = u => { try { return new URL(u).hostname.replace(/^www\./, '').r
 const extFor   = ct => ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
   'image/webp': 'webp', 'image/avif': 'avif', 'image/svg+xml': 'svg', 'image/bmp': 'bmp', 'image/x-icon': 'ico' }[ct.split(';')[0].trim()] || 'img');
 
-// Scroll the page in steps so lazy-loaded / infinite-scroll images actually render before we read them.
+
 async function autoScroll(page, rounds) {
   for (let i = 0; i < rounds; i++) {
     await page.evaluate(() => window.scrollBy(0, window.innerHeight)).catch(() => {});
@@ -64,8 +61,8 @@ async function autoScroll(page, rounds) {
   await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
 }
 
-// Gather every image URL the page references: <img> (src/currentSrc/srcset/lazy attrs), <picture><source>,
-// CSS background-image, and og:image/twitter:image meta — with the element's rendered size so we can rank.
+
+
 async function collectImageCandidates(page) {
   return page.evaluate(() => {
     const seen = new Map();
@@ -105,8 +102,8 @@ async function collectImageCandidates(page) {
   }).catch(() => []);
 }
 
-// verb: 'open' | 'read' | 'click' | 'fill' | 'screenshot' | 'images' | 'login' | 'close'
-// params: { url?, selector?, text?, out?, count?, min?, scroll?, headful?, seconds? }
+
+
 export async function runBrowser(verb, params = {}) {
   if (verb === 'close') {
     if (existsSync(STATE_FILE)) unlinkSync(STATE_FILE);
@@ -120,13 +117,13 @@ export async function runBrowser(verb, params = {}) {
     throw new Error('no active URL: call browser.open --url <url> first');
   }
 
-  // Lazy import — playwright is never required at module load time.
+
   const { chromium } = await import('playwright');
   await ensureChromium(chromium);
 
   mkdirSync(PROFILE, { recursive: true });
 
-  // `login` always runs visibly; everything else is headless unless asked for a visible window.
+
   const headful = verb === 'login' || truthy(params.headful) || process.env.HELM_BROWSER_HEADFUL === '1';
   const ctx = await chromium.launchPersistentContext(PROFILE, {
     headless: !headful,
@@ -139,9 +136,9 @@ export async function runBrowser(verb, params = {}) {
   try {
     const page = ctx.pages()[0] || await ctx.newPage();
 
-    // --- login: open a real (visible) window so the owner signs in once; the cookies persist in the
-    // profile, so every later headless call (open/read/images) is already authenticated. Finishes when
-    // the owner closes the window or after `seconds`.
+
+
+
     if (verb === 'login') {
       const secs = clampInt(params.seconds, 180, 10, 900);
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 }).catch(() => {});
@@ -167,18 +164,18 @@ export async function runBrowser(verb, params = {}) {
       return { ok: true, url: currentUrl, title, text: text.slice(0, 10_000) };
 
     } else if (verb === 'images') {
-      // Navigate (above), scroll to trigger lazy loading, collect every referenced image, rank by
-      // rendered area (biggest = the real content, not icons), then download through the browser's
-      // own request context so cookies/referer apply. No site API required.
+
+
+
       const count    = clampInt(params.count, 20, 1, 200);
-      const minBytes = clampInt(params.min, 3000, 0, 50_000_000);   // skip 1px tracking pixels / spacers
+      const minBytes = clampInt(params.min, 3000, 0, 50_000_000);
       const scrolls  = clampInt(params.scroll, 8, 0, 60);
       const outDir   = params.out || path.join(DOWNLOADS, `${hostSlug(currentUrl)}-${stamp()}`);
 
       await autoScroll(page, scrolls);
       const cands = await collectImageCandidates(page);
 
-      // resolve relative → absolute, drop non-http and dupes, rank by area
+
       const seen = new Set(); const ranked = [];
       for (const c of cands) {
         let abs; try { abs = new URL(c.url, currentUrl).href; } catch { continue; }

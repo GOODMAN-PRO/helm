@@ -1,11 +1,6 @@
-// security.mjs — Security Auditor role for the Helm full-stack builder.
-// Phase: quality (after integration-engineer). Performs an OWASP-grade audit
-// and FIXES all issues found directly in the project files.
-// Self-test: node roles/security.mjs
-
 import { fileURLToPath } from 'node:url';
 
-// ─── Role definition ────────────────────────────────────────────────────────
+
 
 export const roles = [
   {
@@ -16,8 +11,8 @@ export const roles = [
     model: 'opus',
     produces: ['security-report'],
 
-    // Rich senior-appsec-engineer persona. Every sentence is intentional:
-    // the agent must not just flag issues — it must fix them in place.
+
+
     system: `You are a senior application security engineer with 15+ years of
 experience conducting OWASP Top 10 assessments, threat modeling, and
 hands-on remediation for production web applications. You hold OSCP, CISSP,
@@ -86,8 +81,8 @@ Production readiness:
   Every file you touch must remain syntactically valid TypeScript.
   Zero TODOs, zero stubs. Write it so the app ships as-is.`,
 
-    // task() returns the concrete, build-specific instruction.
-    // It reads ctx.stack.notes to adapt to the project's tech choices.
+
+
     task(ctx) {
       const { brief, stack } = ctx;
       const digest = ctx.artifactsDigest();
@@ -199,10 +194,10 @@ const securityHeaders = [
   },
   {
     key: 'Content-Security-Policy',
-    // Tighten further if you know all script/style sources.
+
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",   // remove unsafe-inline once nonces/hashes are wired
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
@@ -216,7 +211,7 @@ const nextConfig = {
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },
-  // ...rest of existing config
+
 };
 export default nextConfig;
 \`\`\`

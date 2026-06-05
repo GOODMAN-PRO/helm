@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Multi-step planning subsystem. DB at workspace/plans/plans.db.
-// All output is JSON on stdout. Exits 0 on success, 1 on error.
-//
-// Verbs:
-//   create <goal>
-//   add-step <plan_id> <task> [--tool <tool_or_cmd>] [--deps <id1,id2,...>]
-//   next <plan_id>
-//   complete <plan_id> <step_id> [--result <text>] [--checkpoint <text>] [--failed] [--no-reflexion]
-//   show <plan_id>
-//   list
-//   replan <plan_id> [--failure <text>] [--steps-json <json>]
-
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -58,16 +46,16 @@ db.exec(`
   );
 `);
 
-// Migrate existing tables — safe no-op if columns already present.
+
 for (const sql of [
   `ALTER TABLE plans ADD COLUMN replan_count INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE steps ADD COLUMN deps TEXT NOT NULL DEFAULT '[]'`,
   `ALTER TABLE steps ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0`,
 ]) {
-  try { db.exec(sql); } catch { /* column already exists */ }
+  try { db.exec(sql); } catch {  }
 }
 
-// ---- helpers ----
+
 
 function out(obj) {
   console.log(JSON.stringify(obj, null, 2));
@@ -103,7 +91,7 @@ function stepRow(row) {
   };
 }
 
-// Replace {{step.ID.result}} tokens with actual stored results.
+
 function substituteResults(planId, task) {
   return task.replace(/\{\{step\.(\d+)\.result\}\}/g, (match, id) => {
     const s = db.prepare(`SELECT result FROM steps WHERE id = ? AND plan_id = ?`)
@@ -112,7 +100,7 @@ function substituteResults(planId, task) {
   });
 }
 
-// Latest checkpoint row for a step (returns parsed state or null).
+
 function latestCheckpoint(stepId) {
   const row = db.prepare(
     `SELECT state_json FROM checkpoints WHERE step_id = ? ORDER BY created_at DESC LIMIT 1`
@@ -120,7 +108,7 @@ function latestCheckpoint(stepId) {
   return row ? JSON.parse(row.state_json) : null;
 }
 
-// All pending steps whose deps are fully satisfied (DAG runnable set).
+
 function runnableSteps(planId) {
   const pending = db.prepare(
     `SELECT * FROM steps WHERE plan_id = ? AND status = 'pending' ORDER BY idx ASC`
@@ -137,7 +125,7 @@ function runnableSteps(planId) {
   });
 }
 
-// Run a single-turn claude -p call; returns stdout text or null on failure.
+
 function claudeOneTurn(prompt, timeoutMs) {
   const cb = resolveClaude();
   const r = spawnSync(
@@ -158,7 +146,7 @@ function claudeOneTurn(prompt, timeoutMs) {
   }
 }
 
-// ---- arg parsing ----
+
 
 const args = process.argv.slice(2);
 
@@ -182,7 +170,7 @@ function hasFlag(flag) {
 
 const verb = shift();
 
-// ---- verbs ----
+
 
 if (verb === 'create') {
   const goal = args.join(' ').trim();
@@ -211,7 +199,7 @@ if (verb === 'create') {
     INSERT INTO steps (plan_id, idx, task, tool_or_cmd, deps) VALUES (?, ?, ?, ?, ?) RETURNING *
   `).get(planId, idx, task, tool, deps);
 
-  // Reactivate plan if it was closed — a new pending step makes it active again.
+
   db.prepare(`UPDATE plans SET status='active' WHERE id=? AND status='done'`).run(planId);
 
   out(stepRow(r));
@@ -239,11 +227,11 @@ if (verb === 'create') {
       `SELECT COUNT(*) as n FROM steps WHERE plan_id=? AND status='pending'`
     ).get(planId);
     if (anyPending.n === 0) {
-      // No pending steps at all — auto-close.
+
       db.prepare(`UPDATE plans SET status = 'done' WHERE id = ? AND status != 'blocked'`).run(planId);
       out({ plan_id: planId, status: 'done', step: null, steps: [] });
     } else {
-      // Pending steps exist but deps not yet satisfied (or waiting on blocked dep).
+
       out({ plan_id: planId, status: plan.status, step: null, steps: [] });
     }
   } else {
@@ -256,8 +244,8 @@ if (verb === 'create') {
     out({
       plan_id: planId,
       status: plan.status,
-      step: enriched[0],   // backwards-compat: first runnable step
-      steps: enriched,     // full parallel set
+      step: enriched[0],
+      steps: enriched,
     });
   }
 
@@ -276,7 +264,7 @@ if (verb === 'create') {
   if (!step) die(`step ${stepId} not found in plan ${planId}`);
   if (step.status !== 'pending') die(`step ${stepId} is already ${step.status}`);
 
-  // Always write a checkpoint.
+
   const stateJson = JSON.stringify({
     status: failed ? 'failed' : 'done',
     result,
@@ -292,7 +280,7 @@ if (verb === 'create') {
     const MAX_RETRIES = 2;
 
     if (retryCount < MAX_RETRIES) {
-      // Best-effort reflexion via claude.
+
       let diagnosis = null;
       if (!noReflexion) {
         const prompt =
@@ -302,10 +290,10 @@ if (verb === 'create') {
         try {
           const txt = claudeOneTurn(prompt, 60_000);
           if (txt) diagnosis = txt.split('\n')[0].trim();
-        } catch { /* skip reflexion if claude unavailable */ }
+        } catch {  }
       }
 
-      // Insert retry step.
+
       const maxRow = db.prepare(
         `SELECT COALESCE(MAX(idx), -1) as m FROM steps WHERE plan_id = ?`
       ).get(planId);
@@ -320,7 +308,7 @@ if (verb === 'create') {
         VALUES (?, ?, ?, ?, ?, ?) RETURNING *
       `).get(planId, newIdx, retryTask, step.tool_or_cmd, depsJson, retryCount + 1);
 
-      // Mark original step as failed (non-permanent; retry is in flight).
+
       db.prepare(
         `UPDATE steps SET status='failed', result=?, updated=unixepoch() WHERE id=?`
       ).run(result, stepId);
@@ -333,7 +321,7 @@ if (verb === 'create') {
       });
 
     } else {
-      // Max retries exceeded — escalate.
+
       db.prepare(
         `UPDATE steps SET status='blocked', result=?, updated=unixepoch() WHERE id=?`
       ).run(result, stepId);
@@ -346,7 +334,7 @@ if (verb === 'create') {
     }
 
   } else {
-    // Success path.
+
     db.prepare(`
       UPDATE steps SET status='done', result=?, checkpoint=?, updated=unixepoch() WHERE id=?
     `).run(result, checkpoint, stepId);
@@ -421,7 +409,7 @@ if (verb === 'create') {
     }
   }
 
-  // Delete pending steps and insert the new set.
+
   db.prepare(`DELETE FROM steps WHERE plan_id=? AND status='pending'`).run(planId);
 
   const maxIdxRow = db.prepare(

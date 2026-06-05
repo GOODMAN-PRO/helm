@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Phase 3 smoke tests.
-// Each test is idempotent and does not require daemons to be running.
-// Exits 0 if all pass, 1 if any fail.
-
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -39,7 +35,7 @@ function parseJSON(s) {
 
 console.log('Phase 3 smoke tests\n');
 
-// ---- 3.1 Screen watcher ----
+
 
 run('screen: watcher.mjs exists', () => {
   const p = path.join(ROOT, 'workspace/senses/screen/watcher.mjs');
@@ -57,9 +53,9 @@ run('screen: launchd plist exists', () => {
 });
 
 run('screen: sense is off by default (installer never auto-enables it)', () => {
-  // "Off by default" is a property of the INSTALL PATH, not live state — the owner may opt in and
-  // run it (then it's loaded), which must NOT fail this test. So verify the default installer/wizard
-  // doesn't auto-register the screen sense; it stays opt-in.
+
+
+
   for (const f of ['scripts/install-service.sh', 'scripts/install-service.ps1', 'scripts/wizard.mjs', 'index.js']) {
     const p = path.join(ROOT, f); if (!existsSync(p)) continue;
     if (/com\.helm\.screen|senses[\/\\]screen[\/\\]watcher|HelmScreen/.test(readFileSync(p, 'utf8')))
@@ -76,7 +72,7 @@ run('screen.recent: empty DB returns []', () => {
 run('screen.at: missing DB returns null', () => {
   const r = runTool('screen.at', `{"ts":${Date.now()}}`);
   const data = parseJSON(r.stdout);
-  // null when no events exist
+
   if (data !== null && !Array.isArray(data) && typeof data !== 'object') {
     throw new Error(`unexpected result: ${r.stdout}`);
   }
@@ -85,13 +81,13 @@ run('screen.at: missing DB returns null', () => {
 run('screen.search: no OCR returns helpful error', () => {
   const r = runTool('screen.search', '{"query":"test"}');
   const data = parseJSON(r.stdout);
-  // Should return error explaining OCR is off, not throw
+
   if (data === null || (data.error === undefined && !Array.isArray(data))) {
     throw new Error(`unexpected result: ${r.stdout}`);
   }
 });
 
-// ---- 3.2 Notify ----
+
 
 run('notify: poller.mjs exists', () => {
   const p = path.join(ROOT, 'workspace/senses/notify/poller.mjs');
@@ -124,10 +120,10 @@ run('notify.unread: returns { messages, calendar, mail } shape', () => {
   if (!('messages' in data)) throw new Error('missing messages key');
   if (!('calendar' in data)) throw new Error('missing calendar key');
   if (!('mail' in data))     throw new Error('missing mail key');
-  // Values may be null if permissions missing — that's acceptable
+
 });
 
-// ---- 3.3 Location ----
+
 
 run('location: location.mjs exists', () => {
   const p = path.join(ROOT, 'workspace/senses/location/location.mjs');
@@ -138,7 +134,7 @@ run('location.here: returns { installed: false } or valid location if CoreLocati
   const r = runTool('location.here', '{}');
   const data = parseJSON(r.stdout);
   if (!data || typeof data !== 'object') throw new Error(`not an object: ${r.stdout}`);
-  // Either installed=false (binary missing) or valid coords
+
   const hasCoords = 'lat' in data && 'lon' in data;
   const isNotInstalled = data.installed === false;
   if (!hasCoords && !isNotInstalled && !data.error) {
@@ -146,7 +142,7 @@ run('location.here: returns { installed: false } or valid location if CoreLocati
   }
 });
 
-// ---- 3.4 Mic ----
+
 
 run('mic: record.mjs exists', () => {
   const p = path.join(ROOT, 'workspace/senses/mic/record.mjs');
@@ -159,19 +155,19 @@ run('mic: transcribe.mjs exists', () => {
 });
 
 run('mic.record: returns not-installed or path (no sox/ffmpeg = graceful)', () => {
-  // We don't want to actually record; test that the tool returns valid JSON
-  // with either a path (if sox/ffmpeg installed) or an error object.
-  // Use --seconds 0 to minimise capture time if tools are present.
-  // Since mic.record is confirm:true, call the impl directly.
+
+
+
+
   const IMPL = path.join(ROOT, 'workspace/senses/mic/record.mjs');
   const r = spawnSync(process.execPath, [IMPL, '--seconds', '1'], {
     encoding: 'utf8', cwd: ROOT,
     timeout: 20000,
-    // Avoid actually recording in CI — just verify it produces valid JSON
+
   });
   const data = parseJSON(r.stdout);
   if (!data || typeof data !== 'object') throw new Error(`not an object: ${r.stdout}`);
-  // Either { error } (not installed / mic denied) or { path } (success)
+
   if (!('error' in data) && !('path' in data)) {
     throw new Error(`unexpected shape: ${r.stdout}`);
   }
@@ -187,7 +183,7 @@ run('mic.transcribe: returns error or text, not crash', () => {
   if (!('error' in data)) throw new Error(`expected error key for missing file: ${r.stdout}`);
 });
 
-// ---- Registry ----
+
 
 run('registry: all phase 3 tools listed', () => {
   const r = spawnSync('node', [TOOLS, 'list'], { encoding: 'utf8', cwd: ROOT, timeout: 10000 });
@@ -206,7 +202,7 @@ run('registry: all phase 3 tools listed', () => {
   if (tools.length < 31) throw new Error(`expected ≥31 tools, got ${tools.length}`);
 });
 
-// ---- Summary ----
+
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

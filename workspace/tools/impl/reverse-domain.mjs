@@ -1,25 +1,10 @@
 #!/usr/bin/env node
-// reverse-domain.mjs — domain/category-aware analysis for the reverse-engineering tool.
-//
-// After the generic + deep passes have collected findings, this layer asks "what KIND of app is this?"
-// and, for recognized categories, explains how the app performs its core job and runs a gap analysis
-// (what capabilities it has vs. lacks). The first deep specialization is NOTE-TAKING apps — it explains
-// how the app takes & stores notes (editor engine, storage format, location, sync, linking, search,
-// extensibility) and lists gaps/opportunities. Other categories get a lighter generic gap analysis.
-//
-// Everything is heuristic + evidence-based (it reasons from detected/undetected dependencies, document
-// types, frameworks). It NEVER throws — returns { lines: [], findings: {} } on any failure.
-//
-// Exports:
-//   classifyDomain(findings)        -> { category, confidence, signals: string[] }
-//   domainAnalysis(findings, kind)  -> { lines: string[], findings: { domain, gaps, noteMechanics? } }
-
 import { fileURLToPath } from 'node:url';
 
-// ---- helpers -------------------------------------------------------------------------------------
 
-// Collect every dependency name (prod + dev) plus main-process requires into one lowercased set, so
-// capability checks are a simple membership test regardless of where the signal lives.
+
+
+
 function depUniverse(findings) {
   const f = findings || {};
   const e = f.electron || {};
@@ -27,9 +12,9 @@ function depUniverse(findings) {
   const add = obj => { if (obj && typeof obj === 'object') for (const k of Object.keys(obj)) names.add(String(k).toLowerCase()); };
   add(e.dependencies); add(e.devDependencies);
   for (const r of (e.mainRequires || [])) names.add(String(r).toLowerCase());
-  for (const s of (e.bundleSignals || [])) names.add(String(s).toLowerCase());   // libs found by scanning the minified bundle
+  for (const s of (e.bundleSignals || [])) names.add(String(s).toLowerCase());
   for (const s of (f.subsystems || [])) names.add(String(s).toLowerCase());
-  // Web: pull host/lib hints from code endpoints + detected services so web note apps get some coverage.
+
   for (const ep of ((f.code && f.code.endpoints) || [])) names.add(String(ep).toLowerCase());
   for (const s of (f.services || [])) names.add(String(s.name || '').toLowerCase());
   return names;
@@ -74,7 +59,7 @@ const DB_LIBS = [
   { needles: ['realm'], name: 'Realm' },
   { needles: ['indexeddb', 'dexie', 'idb'], name: 'IndexedDB' },
 ];
-const SYNC_REALTIME = ['yjs', 'automerge', 'sharedb', 'liveblocks'];   // CRDT / OT real-time collaboration
+const SYNC_REALTIME = ['yjs', 'automerge', 'sharedb', 'liveblocks'];
 const SYNC_NET = ['socket.io', 'websocket', ' ws@', 'ws', 'pusher', 'ably', 'partykit'];
 const CLOUD_SDK = ['aws-sdk', '@aws-sdk', 'dropbox', 'googleapis', '@google-cloud', 'firebase', 'supabase', 'icloud', '@azure'];
 const SEARCH_LIBS = ['lunr', 'flexsearch', 'minisearch', 'orama', 'fuse.js', 'fusejs', 'elasticlunr', 'meilisearch'];
@@ -82,11 +67,11 @@ const CRYPTO_LIBS = ['libsodium', 'tweetnacl', 'crypto-js', 'node-forge', 'openp
 const AI_LIBS = ['openai', '@anthropic', 'anthropic', 'langchain', 'llama', '@huggingface', 'ai-sdk', 'ollama'];
 const FILE_WATCH = ['chokidar', 'fs-extra', 'fswatcher', 'gaze', 'watchpack'];
 
-// ---- known apps -----------------------------------------------------------------------------------
-// A small, high-precision map of well-known apps. Some apps (notably Obsidian) load their real UI code
-// from OUTSIDE the .app bundle, so static analysis can't see the editor/format — but these storage
-// models are stable, well-established facts. Used as ONE strong signal; generic detection still runs for
-// everything not listed here. `mech` seeds the note-mechanics; `note` is shown as "Known behavior".
+
+
+
+
+
 const KNOWN_APPS = [
   { match: /\bobsidian\b|md\.obsidian/i, category: 'note-taking',
     mech: { format: 'markdown-files', storage: 'local-files', editor: 'CodeMirror', linking: true, plugins: true, search: 'built-in', collaboration: null, cloudSync: null },
@@ -153,7 +138,7 @@ function knownApp(findings) {
   } catch { return null; }
 }
 
-// ---- domain classification -----------------------------------------------------------------------
+
 
 export function classifyDomain(findings) {
   try {
@@ -163,27 +148,27 @@ export function classifyDomain(findings) {
     const uni = depUniverse(f);
     const category = (cat, confidence, signals) => ({ category: cat, confidence, signals });
 
-    // Known-app shortcut: a recognized app is a strong, high-precision signal.
+
     const known = knownApp(f);
     if (known) return category(known.category, 'high', ['recognized app (known behavior on record)']);
 
-    // ---- note-taking / knowledge base ----
+
     let noteScore = 0; const noteSignals = [];
     if (/\b(note|notes|notebook|knowledge|wiki|second brain|markdown|zettel|journal|memo|outliner)\b/.test(blob)) { noteScore += 2; noteSignals.push('name/description mentions notes/knowledge'); }
     if (/\b(public\.app-category\.productivity)\b/.test(((f.capabilities && f.capabilities.category) || '').toLowerCase())) { noteScore += 1; noteSignals.push('category: productivity'); }
     if (/(\.md\b|markdown|\.txt\b|public\.text|net\.daringfireball\.markdown|\.rtf\b)/.test(docs)) { noteScore += 2; noteSignals.push('opens text/Markdown documents'); }
     if (EDITOR_ENGINES.some(e => hasAny(uni, e.needles))) { noteScore += 2; noteSignals.push('bundles a text/rich-text editor engine'); }
     if (hasAny(uni, MARKDOWN_LIBS)) { noteScore += 1; noteSignals.push('uses a Markdown parser'); }
-    // Disqualifiers: dedicated code editors / IDEs read like note apps but aren't.
+
     const looksIDE = /\b(ide|code editor|programming|terminal|debugger)\b/.test(blob) || hasAny(uni, ['monaco']);
 
-    // ---- code editor / IDE ----
+
     let codeScore = 0; const codeSignals = [];
     if (hasAny(uni, ['monaco'])) { codeScore += 2; codeSignals.push('bundles the Monaco (VS Code) editor'); }
     if (/\b(code|ide|developer|programming|terminal|git)\b/.test(blob)) { codeScore += 1; codeSignals.push('developer-tool wording'); }
     if (hasAny(uni, ['xterm', 'node-pty'])) { codeScore += 2; codeSignals.push('embeds a terminal (xterm/node-pty)'); }
 
-    // ---- other quick categories ----
+
     let chatScore = 0; const chatSignals = [];
     if (/\b(chat|messaging|messenger|im\b)\b/.test(blob)) { chatScore += 2; chatSignals.push('chat/messaging wording'); }
     if (hasAny(uni, SYNC_REALTIME) || hasAny(uni, SYNC_NET)) { chatScore += 1; chatSignals.push('real-time transport'); }
@@ -205,7 +190,7 @@ export function classifyDomain(findings) {
   } catch { return { category: 'unknown', confidence: 0, signals: [] }; }
 }
 
-// ---- note-taking mechanics + gap analysis --------------------------------------------------------
+
 
 function analyzeNoteTaking(findings) {
   const f = findings || {};
@@ -213,7 +198,7 @@ function analyzeNoteTaking(findings) {
   const docs = docTypeStrings(f);
   const lines = [];
   const known = knownApp(f);
-  const mech = { ...(known && known.mech ? known.mech : {}) };   // seed from known facts; detection augments
+  const mech = { ...(known && known.mech ? known.mech : {}) };
 
   lines.push('## How It Takes Notes', '');
   if (known && known.note) lines.push(`- **Known behavior:** ${known.note}`);
@@ -223,18 +208,18 @@ function analyzeNoteTaking(findings) {
   if (engine) { mech.editor = engine.name; lines.push(`- **Editor engine:** ${engine.name} — ${engine.kind}. This is the component you type into and what defines the editing model (plain-text/Markdown vs. structured rich-text).`); }
   else lines.push('- **Editor engine:** not identified from dependencies — the editor may be custom or in an unparsed bundle.');
 
-  // Note format — what a note actually IS on disk. Prefer what we detect; fall back to known facts.
+
   const usesMarkdown = hasAny(uni, MARKDOWN_LIBS) || docs.some(d => /md|markdown|text/i.test(d));
   const db = DB_LIBS.find(d => hasAny(uni, d.needles));
   if (usesMarkdown && db) mech.format = 'hybrid';
   else if (db) mech.format = 'database';
-  else if (usesMarkdown) mech.format = 'markdown-files';   // else keep whatever the known map seeded
+  else if (usesMarkdown) mech.format = 'markdown-files';
   if (mech.format === 'markdown-files') lines.push('- **Note format:** plain **Markdown / text files** — each note is a portable file you can read, edit, back up or grep outside the app. No proprietary lock-in.');
   else if (mech.format === 'database') lines.push(`- **Note format:** an embedded **${(db && db.name) || 'database'}** — notes live in an app-managed store rather than individual files (faster queries, but less portable / harder to read without the app).`);
   else if (mech.format === 'hybrid') lines.push(`- **Note format:** hybrid — Markdown content with a${db ? ` ${db.name}` : ' database'} index/cache for fast lookup.`);
   else lines.push('- **Note format:** not determinable from this bundle (the app may load its content/editor code from outside the analyzed bundle).');
 
-  // Storage location — local files vs cloud vs local DB.
+
   const watchesFiles = hasAny(uni, FILE_WATCH) || (f.electron && (f.electron.mainRequires || []).some(r => /\bfs\b/.test(r)));
   if (!mech.storage) {
     if (mech.format === 'markdown-files' || watchesFiles) mech.storage = 'local-files';
@@ -244,11 +229,11 @@ function analyzeNoteTaking(findings) {
   else if (mech.storage === 'local-db') lines.push('- **Storage location:** a local app database (offline-capable).');
   else if (mech.storage === 'cloud') lines.push('- **Storage location:** **cloud-hosted** — the vendor’s server is the source of truth; your notes live on their servers and offline use is limited.');
 
-  // Linking / organization.
+
   const blob = textBlob(f);
   if (mech.linking || /\b(wiki|backlink|link|graph|zettel|second brain)\b/.test(blob) || hasAny(uni, ['wikilink', 'backlink'])) { mech.linking = true; lines.push('- **Linking/organization:** note-to-note links (wiki-style `[[links]]` / backlinks / graph) — knowledge-base oriented.'); }
 
-  // Sync & collaboration (detected libs; seeded known facts kept if detection finds nothing).
+
   const realtime = firstHit(uni, SYNC_REALTIME);
   const cloud = firstHit(uni, CLOUD_SDK);
   const net = firstHit(uni, SYNC_NET);
@@ -258,12 +243,12 @@ function analyzeNoteTaking(findings) {
   if (mech.cloudSync) lines.push(`- **Sync:** built-in cross-device sync${typeof mech.cloudSync === 'string' && mech.cloudSync !== 'built-in' ? ` (\`${mech.cloudSync}\`)` : ''}.`);
   else if (net && !realtime) lines.push(`- **Networking:** a realtime transport (\`${net}\`) is bundled (could be sync, live preview, or telemetry).`);
 
-  // Search.
+
   const search = firstHit(uni, SEARCH_LIBS);
   if (search) mech.search = search;
   if (mech.search) lines.push(`- **Search:** in-app full-text search${typeof mech.search === 'string' && mech.search !== 'built-in' ? ` (\`${mech.search}\` index)` : ''}.`);
 
-  // Extensibility / plugins.
+
   const pluginish = mech.plugins || (f.subsystems || []).some(s => /plugin/i.test(String(s))) || hasAny(uni, ['plugin']);
   if (pluginish) { mech.plugins = true; lines.push('- **Extensibility:** a plugin/extension system — third-party code can add features (also widens the attack surface).'); }
 
@@ -290,7 +275,7 @@ function noteGaps(findings, mech) {
   return checks;
 }
 
-// ---- public entry --------------------------------------------------------------------------------
+
 
 export function domainAnalysis(findings, kind = 'app') {
   try {

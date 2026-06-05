@@ -1,17 +1,3 @@
-// reverse-explain.mjs — turn raw technical signals from a reverse-engineering report into
-// one-line, plain-language explanations a non-expert can read.
-//
-// Pure data + tiny matching logic: no dependencies, no I/O, fully synchronous, never throws.
-// Every exported function returns a short plain-language string, or `null` if unknown — so callers
-// can skip cleanly. Matching is case-insensitive and tolerant (normalize → exact → substring/keyword).
-//
-// Used by reverse.mjs to annotate entitlements, frameworks, HTTP headers, CSP directives and SDKs.
-
-// ---------------------------------------------------------------------------
-// shared helpers
-// ---------------------------------------------------------------------------
-
-// Lowercase + trim; tolerate null/undefined/non-string without throwing.
 function norm(s) {
   return String(s == null ? '' : s).trim().toLowerCase();
 }
@@ -46,14 +32,14 @@ const ENTITLEMENTS = {
   'cs.debugger': 'is allowed to act as a debugger and attach to other processes — powerful; expected only in developer/debugging tools',
   'get-task-allow': 'allows other processes to attach and inspect/debug this app — normal for debug builds, but should NOT ship in a release',
 
-  // app sandbox
+
   'app-sandbox': 'runs inside the macOS App Sandbox — its access to files, network and devices is restricted to what it explicitly requests (a good sign)',
 
-  // network
+
   'network.client': 'can make outgoing network connections (act as a client) — e.g. call APIs or load web content',
   'network.server': 'can listen for incoming network connections (act as a server) — it can accept connections from other devices',
 
-  // hardware / capture devices
+
   'device.camera': 'grants access to the camera',
   'device.audio-input': 'grants access to the microphone / audio input',
   'device.microphone': 'grants access to the microphone',
@@ -64,13 +50,13 @@ const ENTITLEMENTS = {
   'device.audio-video-bridging': 'grants access to audio/video bridging (AVB) hardware',
   'device.firewire': 'grants access to FireWire devices',
 
-  // personal information / privacy
+
   'personal-information.location': 'can read your location',
   'personal-information.addressbook': 'can read your Contacts',
   'personal-information.calendars': 'can read and write your Calendar',
   'personal-information.photos-library': 'can access your Photos library',
 
-  // files
+
   'files.user-selected.read-only': 'can read files you explicitly choose in an open/save dialog (read-only)',
   'files.user-selected.read-write': 'can read and write files you explicitly choose in an open/save dialog',
   'files.user-selected.executable': 'can run executables you explicitly choose',
@@ -87,16 +73,16 @@ const ENTITLEMENTS = {
   'files.bookmarks.app-scope': 'can re-open files you previously granted access to (security-scoped bookmarks)',
   'files.bookmarks.document-scope': 'can re-open files tied to a specific document (security-scoped bookmarks)',
 
-  // automation / inter-app
+
   'automation.apple-events': 'can send Apple Events to control or script OTHER applications — a powerful automation capability',
   'scripting-targets': 'declares which other apps it is allowed to script via Apple Events',
   'temporary-exception.apple-events': 'has a temporary exception to send Apple Events to specific apps',
 
-  // identity / data sharing
+
   'keychain-access-groups': 'can store and read passwords/secrets in shared Keychain groups (can share credentials with related apps)',
   'application-groups': 'shares a container (files/preferences) with other apps in the same app group',
 
-  // entitlements seen on signed/distributed apps
+
   'aps-environment': 'can receive Apple Push Notifications',
   'com.apple.developer.aps-environment': 'can receive Apple Push Notifications',
   'com.apple.developer.team-identifier': 'identifies the developer team that signed the app',
@@ -112,7 +98,7 @@ const ENTITLEMENTS = {
   'com.apple.developer.system-extension.install': 'can install a system extension — code that runs with elevated privileges at the OS level',
 };
 
-// Strip the boilerplate prefix so both prefixed and bare keys resolve.
+
 function entitlementKey(key) {
   let k = norm(key);
   k = k.replace(/^com\.apple\.security\./, '');
@@ -139,7 +125,7 @@ const FRAMEWORKS = {
   'catalyst': 'Mac Catalyst — an iPad app ported to run on macOS, so it uses iOS-style UI under the hood',
   'carbon': 'Carbon — a legacy Apple API; its presence suggests older code or backward-compatibility shims',
 
-  // web / cross-platform shells (big tell about how the app is built)
+
   'webkit': 'the WebKit browser engine — the app renders web content (it embeds a browser or is a browser)',
   'electron': 'Electron — the app is really a web app (HTML/JS/CSS) wrapped in a bundled Chromium browser and Node.js',
   'electron framework': 'Electron — the app is really a web app (HTML/JS/CSS) wrapped in a bundled Chromium browser and Node.js',
@@ -149,11 +135,11 @@ const FRAMEWORKS = {
   'flutter': 'Flutter — a cross-platform UI toolkit from Google; the same codebase targets mobile/desktop/web',
   'qt': 'Qt — a cross-platform C++ UI framework; the app likely runs on multiple operating systems from one codebase',
 
-  // updaters (tell you how the app keeps itself current)
+
   'sparkle': 'Sparkle — the popular open-source auto-update framework for Mac apps; the app can update itself outside the App Store',
   'squirrel': 'Squirrel — an auto-update framework (used by Electron apps); the app updates itself in the background',
 
-  // data / media / ML / graphics
+
   'coredata': 'Core Data — Apple’s local database/persistence layer; the app stores structured data on-device',
   'core data': 'Core Data — Apple’s local database/persistence layer; the app stores structured data on-device',
   'avfoundation': 'AVFoundation — Apple’s audio/video framework; the app plays, records or processes media',
@@ -169,11 +155,11 @@ export function explainFramework(name) {
   return lookup(FRAMEWORKS, name);
 }
 
-// ---------------------------------------------------------------------------
-// 3) HTTP response headers (value is optional and may refine the explanation)
-// ---------------------------------------------------------------------------
 
-// Base explanation of what each header is for.
+
+
+
+
 const HEADERS = {
   'strict-transport-security': 'tells browsers to only ever connect over HTTPS, preventing downgrade and cookie-stealing attacks',
   'content-security-policy': 'restricts which sources of scripts, styles and other content the page may load — a strong defence against cross-site scripting (XSS)',
@@ -194,7 +180,7 @@ const HEADERS = {
   'x-xss-protection': 'a legacy browser XSS filter toggle — largely obsolete and superseded by Content-Security-Policy',
 };
 
-// Refine a few headers based on their value where it materially changes the meaning. Never throws.
+
 function refineHeader(name, value, base) {
   const n = norm(name);
   const v = norm(value);
@@ -246,9 +232,9 @@ export function explainHeader(name, value) {
   return refineHeader(name, value, base);
 }
 
-// ---------------------------------------------------------------------------
-// 4) Content-Security-Policy directives
-// ---------------------------------------------------------------------------
+
+
+
 
 const CSP = {
   'default-src': 'the fallback rule for any content type not given its own policy',
@@ -280,24 +266,24 @@ const CSP = {
 };
 
 export function explainCsp(directive) {
-  // strip any value that may have been passed with the directive name
+
   const first = norm(directive).split(/\s+/)[0];
   return lookup(CSP, first);
 }
 
-// ---------------------------------------------------------------------------
-// 5) third-party services / SDKs
-// ---------------------------------------------------------------------------
+
+
+
 
 const SERVICES = {
-  // payments
+
   'stripe': 'Stripe — payment processing; the site can take card payments (card data goes to Stripe, not the site)',
   'paypal': 'PayPal — payment processing / checkout',
   'braintree': 'Braintree — payment processing (owned by PayPal)',
   'adyen': 'Adyen — payment processing',
   'square': 'Square — payment processing',
 
-  // analytics / tracking (privacy implications)
+
   'google analytics': 'Google Analytics — tracks visitor behaviour and traffic; sends usage data to Google',
   'google-analytics': 'Google Analytics — tracks visitor behaviour and traffic; sends usage data to Google',
   'ga': 'Google Analytics — tracks visitor behaviour and traffic; sends usage data to Google',
@@ -312,7 +298,7 @@ const SERVICES = {
   'hotjar': 'Hotjar — records sessions and heatmaps of how users interact with pages (privacy-sensitive)',
   'fullstory': 'FullStory — records full user sessions for analytics (privacy-sensitive)',
 
-  // monitoring / error tracking
+
   'sentry': 'Sentry — error and crash monitoring; captures exceptions and performance data',
   'datadog': 'Datadog — application/infrastructure monitoring and logging',
   'new relic': 'New Relic — application performance monitoring',
@@ -320,7 +306,7 @@ const SERVICES = {
   'bugsnag': 'Bugsnag — error and crash monitoring',
   'rollbar': 'Rollbar — error monitoring and tracking',
 
-  // auth / backend-as-a-service
+
   'firebase': 'Firebase — Google’s backend platform (database, auth, hosting, push); the app likely uses it for data and login',
   'auth0': 'Auth0 — hosted login/authentication; handles sign-in and identity',
   'clerk': 'Clerk — hosted user authentication and management',
@@ -328,41 +314,41 @@ const SERVICES = {
   'okta': 'Okta — enterprise identity and single-sign-on provider',
   'supabase': 'Supabase — open-source backend platform (Postgres database, auth, storage)',
 
-  // CDN / edge / hosting
+
   'cloudflare': 'Cloudflare — CDN, DNS and security/DDoS protection sitting in front of the site',
   'fastly': 'Fastly — content delivery network (CDN) and edge caching',
   'akamai': 'Akamai — content delivery network (CDN) and edge security',
   'vercel': 'Vercel — hosting and edge network, commonly used with Next.js',
   'netlify': 'Netlify — hosting and edge network for web apps',
 
-  // media / images / video
+
   'cloudinary': 'Cloudinary — image/video hosting, optimisation and transformation',
   'mux': 'Mux — video hosting and streaming infrastructure',
   'imgix': 'imgix — on-the-fly image optimisation and delivery',
 
-  // support / chat
+
   'intercom': 'Intercom — in-app customer support chat and messaging',
   'drift': 'Drift — customer support / sales chat widget',
   'zendesk': 'Zendesk — customer support and helpdesk (often the chat widget)',
   'crisp': 'Crisp — customer support chat widget',
 
-  // maps
+
   'mapbox': 'Mapbox — interactive maps and location services',
   'google maps': 'Google Maps — interactive maps and location services from Google',
   'googlemaps': 'Google Maps — interactive maps and location services from Google',
 
-  // experimentation / feature flags
+
   'optimizely': 'Optimizely — A/B testing and experimentation platform',
   'launchdarkly': 'LaunchDarkly — feature-flag management (turns features on/off per user)',
 
-  // fonts
+
   'google fonts': 'Google Fonts — hosted web fonts loaded from Google (can leak visitor info to Google)',
   'googlefonts': 'Google Fonts — hosted web fonts loaded from Google',
   'fonts.googleapis': 'Google Fonts — hosted web fonts loaded from Google',
   'typekit': 'Adobe Typekit/Fonts — hosted web fonts from Adobe',
   'fonts.gstatic': 'Google Fonts — the static asset host that serves Google web fonts',
 
-  // advertising
+
   'doubleclick': 'DoubleClick (Google) — advertising and ad-targeting; tracks users across sites for ads',
   'google ads': 'Google Ads — advertising and conversion tracking',
   'googlesyndication': 'Google AdSense/Ads — serves ads and tracks ad performance',
@@ -374,9 +360,9 @@ export function explainService(name) {
   return lookup(SERVICES, name);
 }
 
-// ---------------------------------------------------------------------------
-// 6) convenience: batch over a list for a given kind
-// ---------------------------------------------------------------------------
+
+
+
 
 const KINDS = {
   entitlement: explainEntitlement,
@@ -386,8 +372,8 @@ const KINDS = {
   service: explainService,
 };
 
-// kind in {entitlement,framework,header,csp,service}; items: string[].
-// Returns Array<{item, explanation}> with explanation === null when unknown. Never throws.
+
+
 export function explainMany(kind, items) {
   const fn = KINDS[norm(kind)];
   const list = Array.isArray(items) ? items : [];

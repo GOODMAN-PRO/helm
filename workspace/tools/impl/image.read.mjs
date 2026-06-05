@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// image.read — deeply analyze an image FILE: describe it, transcribe ALL visible text, and interpret
-// diagrams/charts/tables. Optionally answer a question about it. Upgrades passive `Read` with a
-// focused vision prompt, and gives a text-extraction fallback for non-multimodal (free/local) backends.
-//
-// Usage: node image.read.mjs --path <img> [--question "..."] [--mode auto|engine|ocr]
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -18,10 +13,10 @@ let mode = (get('mode') || 'auto').toLowerCase();
 if (!imgPath) { console.error('--path <image file> required'); process.exit(1); }
 if (!existsSync(imgPath)) { console.error('no such file: ' + imgPath); process.exit(1); }
 
-// auto: use the engine's vision unless we're on a custom (possibly text-only) model, where we OCR.
+
 if (mode === 'auto') mode = (process.env.AUTH_MODE === 'custom') ? 'ocr' : 'engine';
 
-// Resolve a runnable claude (Windows: prefer .exe/.cmd; needs a shell for .cmd).
+
 function claudeCmd() {
   const bin = process.env.CLAUDE_BIN || 'claude';
   if (process.platform !== 'win32') return { cmd: bin, shell: false };

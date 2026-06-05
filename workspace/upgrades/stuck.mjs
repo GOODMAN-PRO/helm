@@ -1,15 +1,10 @@
 #!/usr/bin/env node
-// Helm "stuck" queue. Whenever Helm hits a wall — a failure, a timeout, a task it
-// couldn't finish, or something it explicitly flags — it records the problem here.
-// The nightly self-upgrade reads this queue, tries to fix the root causes, then
-// archives what it handled. Dedups by normalized summary (bumps a count instead of
-// piling up duplicates).
 import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const DIR = path.dirname(fileURLToPath(import.meta.url));   // workspace/upgrades
-// Paths are resolved per-call so tests can redirect via env without re-importing.
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+
 function queuePath()   { return process.env.HELM_STUCK_QUEUE   || path.join(DIR, 'stuck-queue.jsonl'); }
 function archivePath() { return process.env.HELM_STUCK_ARCHIVE || path.join(DIR, 'stuck-archive.jsonl'); }
 const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160);
@@ -45,9 +40,9 @@ export function recordStuck(summary, detail = '', source = 'auto') {
 
 export function listStuck(openOnly = true) { return readAll().filter(i => !openOnly || i.status !== 'resolved'); }
 
-// ---- auto-upgrade capture (shared by all gateways) ----
-// Strip any [STUCK: ...] markers the brain emitted, recording each to the queue.
-// Returns { text, recorded } where `text` has the markers removed.
+
+
+
 export function processStuckMarkers(replyText, userText = '') {
   let recorded = false;
   const text = (replyText || '').replace(/\[STUCK:\s*([^\]]+)\]/gi, (_m, s) => {
@@ -68,8 +63,8 @@ const CANT_PATTERNS = [
 ];
 const CANT_IDIOMS = /can'?t\s+(?:wait|go wrong|thank|believe|help but|complain|argue)/i;
 
-// Safety net: if a reply says/implies Helm can't do something (and no [STUCK] was emitted), queue it
-// for the nightly self-upgrade. Records at most one item per reply. Returns the entry or null.
+
+
 export function autoCaptureCant(text, userText = '') {
   if (!text) return null;
   for (const re of CANT_PATTERNS) {
@@ -82,15 +77,15 @@ export function autoCaptureCant(text, userText = '') {
   return null;
 }
 
-// Markdown-ish block for the nightly self-upgrade prompt.
+
 export function renderStuckForPrompt() {
   const open = listStuck(true);
   if (!open.length) return '';
   return open.map((i, n) => `${n + 1}. (seen ${i.count}x, ${i.source}) ${i.summary}${i.detail ? `\n   detail: ${i.detail}` : ''}`).join('\n');
 }
 
-// After a nightly pass has tried to address the queue, move everything to the archive
-// and clear the live queue. Returns how many were archived.
+
+
 export function archiveAll() {
   const items = readAll(); if (!items.length) return 0;
   const stamp = new Date().toISOString();

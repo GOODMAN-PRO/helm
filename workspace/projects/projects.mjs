@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// projects.mjs — a small structured project tracker the owner manages from chat.
-// Store: workspace/projects.json — [{ id, name, status, note, created, updated }]
-//   status: active | cancelled | done
-// Importable (listProjects/addProject/cancelProject/deleteProject/setStatus) AND a CLI:
-//   node projects.mjs list|add|cancel|done|delete <name>
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -18,7 +13,7 @@ const slug   = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 function load() { try { return JSON.parse(readFileSync(FILE, 'utf8')); } catch { return []; } }
 function save(list) { writeFileSync(FILE, JSON.stringify(list, null, 2)); }
 
-// Match a project by exact id (slug), exact name, or a clear substring of the name.
+
 function match(list, q) {
   const s = String(q || '').trim(); if (!s) return null;
   const ql = s.toLowerCase();
@@ -59,7 +54,7 @@ export function deleteProject(q) {
   return { ok: true, deleted: p.name };
 }
 
-// Pretty one-line-per-project summary for chat (active first).
+
 export function renderProjects() {
   const list = load();
   if (!list.length) return 'No projects tracked yet. Add one: `new project <name>`.';
@@ -69,7 +64,7 @@ export function renderProjects() {
   return sorted.map(p => `${mark[p.status] || '•'} **${p.name}**${p.status !== 'active' ? ` _(${p.status})_` : ''}${p.note ? ` — ${p.note}` : ''}`).join('\n');
 }
 
-// ---- CLI ----
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [verb, ...rest] = process.argv.slice(2);
   const arg = rest.join(' ').trim();

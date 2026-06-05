@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// image.generate — hardened text-to-image for Helm via Pollinations (free, no API key, any OS).
-// FLUX by default. Robust: retries with backoff, magic-byte validation (never saves an HTML error
-// page as an image), free prompt-`enhance`, aspect presets, batch/variations, negative prompt.
-//
-// Usage: node image.generate.mjs --prompt "a red fox in snow" [--out <file>] [--width 1024]
-//        [--height 1024] [--aspect square|landscape|wide|portrait|story] [--model flux]
-//        [--seed 42] [--enhance true] [--negative "blurry, text"] [--batch 1] [--retries 4]
-//
-// Output: single JSON object. Back-compatible: always includes top-level {ok,path,bytes,...};
-// batch>1 also returns an `images` array. Writes the image(s) under the OS temp dir or workspace.
 import { writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
@@ -22,7 +12,7 @@ const bool = (k, def) => { const v = get(k); if (v === null) return def; return 
 const prompt = get('prompt');
 if (!prompt) { console.error('--prompt required'); process.exit(1); }
 
-// Aspect presets → base dimensions (overridden by explicit --width/--height). Clamped to 64..2048.
+
 const ASPECTS = {
   square:    [1024, 1024],
   landscape: [1280, 720],
@@ -46,7 +36,7 @@ const negative = get('negative');
 const batch   = Math.min(8, Math.max(1, parseInt(get('batch')   || '1', 10) || 1));
 const retries = Math.min(8, Math.max(0, parseInt(get('retries') || '4', 10)));
 
-// Output path: default to OS temp; guard against writing outside temp/workspace.
+
 const WORKSPACE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SAFE_ROOTS = [os.tmpdir(), WORKSPACE, '/tmp', '/private/tmp'];
 const safe = p => SAFE_ROOTS.some(r => p === r || p.startsWith(r + path.sep) || p.startsWith(r + '/'));
@@ -56,31 +46,31 @@ if (!safe(baseOut)) {
   process.exit(1);
 }
 
-// Optional free Pollinations token (lifts the anonymous 1-request/IP rate limit). Stays anonymous
-// if absent. Read from env first, else the secrets vault — never required, never echoed.
+
+
 function polltoken() {
   if (process.env.POLLINATIONS_TOKEN) return process.env.POLLINATIONS_TOKEN.trim();
   try {
     const secrets = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'secrets', 'secrets.mjs');
     const r = spawnSync(process.execPath, [secrets, 'get', 'POLLINATIONS_TOKEN'], { encoding: 'utf8', timeout: 8000 });
     if (r.status === 0 && r.stdout && r.stdout.trim()) return r.stdout.trim();
-  } catch { /* no vault / no token → anonymous */ }
+  } catch {  }
   return null;
 }
 const TOKEN = polltoken();
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-// Pollinations returns 402 when its free queue is saturated; 429/5xx are transient too.
+
 const RETRY_STATUS = new Set([402, 408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 
-// Validate that the bytes are actually an image, not an HTML/JSON error page served with 200.
+
 function isImage(b) {
   if (!b || b.length < 100) return false;
-  if (b[0] === 0xFF && b[1] === 0xD8) return true;                                   // JPEG
-  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return true; // PNG
-  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return true;                  // GIF
-  if (b.slice(0, 4).toString('ascii') === 'RIFF' && b.slice(8, 12).toString('ascii') === 'WEBP') return true; // WEBP
-  if (b[0] === 0x42 && b[1] === 0x4D) return true;                                   // BMP
+  if (b[0] === 0xFF && b[1] === 0xD8) return true;
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return true;
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return true;
+  if (b.slice(0, 4).toString('ascii') === 'RIFF' && b.slice(8, 12).toString('ascii') === 'WEBP') return true;
+  if (b[0] === 0x42 && b[1] === 0x4D) return true;
   return false;
 }
 
@@ -103,7 +93,7 @@ async function genOne(outPath, seed) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) await sleep(Math.min(4000 * 2 ** (attempt - 1), 32000) + Math.floor(Math.random() * 1500));
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 120_000);  // generation can take a while
+    const timer = setTimeout(() => ac.abort(), 120_000);
     try {
       const headers = { accept: 'image/*' };
       if (TOKEN) headers.Authorization = `Bearer ${TOKEN}`;

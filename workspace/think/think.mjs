@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-// Helm — 24/7 background cognition.
-//
-// Wakes every THINK_INTERVAL_MIN (default 15), runs a short reflection pass that does ACTIVE
-// LEARNING: infers/refines the owner's preferences over time, notes durable facts, preps useful
-// work — then journals and refreshes the memory index. Stays owner-quiet (exam season). Skips the
-// nightly upgrade window (00:00-05:00) and never overlaps itself or a running self-upgrade.
-//
-// Launched by launchd com.helm.think. Uses a light model (sonnet) so 24/7 cadence stays sustainable.
-
 import { spawnSync } from 'node:child_process';
 import { resolveClaude } from '../lib/engine.mjs';
 import { existsSync, writeFileSync, appendFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
@@ -15,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url)); // workspace/think
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(__dirname, '../..');
 loadEnv({ path: path.join(ROOT, '.env'), override: true });
@@ -24,7 +15,7 @@ const { CLAUDE_BIN = 'claude' } = process.env;
 const MODEL = process.env.THINK_MODEL || 'sonnet';
 const INTERVAL = parseInt(process.env.THINK_INTERVAL_MIN || '15', 10) * 60_000;
 const WEEKLY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
-// Safety guards: exit after MAX_TICKS iterations or MAX_WALL_MS wall time so launchd can restart fresh.
+
 const MAX_TICKS    = parseInt(process.env.THINK_MAX_TICKS || '500', 10);
 const MAX_WALL_MS  = parseInt(process.env.THINK_MAX_WALL_DAYS || '8', 10) * 24 * 60 * 60_000;
 const THINK_START  = Date.now();
@@ -35,11 +26,11 @@ const REFRESH = path.join(WORKSPACE, 'memory', 'refresh-index.mjs');
 const CONSOLIDATE = path.join(WORKSPACE, 'memory', 'consolidate.mjs');
 const WEEKLY_MARK = path.join(__dirname, '.last-weekly-review');
 const PUSH_BIN = path.join(ROOT, 'bin', 'helm-push.mjs');
-// Local time intentional — aligns with launchd's local-time StartCalendarInterval used by
-// com.helm.selfupgrade and com.helm.discord. Window follows owner's overnight on whichever
-// machine Helm is running on.
-const THINK_QUIET_START = 0; // 00:00 local
-const THINK_QUIET_END   = 5; // 05:00 local
+
+
+
+const THINK_QUIET_START = 0;
+const THINK_QUIET_END   = 5;
 mkdirSync(JOURNAL_DIR, { recursive: true });
 
 const ts = () => new Date().toISOString();
@@ -90,24 +81,24 @@ const WEEKLY_PROMPT = [
   'Output 2-4 sentences: what you found, what you persisted, any job proposal. No emojis, no preamble.',
 ].join('\n');
 
-// Urgency keywords that signal the finding warrants interrupting the owner.
+
 const URGENCY_KEYWORDS = [
   'deadline', 'urgent', 'asap', 'due', 'exam', 'tomorrow',
   'critical', 'emergency', 'failing', 'overdue', 'expir',
   'alert', 'warning', 'must', 'immediately',
 ];
 
-// Compute a 0-1 score combining urgency (keyword density) and relevance (memory recall).
-// Only push the owner when score > 0.65 — keeps Helm quiet by default.
+
+
 function computeInterruptScore(finding, recentActivity = [], activeGoals = []) {
   if (!finding || typeof finding !== 'string') return 0;
 
-  // Urgency: count distinct keyword matches, saturate at 3 hits → score 1.0
+
   const lower = finding.toLowerCase();
   const hits = URGENCY_KEYWORDS.filter(k => lower.includes(k)).length;
   const urgency = Math.min(hits / 3, 1.0);
 
-  // Relevance: average confidence of top memory-recall results for this finding.
+
   let relevance = 0;
   try {
     const query = finding.replace(/["\n\r]/g, ' ').trim().slice(0, 150);
@@ -191,7 +182,7 @@ function tick() {
     appendFileSync(path.join(JOURNAL_DIR, ts().slice(0, 10) + '.md'),
       `- ${ts()} ${tag}${(thought || '(no output)').replace(/\n+/g, ' ')}\n`);
 
-    // Interrupt gate: only DM the owner if the thought is genuinely urgent/relevant.
+
     if (thought) {
       try {
         const goals = loadActiveGoals();
@@ -216,7 +207,7 @@ function tick() {
       } catch (e) { log('consolidate error ' + (e.message || e)); }
       // Only stamp the weekly mark when claude actually completed successfully.
       // If it timed out (r.signal === 'SIGTERM') or exited non-zero, leave the mark
-      // untouched so the review is retried next tick rather than suppressed for 7 days.
+
       if (r.status === 0 && !r.signal) {
         try { writeFileSync(WEEKLY_MARK, String(Date.now())); } catch {}
       } else {

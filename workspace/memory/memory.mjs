@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Helm structured memory CLI.
-// Usage:
-//   memory.mjs remember <kind> <key> <value> [--source <s>] [--confidence <0-1>]
-//   memory.mjs recall <query> [--limit N] [--keyword-only]
-//   memory.mjs forget <id>
-//   memory.mjs dump [--kind <kind>] [--all]
-//   memory.mjs history <key>
-//   memory.mjs episode [add <summary>]
-//   memory.mjs unsure [--threshold <0-1>]
-//
-// Exits 0 on success, 1 on error. Output is JSON on stdout.
-
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -19,8 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.join(__dirname, 'memory.db');
 
 const db = new DatabaseSync(DB_PATH);
-// Wait out (don't crash on) concurrent writers — background think/consolidate can
-// touch this DB while an interactive recall runs. Matches sessions.mjs.
+
+
 db.exec(`PRAGMA busy_timeout = 5000`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS facts (
@@ -49,20 +37,20 @@ db.exec(`
     PRIMARY KEY (from_id, to_id, kind)
   );
 `);
-// Active-learning columns. Idempotent: ignore "duplicate column" errors on re-run.
+
 try { db.exec(`ALTER TABLE facts ADD COLUMN evidence_count INTEGER NOT NULL DEFAULT 1`); } catch {}
 try { db.exec(`ALTER TABLE facts ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0`); } catch {}
 db.exec(`UPDATE facts SET last_seen = updated WHERE last_seen = 0`);
 
-// Temporal validity columns.
+
 try { db.exec(`ALTER TABLE facts ADD COLUMN valid_from INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE facts ADD COLUMN expired_at INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE facts ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0`); } catch {}
 db.exec(`UPDATE facts SET valid_from = created WHERE valid_from = 0`);
 
-// Partial unique index: uniqueness enforced only among active (non-expired) rows.
-// Allows multiple expired rows per (kind, key) while keeping one active row unique.
-// Migration: if a full index already exists, rebuild it as partial.
+
+
+
 try {
   const idxRow = db.prepare(
     `SELECT sql FROM sqlite_master WHERE type='index' AND name='facts_kind_key_uniq'`
@@ -130,7 +118,7 @@ switch (verb) {
         ).run(value, source, newConf, evidence, existing.id);
         out({ action: 'updated', id: existing.id, kind, key, value, confidence: newConf, evidence_count: evidence });
       } else {
-        // Value changed: expire old row and insert a new active row.
+
         evidence = 1;
         newConf = isObserved ? Math.min(reqConf, PROVISIONAL_CAP) : reqConf;
         db.prepare(`UPDATE facts SET expired_at = unixepoch() WHERE id = ?`).run(existing.id);
@@ -138,10 +126,10 @@ switch (verb) {
           `INSERT INTO facts (kind, key, value, source, confidence, evidence_count, last_seen, valid_from)
            VALUES (?, ?, ?, ?, ?, 1, unixepoch(), unixepoch())`
         ).run(kind, key, value, source, newConf);
-        // Skip episode-log noise:
-        //   1. Smoke-test keys (__smoke_*) — these flip on every test run.
-        //   2. Identical supersede within the last 6h for the same (kind, key) — collapse repeats
-        //      (e.g. autonomy_mode flips, mode commands) into a single episode per quiet window.
+
+
+
+
         const isSmoke = key.startsWith('__smoke');
         let recentDup = null;
         if (!isSmoke) {
@@ -179,7 +167,7 @@ switch (verb) {
     const limit = parseInt(flags.limit ?? 20, 10);
     const keywordOnly = flags['keyword-only'] === true || flags['keyword-only'] === 'true';
 
-    // Only active (non-expired) facts.
+
     const allFacts = db.prepare(
       `SELECT * FROM facts WHERE expired_at IS NULL ORDER BY updated DESC, confidence DESC LIMIT 500`
     ).all();
@@ -268,11 +256,11 @@ switch (verb) {
           );
         }
       } catch {
-        // no model — keep TF-IDF cosScores
+
       }
     }
 
-    // 1.3x boost when any query stem appears in the fact key.
+
     const keyMatchBoost = f => {
       const keyStems = tokenize(f.key).map(stem);
       return qStems.some(qt => keyStems.includes(qt)) ? 1.3 : 1.0;
@@ -281,7 +269,7 @@ switch (verb) {
 
     let scored, results;
     if (keywordOnly || !cosScores) {
-      // BM25-only path: score = bm25 * confWeight * keyBoost
+
       scored = allFacts.map((f, i) => ({ ...f, _score: bm25Scores[i] * confWeight(f) * keyMatchBoost(f) }));
       results = scored
         .filter(f => f._score > 0)
@@ -289,7 +277,7 @@ switch (verb) {
         .slice(0, limit)
         .map(({ _score, ...f }) => f);
     } else {
-      // RRF fusion: rank BM25 and cosine independently, combine via Reciprocal Rank Fusion.
+
       const bm25Idx = allFacts.map((_, i) => i).sort((a, b) => bm25Scores[b] - bm25Scores[a]);
       const bm25Rank = new Array(allFacts.length); bm25Idx.forEach((idx, rank) => { bm25Rank[idx] = rank; });
       const cosIdx = allFacts.map((_, i) => i).sort((a, b) => cosScores[b] - cosScores[a]);
@@ -306,8 +294,8 @@ switch (verb) {
     }
     for (const f of results) db.prepare(`UPDATE facts SET access_count = access_count + 1 WHERE id = ?`).run(f.id);
 
-    // --with-episodes: also semantically rank PAST CONVERSATIONS (episodes), blended with recency, so the
-    // brain can recall "what we talked about", not just stored facts. Output shape becomes {facts,episodes}.
+
+
     if (flags['with-episodes'] || flags.episodes === true) {
       const epLimit = parseInt(flags['ep-limit'] ?? 6, 10);
       const eps = db.prepare(`SELECT id, summary, channel, ts FROM episodes WHERE summary IS NOT NULL AND summary != '' ORDER BY ts DESC LIMIT 500`).all();
@@ -324,7 +312,7 @@ switch (verb) {
           const e = eps[i]; let cos = 0;
           if (em && qVecEp) { const ev = await em.getOrComputeEpisodeVector(db, e.id, e.summary); if (ev) cos = em.cosineSimilarity(qVecEp, ev); }
           const bm = ebm(epDocs[i]);
-          const recency = Math.exp(-(now - (e.ts || now)) / (60 * 60 * 24 * 30)); // ~30-day decay
+          const recency = Math.exp(-(now - (e.ts || now)) / (60 * 60 * 24 * 30));
           episodes.push({ id: e.id, summary: e.summary, channel: e.channel, ts: e.ts, _s: (cos + bm * 0.12) * (0.6 + 0.4 * recency), _cos: cos, _bm: bm });
         }
         episodes = episodes.filter(e => e._cos > 0.18 || e._bm > 0).sort((a, b) => b._s - a._s).slice(0, epLimit).map(({ _s, _cos, _bm, ...e }) => e);
@@ -379,7 +367,7 @@ switch (verb) {
   }
 
   case 'history': {
-    // Return all versions of facts with the given key (active + expired), newest first.
+
     const { pos } = parseFlags(rest);
     const key = pos[0];
     if (!key) die('usage: history <key>');

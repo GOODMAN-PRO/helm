@@ -1,15 +1,7 @@
 #!/usr/bin/env node
-// Helm elite structured problem-solver.
-// Usage:
-//   solve.mjs --problem "<text>" [--mode quick|deep] [--constraints "<text>"]
-//
-// quick (default): one claude -p call with a rigorous framework prompt → parse JSON → return.
-// deep: up to 4 sequential claude -p calls (decompose → approaches → evaluate → synthesize).
-// Always outputs exactly ONE JSON object: {ok, problem, approaches, solution, steps, assumptions, risks, confidence}
-
 import { spawnSync } from 'node:child_process';
 
-// ── arg parsing ────────────────────────────────────────────────────────────────
+
 const args = process.argv.slice(2);
 const get  = (k) => { const i = args.indexOf(`--${k}`); return i !== -1 ? args[i + 1] : null; };
 
@@ -26,7 +18,7 @@ if (!['quick', 'deep'].includes(mode)) {
   process.exit(0);
 }
 
-// ── claude runner ───────────────────────────────────────────────────────────────
+
 function runClaude(prompt) {
   const r = spawnSync('claude', ['-p', prompt], { encoding: 'utf8', timeout: 120_000 });
   if (r.error) throw new Error(`claude exec failed: ${r.error.message}`);
@@ -74,7 +66,7 @@ function normalise(parsed, problem, raw) {
   };
 }
 
-// ── QUICK mode ─────────────────────────────────────────────────────────────────
+
 function runQuick() {
   const constraintLine = constraints
     ? `\nConstraints / context: ${constraints}`
@@ -139,7 +131,7 @@ function runDeep() {
       : [appr.slice(0, 600)];
   } catch { approaches = [appr.slice(0, 600)]; }
 
-  // Stage 3: evaluate & pick best
+
   const eval_ = runClaude(
     `${ctx}Problem: ${problem}\nApproaches:\n${approaches.join('\n')}\n\n` +
     `Evaluate each approach on feasibility, risk, and completeness. Pick the best one and state WHY. ` +
@@ -187,7 +179,7 @@ function runDeep() {
   };
 }
 
-// ── main ───────────────────────────────────────────────────────────────────────
+
 try {
   const result = mode === 'deep' ? runDeep() : runQuick();
   console.log(JSON.stringify(result));

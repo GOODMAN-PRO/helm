@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// Helm tool dispatcher.
-// Usage:
-//   tools.mjs list
-//   tools.mjs call <name> [--json '{"key":"val"}']
-
 import { readFileSync } from 'node:fs';
 import { spawnSync }    from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -13,10 +8,10 @@ import { CircuitBreaker } from './circuit-breaker.mjs';
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const REGISTRY   = path.join(__dirname, 'registry.json');
 const WORKSPACE  = path.resolve(__dirname, '..');
-// Registry exec paths are hardcoded to the canonical install root. When running
-// from a git worktree (e.g. during swarm/sweep tasks), remap them to the local
-// root so tool scripts read the correct local databases.
-const CANONICAL_ROOT = path.resolve(WORKSPACE, '..');  // this install's root (registry exec paths are relative)
+
+
+
+const CANONICAL_ROOT = path.resolve(WORKSPACE, '..');
 const LOCAL_ROOT     = path.resolve(WORKSPACE, '..');
 
 const [,, verb, name, ...rest] = process.argv;
@@ -44,14 +39,14 @@ if (verb === 'call') {
   const tool = registry.find(t => t.name === name);
   if (!tool) die(`unknown tool: ${name}`);
 
-  // Platform gate: tools marked `"platform": "darwin"` (mouse/keyboard, iMessage, AppleScript apps,
-  // Vision OCR) only work on macOS. On other OSes, refuse cleanly so the brain picks another path.
+
+
   if (tool.platform && tool.platform !== process.platform) {
     console.error(`${name} is ${tool.platform}-only and this machine is ${process.platform}. Not available here — use a cross-platform tool (shell, files, web, screenshot) instead.`);
     process.exit(4);
   }
 
-  // Parse --json arg
+
   let args = {};
   const jsonIdx = rest.indexOf('--json');
   if (jsonIdx !== -1) {
@@ -60,7 +55,7 @@ if (verb === 'call') {
     try { args = JSON.parse(jsonVal); } catch (e) { die(`bad --json: ${e.message}`); }
   }
 
-  // Enforce confirm gate: tools with confirm:true require --force
+
   if (tool.confirm && !rest.includes('--force')) {
     console.error(`CONFIRM REQUIRED: ${tool.name}`);
     console.error(`Summary: ${tool.summary}`);
@@ -70,9 +65,9 @@ if (verb === 'call') {
     process.exit(2);
   }
 
-  // Build argv: each key=value as --key value
+
   if (typeof tool.exec !== 'string' || !tool.exec) die(`tool ${name}: registry entry missing exec`);
-  // Remap canonical root to local root so worktree runs use the correct scripts/DBs.
+
   const localExec = LOCAL_ROOT !== CANONICAL_ROOT
     ? tool.exec.replace(CANONICAL_ROOT, LOCAL_ROOT)
     : tool.exec;
@@ -89,7 +84,7 @@ if (verb === 'call') {
 
   const r = spawnSync(cmd, cmdArgs, { cwd: WORKSPACE, encoding: 'utf8', stdio: 'inherit' });
   if (r.error) { cb.onFailure(); die(`exec failed (${cmd}): ${r.error.message}`); }
-  // code 2 = confirm gate (not a tool failure); code 0 = success
+
   if (r.status === 0) cb.onSuccess();
   else if (r.status !== 2) cb.onFailure();
   process.exit(r.status ?? 1);

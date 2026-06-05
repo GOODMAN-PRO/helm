@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Helm LLM proxy — lets Claude Code (Helm's engine) run on ANY OpenAI-compatible model, including
-// free online ones (Groq, OpenRouter, Cerebras, Together, ...) and local Ollama.
-//
-// Claude Code only speaks Anthropic's /v1/messages API. This proxy accepts those requests and
-// translates them to /v1/chat/completions on an OpenAI-compatible provider, then translates the
-// reply back. Point Claude Code at it with  ANTHROPIC_BASE_URL=http://localhost:<PORT>.
-//
-// Config (env):
-//   PROXY_PORT       default 8787
-//   OPENAI_BASE_URL  e.g. https://api.groq.com/openai/v1  ·  https://openrouter.ai/api/v1  ·  http://localhost:11434/v1
-//   OPENAI_API_KEY   the provider's (free) key  ·  for Ollama use "ollama"
-//   OPENAI_MODEL     e.g. llama-3.3-70b-versatile (Groq)  ·  a free OpenRouter model id
 import http from 'node:http';
 
 const PORT = parseInt(process.env.PROXY_PORT || '8787', 10);
@@ -61,9 +49,9 @@ function toOpenAI(a) {
     req.stream_options = { include_usage: true };
   }
   if (typeof a.temperature === 'number') req.temperature = a.temperature;
-  // Claude Code sends its full tool suite (dozens). Forwarding ALL overwhelms weak free models;
-  // forwarding NONE makes Helm a chatbot that only *claims* to act. Default = a curated CORE set so the
-  // free model is a real (if smaller) agent. PROXY_TOOLS=all forwards everything; =none/0 forwards none.
+
+
+
   const mode = (process.env.PROXY_TOOLS || 'core').toLowerCase();
   if (mode !== 'none' && mode !== '0' && Array.isArray(a.tools) && a.tools.length) {
     const CORE = new Set(['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'LS', 'TodoWrite']);
@@ -73,7 +61,7 @@ function toOpenAI(a) {
   return req;
 }
 
-// ---- OpenAI response -> Anthropic content blocks + stop reason ----
+
 function toBlocks(oai) {
   const msg = (oai.choices && oai.choices[0] && oai.choices[0].message) || {};
   const blocks = [];
@@ -91,11 +79,11 @@ function toBlocks(oai) {
 function sse(res, event, data) { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); }
 
 const server = http.createServer(async (req, res) => {
-  // Claude Code probes the base URL (HEAD/GET) before using it — answer 200 so it proceeds.
+
   if (req.method === 'GET' || req.method === 'HEAD') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"ok":true}'); return; }
   if (req.method !== 'POST') { res.writeHead(404).end('not found'); return; }
   const raw = await readBody(req);
-  // token-count endpoint Claude Code may call — return a rough estimate
+
   if (req.url.includes('count_tokens')) {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ input_tokens: Math.ceil((raw || '').length / 4) })); return;
@@ -118,8 +106,8 @@ const server = http.createServer(async (req, res) => {
         : up.status === 404
         ? `Provider 404 — model "${MODEL}" may not exist at ${BASE}. Run \`helm doctor\` to list valid models.`
         : `${up.status}: ${t.slice(0, 600)}`;
-      // Pass the status THROUGH so Claude Code reacts correctly: 400/401/403/404 FAIL FAST (no pointless
-      // retry storm on a bad key/model — that's what made it "hang"); only 429/5xx are retried.
+
+
       const code = [400, 401, 403, 404, 429].includes(up.status) ? up.status : 502;
       const etype = code === 401 ? 'authentication_error' : code === 403 ? 'permission_error' : code === 400 ? 'invalid_request_error' : code === 404 ? 'not_found_error' : code === 429 ? 'rate_limit_error' : 'api_error';
       res.writeHead(code, { 'content-type': 'application/json' });
@@ -136,7 +124,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // End-to-end streaming
+
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
@@ -162,7 +150,7 @@ const server = http.createServer(async (req, res) => {
     let textStopped = false;
     const textBlockIdx = 0;
     let nextBlockIdx = 1;
-    const toolCalls = {}; // index -> { id, name, argsBuffer, started, blockIdx }
+    const toolCalls = {};
     let finishReason = null;
     let finalUsage = null;
 
@@ -172,7 +160,7 @@ const server = http.createServer(async (req, res) => {
     for await (const chunk of up.body) {
       buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
       let lines = buffer.split('\n');
-      buffer = lines.pop(); // keep partial line
+      buffer = lines.pop();
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -270,7 +258,7 @@ const server = http.createServer(async (req, res) => {
               }
             }
           } catch (e) {
-            // Ignore bad JSON
+
           }
         }
       }

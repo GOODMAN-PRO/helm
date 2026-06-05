@@ -1,9 +1,3 @@
-// visual-polish-critic.mjs — Award-grade visual polish critic + fixer role.
-// Holds the finished build to apple.com / Awwwards Site-of-the-Day / Stripe / Linear bar.
-// Spots AND FIXES the gap between "fine" and "exceptional": spacing/rhythm, type hierarchy,
-// motion timing, missing interaction states, section seams, color, imagery, mobile edges.
-// Depends on integration being clean (deps: ['integration-engineer']).
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [

@@ -1,12 +1,8 @@
-// api.mjs — roles for the API/backend layer of the full-stack builder.
-// Two roles: api-designer (architecture phase) then backend-engineer (backend phase).
-// Contract: §1 of CONTRACT.md — every Role has id, title, phase, deps, model, produces, system, task(ctx).
-
 import { fileURLToPath } from 'node:url';
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
 
-// Trim a string so it fits inside a prompt without burning tokens unnecessarily.
+
+
 function excerpt(str, maxChars = 8000) {
   if (!str) return '';
   return str.length > maxChars ? str.slice(0, maxChars) + '\n…[truncated]' : str;
@@ -241,7 +237,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
   }
 
-  // 3. Spot-check specific role ids.
+
   const ids = roles.map(r => r.id);
   for (const expected of ['api-designer', 'backend-engineer']) {
     if (!ids.includes(expected)) {

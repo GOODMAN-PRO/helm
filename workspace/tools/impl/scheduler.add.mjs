@@ -13,7 +13,7 @@ const name    = get('name');
 const cron    = get('cron');
 const payload = get('payload');
 const enabled = get('enabled') === 'true' ? 1 : 0;
-// notify defaults to 1 (on) — pass --notify false to silence completion DMs.
+
 const notify  = get('notify') === 'false' ? 0 : 1;
 
 if (!name || !cron || !payload) {
@@ -21,7 +21,7 @@ if (!name || !cron || !payload) {
   process.exit(1);
 }
 
-// Validate cron expression — reject impossible schedules at add-time
+
 const { nextCronDate } = await import('../../scheduler/cron.mjs');
 const next = nextCronDate(cron);
 if (!next) {
@@ -38,8 +38,8 @@ db.exec(`
     created INTEGER NOT NULL DEFAULT (unixepoch())
   );
 `);
-// Idempotent: ensure notify column exists (matches scheduler.mjs runtime upgrade).
-try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch { /* already present */ }
+
+try { db.exec(`ALTER TABLE jobs ADD COLUMN notify INTEGER NOT NULL DEFAULT 1`); } catch {  }
 
 const existing = db.prepare(`SELECT id FROM jobs WHERE name = ?`).get(name);
 if (existing) {

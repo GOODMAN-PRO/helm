@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Tool: screen.at --ts <unix_ms>
-// Returns the screen event closest to the given timestamp.
-
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +33,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS events (
   ocr_text TEXT
 )`);
 
-// Closest by absolute time difference
+
 const row = db.prepare(`
   SELECT id, ts, hash, png_path, ocr_text
   FROM events

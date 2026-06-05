@@ -1,5 +1,3 @@
-// reverse-engineering skill — reverse-engineer web, app, or file targets
-
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 

@@ -1,17 +1,14 @@
 #!/usr/bin/env node
-// agent-runner.mjs — shell out to `claude -p` to run one specialist role.
-// Never throws: every error path returns a structured result.
-
 import { spawn }         from 'node:child_process';
 import { existsSync }    from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os                from 'node:os';
-import { AWARD_STANDARD } from './motion/reference-standard.mjs';   // the apple.com/Awwwards quality bar
-import { ANIMATION_STACK } from './motion/animation-libs.mjs';      // GSAP/Lenis/Framer/R3F toolkit guidance
+import { AWARD_STANDARD } from './motion/reference-standard.mjs';
+import { ANIMATION_STACK } from './motion/animation-libs.mjs';
 
-// ---------------------------------------------------------------------------
-// ANTI_STUB_RULES — appended to every agent prompt to enforce production quality
-// ---------------------------------------------------------------------------
+
+
+
 
 export const ANTI_STUB_RULES = `
 ================================================================================
@@ -60,15 +57,15 @@ Produce complete, correct, shippable code on the first pass.
 ================================================================================
 `;
 
-// ---------------------------------------------------------------------------
-// resolveClaudeBin — find the `claude` CLI binary
-// ---------------------------------------------------------------------------
+
+
+
 
 export function resolveClaudeBin() {
-  // Explicit override wins first
+
   if (process.env.CLAUDE_BIN) return process.env.CLAUDE_BIN;
 
-  // Known install locations, ordered by preference
+
   const candidates = [
     `${os.homedir()}/.local/bin/claude`,
     `${os.homedir()}/.claude/local/claude`,
@@ -80,32 +77,32 @@ export function resolveClaudeBin() {
     if (existsSync(p)) return p;
   }
 
-  // Fall back to PATH lookup — let the OS resolve it
+
   return 'claude';
 }
 
-// ---------------------------------------------------------------------------
-// runRole — spawn claude to execute one specialist role
-// ---------------------------------------------------------------------------
+
+
+
 
 export async function runRole(role, ctx, opts = {}) {
   const {
     dryRun    = false,
     timeoutMs = 600_000,
-    onEvent,              // optional (phase, role, status) callback — not used by runner directly
+    onEvent,
   } = opts;
 
   const t0 = Date.now();
 
-  // Token efficiency: the big AWARD_STANDARD + ANIMATION_TOOLKIT blocks only matter to roles that touch
-  // visuals/motion. Backend/data/auth/devops/docs roles get a one-line quality note and a smaller spec
-  // digest instead — saving thousands of tokens per agent across the pipeline.
+
+
+
   const VISUAL_PHASES = new Set(['design', 'frontend', 'quality']);
   const isVisual = VISUAL_PHASES.has(role.phase);
   const digestCap = isVisual ? 6000 : 3000;
 
-  // Assemble the full prompt the agent will receive on stdin.
-  // Order: persona/framing → shared context → concrete task → quality rules
+
+
   const stackHeader = [
     '## BUILD BRIEF',
     ctx.brief,
@@ -136,7 +133,7 @@ export async function runRole(role, ctx, opts = {}) {
     ANTI_STUB_RULES,
   ].join('\n');
 
-  // Dry-run: no spawning, return synthetic result immediately
+
   if (dryRun) {
     return {
       ok:         true,
@@ -149,9 +146,9 @@ export async function runRole(role, ctx, opts = {}) {
   const bin   = resolveClaudeBin();
   const model = role.model || 'sonnet';
 
-  // Spawn argv (documented in contract §3):
-  //   <bin> -p --model <model> --permission-mode bypassPermissions
-  //         --add-dir <projectDir> --add-dir <buildDir>
+
+
+
   const args = [
     '-p',
     '--model',                model,
@@ -173,7 +170,7 @@ export async function runRole(role, ctx, opts = {}) {
         stdio:       ['pipe', 'pipe', 'pipe'],
       });
     } catch (spawnErr) {
-      // spawn itself threw (e.g. ENOENT) — return structured failure
+
       resolve({
         ok:         false,
         role:       role.id,
@@ -186,24 +183,24 @@ export async function runRole(role, ctx, opts = {}) {
 
     // Guard stdin against EPIPE: if claude exits before reading the (large) prompt, the error is
     // emitted asynchronously on the stream — a surrounding try/catch won't catch it, and an
-    // unhandled stream 'error' is a fatal uncaught exception. proc.on('error') is the child, not stdin.
+
     proc.stdin.on('error', () => {});
-    // Write prompt to stdin then close so the process knows input is done
+
     try {
       proc.stdin.write(prompt, 'utf8');
       proc.stdin.end();
     } catch {
-      // stdin might already be closed if spawn failed silently; ignore
+
     }
 
-    // Collect stdout — generous buffer (~32 MB) by accumulating chunks
+
     proc.stdout.on('data', (chunk) => { output  += chunk.toString('utf8'); });
     proc.stderr.on('data', (chunk) => { errText += chunk.toString('utf8'); });
 
-    // Enforce timeout by killing the process
+
     const timer = setTimeout(() => {
       timedOut = true;
-      try { proc.kill('SIGTERM'); } catch { /* already dead */ }
+      try { proc.kill('SIGTERM'); } catch {  }
     }, timeoutMs);
 
     proc.on('error', (err) => {
@@ -236,16 +233,16 @@ export async function runRole(role, ctx, opts = {}) {
         role:       role.id,
         output,
         durationMs: Date.now() - t0,
-        // Only include error key when there was an actual failure message
+
         ...(code !== 0 && { error: errText.trim() || `exit code ${code}` }),
       });
     });
   });
 }
 
-// ---------------------------------------------------------------------------
-// Self-test (run with: node agent-runner.mjs)
-// ---------------------------------------------------------------------------
+
+
+
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let passed = 0;
@@ -263,17 +260,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('\n=== agent-runner.mjs self-test ===\n');
 
-  // 1. resolveClaudeBin returns a non-empty string
+
   const bin = resolveClaudeBin();
   assert('resolveClaudeBin() returns a string', typeof bin === 'string');
   assert('resolveClaudeBin() returns a non-empty string', bin.length > 0);
 
-  // 2. ANTI_STUB_RULES is a non-empty string
+
   assert('ANTI_STUB_RULES is a string', typeof ANTI_STUB_RULES === 'string');
   assert('ANTI_STUB_RULES mentions TODO', ANTI_STUB_RULES.includes('TODO'));
   assert('ANTI_STUB_RULES mentions placeholder', ANTI_STUB_RULES.toLowerCase().includes('placeholder'));
 
-  // 3. dry-run returns the right shape without spawning claude
+
   const fakeRole = {
     id:     'test-role',
     title:  'Test Role',
@@ -302,7 +299,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('dry-run durationMs === 0',    result.durationMs === 0);
   assert('dry-run has no error key',    !('error' in result));
 
-  // 4. dry-run with missing role.model falls back gracefully (model defaults to 'sonnet')
+
   const noModelRole = { ...fakeRole, model: undefined };
   const r2 = await runRole(noModelRole, fakeCtx, { dryRun: true });
   assert('dry-run with model=undefined still returns ok', r2.ok === true);

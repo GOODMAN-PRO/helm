@@ -1,5 +1,3 @@
-// search_repo(pattern, cwd) -> string[]
-// Returns tracked file paths that contain `pattern` as a substring (capped at 50).
 import { spawnSync } from 'node:child_process';
 
 export function search_repo(pattern, cwd = process.cwd()) {

@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// performance.mjs — Performance Engineer role: audit and fix Core Web Vitals + runtime perf.
-// Phase: quality. Depends on feature-engineer finishing first.
-// Actually edits project files; writes findings+fixes to .helm-build/artifacts/perf-report.md.
-
 import { fileURLToPath } from 'node:url';
 
 export const roles = [
@@ -159,8 +155,8 @@ Do not break any existing functionality. If in doubt about a change, skip it and
   },
 ];
 
-// ── self-test ─────────────────────────────────────────────────────────────────
-// Run: node workspace/builder/roles/performance.mjs
+
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const VALID_PHASES = new Set([
     'discovery','architecture','design','scaffold','data',
@@ -188,13 +184,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   console.log('\n=== performance.mjs self-test ===\n');
 
-  // Array shape
+
   assert('exports an array',   Array.isArray(roles));
   assert('exactly 1 role',     roles.length === 1);
 
   const role = roles[0];
 
-  // Required fields
+
   assert('id is performance-engineer',      role.id === 'performance-engineer');
   assert('title is non-empty string',       typeof role.title === 'string' && role.title.length > 0);
   assert('phase is quality',                role.phase === 'quality');
@@ -206,12 +202,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   assert('produces perf-report',            role.produces.includes('perf-report'));
   assert('system is non-empty string',      typeof role.system === 'string' && role.system.length > 0);
 
-  // task()
+
   assert('task is a function',              typeof role.task === 'function');
   const taskOutput = role.task(fakeCtx);
   assert('task(fakeCtx) returns a string',  typeof taskOutput === 'string');
   assert('task(fakeCtx) is non-empty',      taskOutput.length > 0);
-  // task must reference ctx.stack.notes content
+
   assert('task references stack notes',     taskOutput.includes('RSC, next/image'));
 
   console.log(`\n${passed} passed, ${failed} failed\n`);

@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// roles.mjs — aggregates every specialist role module under ./roles/ into one roster.
-// Each ./roles/*.mjs exports `roles` (an array of Role objects per CONTRACT.md §1). The orchestrator
-// imports getAllRoles() to schedule the full pipeline. Adding a new role file + listing it here is all
-// it takes to extend the builder.
-
 import { fileURLToPath } from 'node:url';
 
 import { roles as discovery } from './roles/discovery.mjs';
@@ -23,8 +18,8 @@ import { roles as accessibility } from './roles/accessibility.mjs';
 import { roles as performance } from './roles/performance.mjs';
 import { roles as finalize } from './roles/finalize.mjs';
 
-// Award-grade web upgrade: creative direction, motion system, and the animation/interaction engineers
-// that take a site to apple.com / Awwwards caliber.
+
+
 import { roles as creativeDirector } from './roles/creative-director.mjs';
 import { roles as motionDesigner } from './roles/motion-designer.mjs';
 import { roles as artDirector } from './roles/art-director.mjs';
@@ -56,8 +51,8 @@ export function getAllRoles() {
   return out;
 }
 
-// Validate the roster: unique ids, valid phases, deps that resolve, and a callable task(). Returns
-// { ok, count, errors } — used by the smoke test and the CLI's --check.
+
+
 const VALID_PHASES = ['discovery', 'architecture', 'design', 'scaffold', 'data', 'backend', 'auth', 'frontend', 'integration', 'quality', 'finalize'];
 export function validateRoles(roles = getAllRoles()) {
   const errors = [];

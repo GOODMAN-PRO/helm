@@ -1,16 +1,10 @@
 #!/usr/bin/env node
-// Parse <<<OLD path\nold\n===\nnew\n>>>NEW edit blocks from agent text and apply them.
-// Errors on 0 or >1 match of the OLD block in the target file.
-// Reverts via `git checkout -- <file>` if `node --check` fails on JS/MJS files.
-// Exports: applyEdits(text, cwd) -> { applied, diffs, errors }
-// CLI:  echo "<agent output>" | node apply-edit.mjs [--cwd <dir>]
-
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Split on the <<<OLD marker (which always starts a new line and is followed by a space + path).
+
 function parseEdits(text) {
   const blocks = [];
   const parts = text.split(/^<<<OLD /m);
@@ -44,7 +38,7 @@ export function applyEdits(text, cwd = process.cwd()) {
       continue;
     }
 
-    // Count exact occurrences of the OLD block
+
     const count = content.split(block.old).length - 1;
     if (count === 0) {
       errors.push({ file: block.file, error: 'OLD block not found in file (0 matches)' });
@@ -58,7 +52,7 @@ export function applyEdits(text, cwd = process.cwd()) {
     const updated = content.replace(block.old, block.new);
     writeFileSync(absPath, updated);
 
-    // Syntax-check JS/MJS files; auto-revert on failure
+
     if (/\.(m?js|cjs)$/.test(block.file)) {
       const check = spawnSync('node', ['--check', absPath], { encoding: 'utf8' });
       if (check.status !== 0) {
@@ -82,7 +76,7 @@ export function applyEdits(text, cwd = process.cwd()) {
   };
 }
 
-// CLI entry point
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   const cwdIdx = argv.indexOf('--cwd');

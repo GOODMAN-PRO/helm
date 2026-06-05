@@ -1,14 +1,10 @@
 #!/usr/bin/env node
-// files.mjs — elite file management for Helm (cross-platform, Node built-ins only)
-// Verbs: find | tree | big | dupes | organize | rename | zip | unzip
-// Always prints ONE JSON object to stdout; exits 0.
-
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
-// ── arg parsing ───────────────────────────────────────────────────────────────
+
 const argv = process.argv.slice(2);
 const verb = argv[0];
 const get = (k, def = null) => {
@@ -22,11 +18,11 @@ function die(msg) {
   process.exit(0);
 }
 
-// ── shared helpers ─────────────────────────────────────────────────────────────
+
 
 const SKIP_DIRS = new Set(['node_modules', '.git', '.svn', '__pycache__', '.DS_Store']);
 
-/** Recursively walk a directory, yielding file stats. Skips SKIP_DIRS. */
+
 function* walkFiles(dir) {
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
@@ -40,14 +36,14 @@ function* walkFiles(dir) {
       try {
         const st = fs.statSync(full);
         yield { path: full, size: st.size, mtime: st.mtime };
-      } catch { /* skip unreadable */ }
+      } catch {  }
     }
   }
 }
 
-/** Glob-style match: only * and ? wildcards (no path separators in pattern). */
+
 function matchGlob(pattern, name) {
-  // Convert simple glob to regex — escape everything except * and ?
+
   const re = new RegExp(
     '^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
                   .replace(/\*/g, '.*')
@@ -57,7 +53,7 @@ function matchGlob(pattern, name) {
   return re.test(name);
 }
 
-// ── FIND ──────────────────────────────────────────────────────────────────────
+
 if (verb === 'find') {
   const dir     = get('path');
   const nameGlob = get('name');
@@ -86,7 +82,7 @@ if (verb === 'find') {
 
   console.log(JSON.stringify({ ok: true, verb: 'find', count: results.length, files: results }));
 
-// ── TREE ──────────────────────────────────────────────────────────────────────
+
 } else if (verb === 'tree') {
   const dir   = get('path');
   const depth = get('depth') !== null ? parseInt(get('depth'), 10) : 3;
@@ -120,7 +116,7 @@ if (verb === 'find') {
     return node;
   }
 
-  // Also render a compact text version
+
   function renderTree(node, prefix, isLast) {
     const connector = isLast ? '└── ' : '├── ';
     const lines = [prefix + connector + node.name + (node.type === 'dir' ? '/' : '')];
@@ -165,7 +161,7 @@ if (verb === 'find') {
 
   console.log(JSON.stringify({ ok: true, verb: 'tree', depth, root: dir, tree, text: textLines.join('\n') }));
 
-// ── BIG ───────────────────────────────────────────────────────────────────────
+
 } else if (verb === 'big') {
   const dir = get('path');
   const top = get('top') !== null ? parseInt(get('top'), 10) : 20;
@@ -191,13 +187,13 @@ if (verb === 'find') {
   const annotated = files.map(f => ({ ...f, size_human: fmtBytes(f.size) }));
   console.log(JSON.stringify({ ok: true, verb: 'big', total_files: all.length, total_size: totalSize, top, files: annotated }));
 
-// ── DUPES ─────────────────────────────────────────────────────────────────────
+
 } else if (verb === 'dupes') {
   const dir = get('path');
   if (!dir) die('dupes requires --path <dir>');
   if (!fs.existsSync(dir)) die(`path does not exist: ${dir}`);
 
-  // Group by size first (fast), then hash same-size files
+
   const bySize = new Map();
   for (const f of walkFiles(dir)) {
     if (f.size === 0) continue;
@@ -232,34 +228,34 @@ if (verb === 'find') {
 
   console.log(JSON.stringify({ ok: true, verb: 'dupes', groups_found: groups.length, wasted_bytes: wastedBytes, groups }));
 
-// ── ORGANIZE ──────────────────────────────────────────────────────────────────
+
 } else if (verb === 'organize') {
   const dir   = get('path');
-  const by    = get('by', 'type');   // 'type' | 'date'
+  const by    = get('by', 'type');
   const apply = get('apply', 'false') === 'true';
 
   if (!dir) die('organize requires --path <dir>');
   if (!fs.existsSync(dir)) die(`path does not exist: ${dir}`);
   if (!['type', 'date'].includes(by)) die('--by must be "type" or "date"');
 
-  // Extension → category map
+
   const EXT_MAP = {
-    // Images
+
     jpg: 'Images', jpeg: 'Images', png: 'Images', gif: 'Images', bmp: 'Images',
     webp: 'Images', tiff: 'Images', tif: 'Images', svg: 'Images', ico: 'Images', heic: 'Images', avif: 'Images',
-    // Docs
+
     pdf: 'Docs', doc: 'Docs', docx: 'Docs', xls: 'Docs', xlsx: 'Docs',
     ppt: 'Docs', pptx: 'Docs', txt: 'Docs', md: 'Docs', rtf: 'Docs', odt: 'Docs', csv: 'Docs',
-    // Video
+
     mp4: 'Video', mkv: 'Video', avi: 'Video', mov: 'Video', wmv: 'Video',
     flv: 'Video', webm: 'Video', m4v: 'Video', mpg: 'Video', mpeg: 'Video',
-    // Audio
+
     mp3: 'Audio', wav: 'Audio', aac: 'Audio', flac: 'Audio', ogg: 'Audio',
     wma: 'Audio', m4a: 'Audio', aiff: 'Audio',
-    // Archives
+
     zip: 'Archives', tar: 'Archives', gz: 'Archives', bz2: 'Archives',
     '7z': 'Archives', rar: 'Archives', xz: 'Archives', tgz: 'Archives',
-    // Code
+
     js: 'Code', mjs: 'Code', cjs: 'Code', ts: 'Code', py: 'Code', rb: 'Code',
     java: 'Code', c: 'Code', cpp: 'Code', h: 'Code', cs: 'Code', go: 'Code',
     rs: 'Code', php: 'Code', html: 'Code', css: 'Code', json: 'Code', xml: 'Code',
@@ -268,7 +264,7 @@ if (verb === 'find') {
   };
 
   const moves = [];
-  // Only top-level files — don't dive into subdirectories for organize
+
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
   catch (e) { die(`cannot read dir: ${e.message}`); }
@@ -282,7 +278,7 @@ if (verb === 'find') {
       const ext = path.extname(e.name).slice(1).toLowerCase();
       subfolder = EXT_MAP[ext] || 'Other';
     } else {
-      // by date: YYYY-MM from mtime
+
       try {
         const st = fs.statSync(srcPath);
         const d = st.mtime;
@@ -314,7 +310,7 @@ if (verb === 'find') {
     console.log(JSON.stringify({ ok: true, verb: 'organize', dry_run: true, by, planned_moves: moves.length, moves }));
   }
 
-// ── RENAME ─────────────────────────────────────────────────────────────────────
+
 } else if (verb === 'rename') {
   const dir   = get('path');
   const match = get('match');
@@ -338,7 +334,7 @@ if (verb === 'find') {
   for (const e of entries) {
     if (!e.isFile()) continue;
     if (!re.test(e.name)) continue;
-    // Replace with $1..$9 backrefs
+
     const newName = e.name.replace(re, to);
     if (newName === e.name) continue;
     renames.push({
@@ -349,7 +345,7 @@ if (verb === 'find') {
     });
   }
 
-  // Check for collisions
+
   const destNames = new Set(renames.map(r => r.dest));
   if (destNames.size !== renames.length) {
     die('rename plan has collisions (two files would get the same name). Aborting.');
@@ -370,7 +366,7 @@ if (verb === 'find') {
     console.log(JSON.stringify({ ok: true, verb: 'rename', dry_run: true, planned: renames.length, renames }));
   }
 
-// ── ZIP ───────────────────────────────────────────────────────────────────────
+
 } else if (verb === 'zip') {
   const src = get('src');
   const out = get('out');
@@ -379,7 +375,7 @@ if (verb === 'find') {
   if (!out) die('zip requires --out <zip>');
   if (!fs.existsSync(src)) die(`src does not exist: ${src}`);
 
-  // Use PowerShell Compress-Archive
+
   const script = `
 $ErrorActionPreference = 'Stop'
 try {
@@ -410,7 +406,7 @@ try {
     console.log(JSON.stringify({ ok: false, verb: 'zip', error: errText }));
   }
 
-// ── UNZIP ─────────────────────────────────────────────────────────────────────
+
 } else if (verb === 'unzip') {
   const src   = get('src');
   const out   = get('out');
@@ -421,7 +417,7 @@ try {
   if (!fs.existsSync(src)) die(`src does not exist: ${src}`);
 
   if (!apply) {
-    // Dry-run: list zip contents using PowerShell
+
     const script = `
 $ErrorActionPreference = 'Stop'
 try {
@@ -448,10 +444,10 @@ try {
         console.log(JSON.stringify({ ok: false, verb: 'unzip', error: parsed.error }));
         process.exit(0);
       }
-    } catch { /* leave empty */ }
+    } catch {  }
     console.log(JSON.stringify({ ok: true, verb: 'unzip', dry_run: true, src, out, entry_count: entries.length, entries }));
   } else {
-    // Actually extract
+
     const script = `
 $ErrorActionPreference = 'Stop'
 try {
@@ -481,7 +477,7 @@ try {
     }
   }
 
-// ── UNKNOWN VERB ──────────────────────────────────────────────────────────────
+
 } else {
   die(`unknown verb "${verb || '(none)'}". Valid verbs: find | tree | big | dupes | organize | rename | zip | unzip`);
 }

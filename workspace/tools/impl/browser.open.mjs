@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Open a URL in headless Chromium. Returns page text.
-// playwright is imported lazily inside runBrowser — safe to import this module without launching a browser.
-
 import { fileURLToPath } from 'node:url';
 
 async function main() {
